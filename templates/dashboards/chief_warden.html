@@ -1,0 +1,92 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block breadcrumb_current %}Chief Warden Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-5 border-b border-slate-200">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Institution Hostel Overview</h1>
+            <p class="mt-1 text-xs text-slate-500">Cross-hostel occupancy metrics, capacity distribution, and warden monitoring for {{ current_institution.name|default:"the institution" }}.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="{% url 'hostels:occupancy_assign' %}" class="btn-primary btn-sm">
+                + Allocate Student
+            </a>
+            <a href="{% url 'hostels:hostel_list' %}" class="btn-secondary btn-sm">
+                Hostels Directory
+            </a>
+        </div>
+    </div>
+
+    <!-- Metric Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {% include 'components/stats_card.html' with title="Total Hostels" value=total_hostels subtitle=total_rooms|stringformat:"d"|add:" operational rooms" %}
+        {% include 'components/stats_card.html' with title="Total Bed Capacity" value=total_beds subtitle="Institution-wide slots" %}
+        {% include 'components/stats_card.html' with title="Active Residents" value=occupied_beds subtitle=occupancy_pct|stringformat:".1f"|add:"% occupancy rate" progress_pct=occupancy_pct %}
+        {% include 'components/stats_card.html' with title="Available Beds" value=available_beds subtitle=maintenance_beds|stringformat:"d"|add:" beds under maintenance" %}
+    </div>
+
+    <!-- Comparative Hostel Performance Cards -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="text-base font-bold text-slate-900">Hostel Comparison & Utilization</h2>
+                <p class="text-xs text-slate-500">Real database aggregates across residential units.</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {% for hostel in hostels %}
+            <div class="p-5 rounded-xl border border-slate-200 bg-white hover:shadow-sm transition-all flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-bold text-slate-900 text-sm">{{ hostel.name }}</span>
+                        <span class="badge-neutral font-mono">{{ hostel.code }}</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-4">{{ hostel.resident_category }}</p>
+
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">Total Rooms:</span>
+                            <span class="font-semibold text-slate-800">{{ hostel.total_rooms }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">Total Beds:</span>
+                            <span class="font-semibold text-slate-800">{{ hostel.total_beds }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">Occupied Beds:</span>
+                            <span class="font-semibold text-teal-700">{{ hostel.occupied_beds }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">Available:</span>
+                            <span class="font-semibold text-emerald-600">{{ hostel.available_beds }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-5 pt-3 border-t border-slate-100">
+                    <div class="flex items-center justify-between text-xs text-slate-500 mb-1.5">
+                        <span>Utilization</span>
+                        <span class="font-bold text-slate-900">{{ hostel.occupancy_rate }}%</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div class="bg-teal-700 h-2 rounded-full" style="width: {{ hostel.occupancy_rate }}%;"></div>
+                    </div>
+
+                    <div class="mt-4 flex justify-end">
+                        <a href="{% url 'hostels:hostel_detail' pk=hostel.id %}" class="btn-secondary btn-sm w-full text-center">
+                            View Hostel Details
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-xs text-slate-500 col-span-3 text-center py-6">No hostels recorded in this institution.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

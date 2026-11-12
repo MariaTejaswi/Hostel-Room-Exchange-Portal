@@ -1,0 +1,118 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block breadcrumb_current %}{{ hostel.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-slate-200">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <a href="{% url 'hostels:hostel_list' %}" class="text-xs text-teal-700 hover:text-teal-800 font-medium">
+                    &larr; All Hostels
+                </a>
+                <span class="text-slate-300">•</span>
+                <span class="badge-brand font-mono">{{ hostel.code }}</span>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">{{ hostel.name }}</h1>
+            <p class="mt-1 text-xs text-slate-500">{{ hostel.resident_category }} • {{ hostel.address|default:"Campus" }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+            {% if can_manage_inventory %}
+            <a href="{% url 'hostels:hostel_edit' pk=hostel.id %}" class="btn-secondary btn-sm">
+                Edit Hostel
+            </a>
+            <a href="{% url 'hostels:room_create' %}" class="btn-primary btn-sm">
+                + Add Room
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Statistics Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        {% include 'components/stats_card.html' with title="Total Rooms" value=hostel.total_rooms subtitle="Active configured rooms" %}
+        {% include 'components/stats_card.html' with title="Total Capacity" value=hostel.total_beds subtitle="Total bed accommodations" %}
+        {% include 'components/stats_card.html' with title="Occupied Beds" value=hostel.occupied_beds subtitle="Allocated residents" progress_pct=hostel.occupancy_rate %}
+        {% include 'components/stats_card.html' with title="Available Beds" value=hostel.available_beds subtitle=hostel.occupancy_rate|stringformat:".1f"|add:"% occupancy" %}
+    </div>
+
+    <!-- Blocks & Floor Layout Section -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="text-base font-bold text-slate-900">Blocks & Floor Layout</h2>
+                <p class="text-xs text-slate-500">Structural hierarchy of wings, floors, and rooms.</p>
+            </div>
+            <a href="{% url 'hostels:room_inventory' %}?hostel={{ hostel.id }}" class="btn-secondary btn-sm">
+                View All Rooms
+            </a>
+        </div>
+
+        {% if blocks %}
+        <div class="space-y-6">
+            {% for block in blocks %}
+            <div class="p-5 rounded-xl border border-slate-200 bg-slate-50/40">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">{{ block.name }}</h3>
+                        <p class="text-xs text-slate-500 font-mono">{{ block.code }}</p>
+                    </div>
+                    <span class="badge-neutral text-xs">{{ block.floors.count }} Floors</span>
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {% for floor in block.floors.all %}
+                    <div class="p-3 bg-white rounded-lg border border-slate-200 flex items-center justify-between text-xs">
+                        <div>
+                            <span class="font-bold text-slate-800">{{ floor.floor_label }}</span>
+                            <span class="text-slate-500 block text-[11px]">{{ floor.rooms.count }} Rooms</span>
+                        </div>
+                        <a href="{% url 'hostels:room_inventory' %}?floor={{ floor.id }}" class="text-teal-700 hover:text-teal-800 font-medium">
+                            Browse &rarr;
+                        </a>
+                    </div>
+                    {% empty %}
+                    <p class="text-xs text-slate-500 col-span-3">No floors added to this block yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-xs text-slate-500 text-center py-6">No blocks currently configured for this hostel.</p>
+        {% endif %}
+    </div>
+
+    <!-- Assigned Wardens Section -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="text-base font-bold text-slate-900">Assigned Wardens</h2>
+                <p class="text-xs text-slate-500">Authorized residential staff for {{ hostel.name }}.</p>
+            </div>
+        </div>
+
+        {% if assigned_wardens %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {% for assignment in assigned_wardens %}
+            <div class="p-4 rounded-xl border border-slate-200 bg-white flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-teal-100 text-teal-800 font-semibold flex items-center justify-center text-xs flex-shrink-0">
+                    {{ assignment.warden.full_name|slice:":2"|upper }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    <span class="text-xs font-bold text-slate-900 block truncate">{{ assignment.warden.full_name }}</span>
+                    <span class="text-[11px] text-slate-500 block truncate">{{ assignment.warden.email }}</span>
+                    {% if assignment.is_primary %}
+                    <span class="mt-1 badge-brand text-[10px] py-0.5">Primary Warden</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-xs text-slate-500 text-center py-6">No wardens currently assigned to this hostel.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

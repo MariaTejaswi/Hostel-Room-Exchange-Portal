@@ -1,0 +1,35 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block body %}
+<div class="min-h-screen bg-slate-50 flex">
+    <!-- Mobile Sidebar Backdrop -->
+    <div id="sidebar-backdrop" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 lg:hidden"></div>
+
+    <!-- Left Sidebar -->
+    {% include 'components/sidebar.html' %}
+
+    <!-- Main Application Shell -->
+    <div class="main-content flex-1 flex flex-col min-w-0">
+        <!-- Topbar -->
+        {% include 'components/topbar.html' %}
+
+        <!-- Main Viewport Content Area -->
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="mt-auto border-t border-slate-200 bg-white py-4 px-6 text-center sm:flex sm:justify-between sm:text-left text-xs text-slate-500">
+            <div>
+                &copy; 2026 RoomLoop Accommodation Platform. All rights reserved.
+            </div>
+            <div class="mt-2 sm:mt-0 flex gap-4 justify-center sm:justify-end">
+                <span>Phase 1 (M0 + M8)</span>
+                <span>•</span>
+                <span>Institution: {{ current_institution.name|default:"Demo University" }}</span>
+            </div>
+        </footer>
+    </div>
+</div>
+{% endblock %}

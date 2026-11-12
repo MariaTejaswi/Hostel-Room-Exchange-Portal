@@ -1,0 +1,84 @@
+name: RoomLoop CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint-and-check:
+    name: Code Quality & Django Checks
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: roomloop_test_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/local.txt
+
+      - name: Install Node Dependencies & Build CSS
+        run: |
+          npm ci
+          npm run build:css
+
+      - name: Ruff Code Quality Lint
+        run: |
+          ruff check .
+
+      - name: Django System & Migration Checks
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.development
+          DJANGO_SECRET_KEY: test-secret-key-for-ci
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/roomloop_test_db
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+
+      - name: Run Test Suite (pytest)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.development
+          DJANGO_SECRET_KEY: test-secret-key-for-ci
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/roomloop_test_db
+        run: |
+          pytest -v

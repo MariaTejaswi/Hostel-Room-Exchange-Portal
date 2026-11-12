@@ -1,0 +1,125 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block breadcrumb_current %}Warden Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-5 border-b border-slate-200">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Warden Operations Console</h1>
+            <p class="mt-1 text-xs text-slate-500">Managing assigned residential hostels, room capacity, and student allocations.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="{% url 'hostels:occupancy_assign' %}" class="btn-primary btn-sm">
+                + Allocate Student
+            </a>
+            <a href="{% url 'hostels:room_inventory' %}" class="btn-secondary btn-sm">
+                View Rooms
+            </a>
+        </div>
+    </div>
+
+    <!-- Scoped Statistics Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {% include 'components/stats_card.html' with title="Assigned Rooms" value=total_rooms subtitle="Total configured rooms" %}
+        {% include 'components/stats_card.html' with title="Total Capacity" value=total_beds subtitle="Bed slots in assigned hostels" %}
+        {% include 'components/stats_card.html' with title="Occupied Beds" value=occupied_beds subtitle="Active residents" progress_pct=occupancy_pct %}
+        {% include 'components/stats_card.html' with title="Available Beds" value=available_beds subtitle=occupancy_pct|stringformat:".1f"|add:"% occupancy rate" %}
+    </div>
+
+    <!-- Assigned Hostels Overview -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="text-base font-bold text-slate-900">Your Assigned Hostels</h2>
+                <p class="text-xs text-slate-500">Hostels under your direct administrative supervision.</p>
+            </div>
+        </div>
+
+        {% if hostels %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for hostel in hostels %}
+            <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-teal-300 transition-all flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-bold text-slate-900 text-sm">{{ hostel.name }}</span>
+                        <span class="badge-brand">{{ hostel.code }}</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-3">{{ hostel.resident_category }}</p>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between text-xs text-slate-600 mb-1.5">
+                        <span>Occupancy</span>
+                        <span class="font-semibold text-slate-900">{{ hostel.occupied_beds }} / {{ hostel.total_beds }} Beds</span>
+                    </div>
+                    <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                        <div class="bg-teal-700 h-1.5 rounded-full" style="width: {{ hostel.occupancy_rate|default:0 }}%;"></div>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-200 flex justify-between items-center text-xs">
+                        <span class="text-emerald-700 font-medium">{{ hostel.available_beds|default:0 }} Available</span>
+                        <a href="{% url 'hostels:hostel_detail' pk=hostel.id %}" class="text-teal-700 hover:text-teal-800 font-medium">
+                            Details &rarr;
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-xs text-slate-500 text-center py-6">You have not yet been assigned to supervise any hostels.</p>
+        {% endif %}
+    </div>
+
+    <!-- Recent Active Allocations Table in Assigned Hostels -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="text-base font-bold text-slate-900">Recent Resident Allocations</h2>
+                <p class="text-xs text-slate-500">Active student occupancies within your jurisdiction.</p>
+            </div>
+            <a href="{% url 'hostels:occupancy_list' %}" class="btn-secondary btn-sm">
+                View All Roster
+            </a>
+        </div>
+
+        {% if recent_occupancies %}
+        <div class="data-table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Roll / Reg No</th>
+                        <th>Hostel & Room</th>
+                        <th>Bed Slot</th>
+                        <th>Allocation Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for occ in recent_occupancies %}
+                    <tr>
+                        <td class="font-medium text-slate-900">
+                            {{ occ.student.full_name }}
+                            <div class="text-[11px] text-slate-500">{{ occ.student.email }}</div>
+                        </td>
+                        <td class="font-mono text-xs">{{ occ.student.registration_number|default:"-" }}</td>
+                        <td>{{ occ.bed.room.floor.block.hostel.name }} • Room {{ occ.bed.room.room_number }}</td>
+                        <td><span class="badge-neutral font-mono">{{ occ.bed.bed_label }}</span></td>
+                        <td>{{ occ.start_date|date:"M d, Y" }}</td>
+                        <td>
+                            <a href="{% url 'hostels:occupancy_detail' pk=occ.id %}" class="text-teal-700 hover:text-teal-800 text-xs font-medium">
+                                Manage
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-xs text-slate-500 text-center py-6">No active student allocations currently recorded in your assigned hostels.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

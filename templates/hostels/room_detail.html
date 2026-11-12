@@ -1,0 +1,149 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block breadcrumb_current %}Room {{ room.room_number }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-slate-200">
+        <div>
+            <div class="flex items-center gap-2 mb-1 text-xs">
+                <a href="{% url 'hostels:room_inventory' %}" class="text-teal-700 hover:text-teal-800 font-medium">
+                    &larr; Room Inventory
+                </a>
+                <span class="text-slate-300">•</span>
+                <span>{{ room.floor.block.hostel.name }}</span>
+                <span class="text-slate-300">•</span>
+                <span>{{ room.floor.block.name }}</span>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Room {{ room.room_number }}</h1>
+            <p class="mt-1 text-xs text-slate-500">
+                {{ room.floor.floor_label }} • {{ room.get_room_type_display }} • {{ room.occupancy_category }}
+            </p>
+        </div>
+        <div class="flex items-center gap-2">
+            {% if is_privileged %}
+            <a href="{% url 'hostels:occupancy_assign' %}" class="btn-primary btn-sm">
+                + Allocate Occupant
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Room Overview Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="card p-4">
+            <span class="text-xs font-semibold text-slate-400 block mb-1">Configuration</span>
+            <span class="text-sm font-bold text-slate-800">{{ room.get_room_type_display }}</span>
+        </div>
+        <div class="card p-4">
+            <span class="text-xs font-semibold text-slate-400 block mb-1">Total Capacity</span>
+            <span class="text-sm font-bold text-slate-800">{{ room.beds.count }} Beds</span>
+        </div>
+        <div class="card p-4">
+            <span class="text-xs font-semibold text-slate-400 block mb-1">Operational Status</span>
+            <div>
+                {% if room.operational_status == 'in_service' %}
+                <span class="badge-success">In Service</span>
+                {% elif room.operational_status == 'maintenance' %}
+                <span class="badge-warning">Maintenance</span>
+                {% else %}
+                <span class="badge-danger">Out of Service</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card p-4">
+            <span class="text-xs font-semibold text-slate-400 block mb-1">Accessibility</span>
+            <span class="text-xs text-slate-700 font-medium">{{ room.accessibility_attributes|default:"Standard" }}</span>
+        </div>
+    </div>
+
+    <!-- Bed Slots and Occupancy Card Grid -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="text-base font-bold text-slate-900">Bed Allocations & Slot Status</h2>
+                <p class="text-xs text-slate-500">Individual bed records and live student assignments.</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for item in bed_data %}
+            <div class="p-5 rounded-xl border border-slate-200 bg-white flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-slate-900 text-sm">{{ item.bed.bed_label }}</span>
+                            {% if item.active_occupancy %}
+                            <span class="badge-brand text-[10px]">Occupied</span>
+                            {% else %}
+                            <span class="badge-success text-[10px]">Available</span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Operational Status Badge -->
+                        <div>
+                            {% if item.bed.operational_status == 'in_service' %}
+                            <span class="badge-neutral text-[10px]">In Service</span>
+                            {% elif item.bed.operational_status == 'maintenance' %}
+                            <span class="badge-warning text-[10px]">Maintenance</span>
+                            {% else %}
+                            <span class="badge-danger text-[10px]">Out of Service</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Occupant Details (Privacy-Scoring) -->
+                    <div class="mt-4 text-xs space-y-2">
+                        {% if item.active_occupancy %}
+                            {% if item.show_occupant_details %}
+                            <div>
+                                <span class="text-slate-400 block text-[11px]">Resident</span>
+                                <span class="font-bold text-slate-900">{{ item.active_occupancy.student.full_name }}</span>
+                                <div class="text-[11px] text-slate-500 font-mono">{{ item.active_occupancy.student.registration_number|default:item.active_occupancy.student.email }}</div>
+                            </div>
+                            <div class="flex justify-between pt-1">
+                                <span class="text-slate-500">Allocated Date:</span>
+                                <span class="font-medium text-slate-800">{{ item.active_occupancy.start_date|date:"M d, Y" }}</span>
+                            </div>
+                            {% else %}
+                            <div class="p-3 bg-slate-50 rounded-lg text-slate-500 text-xs">
+                                <em>Bed slot is occupied by an active student. (Private details hidden)</em>
+                            </div>
+                            {% endif %}
+                        {% else %}
+                        <div class="p-3 bg-emerald-50 text-emerald-800 rounded-lg text-xs">
+                            Bed slot is vacant and ready for student allocation.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Staff Bed Control Form (Toggle status / Manage allocation) -->
+                {% if is_privileged %}
+                <div class="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <form method="post" action="{% url 'hostels:bed_status_update' pk=item.bed.id %}" class="flex items-center gap-2">
+                        {% csrf_token %}
+                        <select name="operational_status" class="form-select text-[11px] py-1 px-2 w-auto">
+                            <option value="in_service" {% if item.bed.operational_status == 'in_service' %}selected{% endif %}>In Service</option>
+                            <option value="maintenance" {% if item.bed.operational_status == 'maintenance' %}selected{% endif %}>Maintenance</option>
+                            <option value="out_of_service" {% if item.bed.operational_status == 'out_of_service' %}selected{% endif %}>Out of Service</option>
+                        </select>
+                        <button type="submit" class="btn-secondary btn-sm py-1 px-2.5 text-[11px]">
+                            Update
+                        </button>
+                    </form>
+
+                    {% if item.active_occupancy %}
+                    <a href="{% url 'hostels:occupancy_release' pk=item.active_occupancy.id %}" class="text-xs text-red-600 hover:text-red-700 font-medium">
+                        Release Occupant
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

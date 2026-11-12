@@ -1,0 +1,83 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block breadcrumb_current %}Executive Overview (Dean){% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header: Explicitly Read-Only Executive Summary -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-5 border-b border-slate-200">
+        <div>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold mb-1">
+                Executive Read-Only Overview
+            </div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Dean of Student Welfare Analytics</h1>
+            <p class="mt-1 text-xs text-slate-500">Strategic capacity utilization, accommodation metrics, and hostel distribution for {{ current_institution.name|default:"the university" }}.</p>
+        </div>
+        <div>
+            <span class="badge-neutral text-xs px-3 py-1">
+                Report Generated Live
+            </span>
+        </div>
+    </div>
+
+    <!-- Aggregate Statistics Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {% include 'components/stats_card.html' with title="Total Residential Units" value=total_hostels subtitle=total_rooms|stringformat:"d"|add:" configured rooms" %}
+        {% include 'components/stats_card.html' with title="Total Student Capacity" value=total_beds subtitle="Total bed accommodations" %}
+        {% include 'components/stats_card.html' with title="Accommodated Students" value=occupied_beds subtitle=occupancy_pct|stringformat:".1f"|add:"% occupancy rate" progress_pct=occupancy_pct %}
+        {% include 'components/stats_card.html' with title="Available Vacancies" value=available_beds subtitle="Unallocated bed slots" %}
+    </div>
+
+    <!-- Hostel Utilization Breakdown Table -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="text-base font-bold text-slate-900">Hostel Utilization & Capacity Breakdown</h2>
+                <p class="text-xs text-slate-500">Live operational data aggregated directly from PostgreSQL database records.</p>
+            </div>
+        </div>
+
+        <div class="data-table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Hostel Name</th>
+                        <th>Code</th>
+                        <th>Resident Category</th>
+                        <th>Total Rooms</th>
+                        <th>Total Capacity</th>
+                        <th>Occupied</th>
+                        <th>Available</th>
+                        <th>Utilization Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for hostel in hostels %}
+                    <tr>
+                        <td class="font-bold text-slate-900">{{ hostel.name }}</td>
+                        <td class="font-mono text-xs">{{ hostel.code }}</td>
+                        <td>{{ hostel.resident_category }}</td>
+                        <td>{{ hostel.total_rooms }}</td>
+                        <td>{{ hostel.total_beds }}</td>
+                        <td class="font-semibold text-teal-700">{{ hostel.occupied_beds }}</td>
+                        <td class="font-semibold text-emerald-600">{{ hostel.available_beds }}</td>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <div class="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                    <div class="bg-teal-700 h-1.5 rounded-full" style="width: {{ hostel.occupancy_rate }}%;"></div>
+                                </div>
+                                <span class="font-mono text-xs font-semibold text-slate-800">{{ hostel.occupancy_rate }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-6 text-xs text-slate-500">No hostel records found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

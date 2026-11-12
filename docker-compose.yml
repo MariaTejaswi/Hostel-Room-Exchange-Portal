@@ -1,0 +1,108 @@
+services:
+  # PostgreSQL 16 Relational Database
+  db:
+    image: postgres:16-alpine
+    container_name: roomloop_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-roomloop_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-roomloop_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis In-Memory Cache and Task Broker
+  redis:
+    image: redis:7-alpine
+    container_name: roomloop_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Django Web Application Service
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: roomloop_web
+    restart: unless-stopped
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-django-insecure-docker-secret-key-2026}
+      - DJANGO_DEBUG=True
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,web,0.0.0.0
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-roomloop_db}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Celery Background Task Worker
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: roomloop_celery_worker
+    restart: unless-stopped
+    command: celery -A config worker -l info
+    volumes:
+      - .:/app
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-django-insecure-docker-secret-key-2026}
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-roomloop_db}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - web
+      - redis
+      - db
+
+  # Celery Beat Periodic Task Scheduler
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: roomloop_celery_beat
+    restart: unless-stopped
+    command: celery -A config beat -l info
+    volumes:
+      - .:/app
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-django-insecure-docker-secret-key-2026}
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-roomloop_db}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - celery_worker
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:

@@ -1,0 +1,119 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block breadcrumb_current %}Beds Management{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-slate-200">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Bed Records & Service Status</h1>
+            <p class="mt-1 text-xs text-slate-500">Monitor individual bed states, active occupancy, and maintenance schedules.</p>
+        </div>
+        <a href="{% url 'hostels:occupancy_assign' %}" class="btn-primary btn-sm">
+            + Assign Student
+        </a>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="card p-4">
+        <form method="get" class="flex flex-col sm:flex-row items-center gap-3">
+            <div class="relative flex-1 w-full">
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search by bed label, room, or hostel..." class="form-input text-xs pl-9">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </div>
+            </div>
+
+            <div class="w-full sm:w-48">
+                <select name="status" class="form-select text-xs">
+                    <option value="">All Operational States</option>
+                    <option value="in_service" {% if selected_status == 'in_service' %}selected{% endif %}>In Service</option>
+                    <option value="maintenance" {% if selected_status == 'maintenance' %}selected{% endif %}>Under Maintenance</option>
+                    <option value="out_of_service" {% if selected_status == 'out_of_service' %}selected{% endif %}>Out of Service</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn-secondary btn-sm w-full sm:w-auto">
+                Filter
+            </button>
+            {% if search_query or selected_status %}
+            <a href="{% url 'hostels:bed_list' %}" class="text-xs text-slate-500 hover:text-slate-800">
+                Clear
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Bed Table -->
+    <div class="card p-0 overflow-hidden">
+        <div class="data-table-container border-0">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Bed Label</th>
+                        <th>Hostel & Room</th>
+                        <th>Occupancy</th>
+                        <th>Service State</th>
+                        <th>Quick Status Update</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for bed in page_obj %}
+                    <tr>
+                        <td class="font-bold text-slate-900 font-mono text-xs">
+                            {{ bed.bed_label }}
+                        </td>
+                        <td>
+                            <div class="font-medium text-slate-900 text-xs">{{ bed.room.floor.block.hostel.name }}</div>
+                            <div class="text-[11px] text-slate-500">Room {{ bed.room.room_number }} ({{ bed.room.floor.block.name }})</div>
+                        </td>
+                        <td>
+                            {% if bed.is_occupied %}
+                            <span class="badge-brand">Occupied</span>
+                            {% else %}
+                            <span class="badge-success">Vacant</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if bed.operational_status == 'in_service' %}
+                            <span class="badge-neutral">In Service</span>
+                            {% elif bed.operational_status == 'maintenance' %}
+                            <span class="badge-warning">Maintenance</span>
+                            {% else %}
+                            <span class="badge-danger">Out of Service</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form method="post" action="{% url 'hostels:bed_status_update' pk=bed.id %}" class="flex items-center gap-1.5">
+                                {% csrf_token %}
+                                <select name="operational_status" class="form-select text-[11px] py-1 px-2 w-auto">
+                                    <option value="in_service" {% if bed.operational_status == 'in_service' %}selected{% endif %}>In Service</option>
+                                    <option value="maintenance" {% if bed.operational_status == 'maintenance' %}selected{% endif %}>Maintenance</option>
+                                    <option value="out_of_service" {% if bed.operational_status == 'out_of_service' %}selected{% endif %}>Out of Service</option>
+                                </select>
+                                <button type="submit" class="btn-secondary btn-sm py-1 px-2 text-[10px]">
+                                    Save
+                                </button>
+                            </form>
+                        </td>
+                        <td>
+                            <a href="{% url 'hostels:room_detail' pk=bed.room.id %}" class="text-teal-700 hover:text-teal-800 text-xs font-medium">
+                                View Room
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-8 text-xs text-slate-500">
+                            No beds matched the filter criteria.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include 'components/pagination.html' %}
+    </div>
+</div>
+{% endblock %}

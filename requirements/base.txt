@@ -1,0 +1,9 @@
+# Base requirements for RoomLoop Phase 1
+Django>=5.1.4,<6.0.0
+psycopg[binary]>=3.2.0
+python-dotenv>=1.0.1
+redis>=5.2.0
+celery>=5.4.0
+Pillow>=10.4.0
+sqlparse>=0.5.0
+asgiref>=3.8.1

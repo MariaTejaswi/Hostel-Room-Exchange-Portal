@@ -1,0 +1,123 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block breadcrumb_current %}Hostels{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-slate-200">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Hostel Inventory</h1>
+            <p class="mt-1 text-xs text-slate-500">Overview of residential facilities, block hierarchies, and occupancy across campus.</p>
+        </div>
+        {% if can_manage_inventory %}
+        <div>
+            <a href="{% url 'hostels:hostel_create' %}" class="btn-primary btn-sm">
+                + Add New Hostel
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Filters & Search Toolbar -->
+    <div class="card p-4">
+        <form method="get" class="flex flex-col sm:flex-row items-center gap-3">
+            <div class="relative flex-1 w-full">
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search hostels by name..." class="form-input text-xs pl-9">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </div>
+            </div>
+
+            <div class="w-full sm:w-48">
+                <select name="status" class="form-select text-xs">
+                    <option value="">All Statuses</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                    <option value="maintenance" {% if status_filter == 'maintenance' %}selected{% endif %}>Under Maintenance</option>
+                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn-secondary btn-sm w-full sm:w-auto">
+                Filter
+            </button>
+            {% if search_query or status_filter %}
+            <a href="{% url 'hostels:hostel_list' %}" class="text-xs text-slate-500 hover:text-slate-800">
+                Clear
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Hostels Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for hostel in hostels %}
+        <div class="card p-6 flex flex-col justify-between hover:shadow-md transition-all">
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <span class="badge-brand font-mono font-bold">{{ hostel.code }}</span>
+                    {% if hostel.status == 'active' %}
+                    <span class="badge-success">Operational</span>
+                    {% elif hostel.status == 'maintenance' %}
+                    <span class="badge-warning">Maintenance</span>
+                    {% else %}
+                    <span class="badge-danger">Inactive</span>
+                    {% endif %}
+                </div>
+
+                <h3 class="text-lg font-bold text-slate-900 tracking-tight">{{ hostel.name }}</h3>
+                <p class="text-xs text-slate-500 mt-0.5">{{ hostel.resident_category }}</p>
+                <p class="text-xs text-slate-600 mt-2 line-clamp-2">{{ hostel.address|default:"Campus residential area" }}</p>
+
+                <!-- Statistics Metrics -->
+                <div class="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-slate-100 text-xs">
+                    <div class="p-2.5 bg-slate-50 rounded-lg">
+                        <span class="text-slate-400 block text-[11px]">Total Rooms</span>
+                        <span class="font-bold text-slate-800 text-sm">{{ hostel.total_rooms }}</span>
+                    </div>
+                    <div class="p-2.5 bg-slate-50 rounded-lg">
+                        <span class="text-slate-400 block text-[11px]">Total Beds</span>
+                        <span class="font-bold text-slate-800 text-sm">{{ hostel.total_beds }}</span>
+                    </div>
+                    <div class="p-2.5 bg-slate-50 rounded-lg">
+                        <span class="text-slate-400 block text-[11px]">Occupied</span>
+                        <span class="font-bold text-teal-700 text-sm">{{ hostel.occupied_beds }}</span>
+                    </div>
+                    <div class="p-2.5 bg-slate-50 rounded-lg">
+                        <span class="text-slate-400 block text-[11px]">Available</span>
+                        <span class="font-bold text-emerald-600 text-sm">{{ hostel.available_beds }}</span>
+                    </div>
+                </div>
+
+                <!-- Utilization Bar -->
+                <div class="mt-4">
+                    <div class="flex justify-between text-xs text-slate-500 mb-1">
+                        <span>Occupancy Rate</span>
+                        <span class="font-bold text-slate-900">{{ hostel.occupancy_rate }}%</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div class="bg-teal-700 h-1.5 rounded-full" style="width: {{ hostel.occupancy_rate }}%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Action Buttons -->
+            <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                <a href="{% url 'hostels:hostel_detail' pk=hostel.id %}" class="btn-primary btn-sm flex-1 text-center justify-center">
+                    View Details & Blocks
+                </a>
+                {% if can_manage_inventory %}
+                <a href="{% url 'hostels:hostel_edit' pk=hostel.id %}" class="btn-secondary btn-sm ml-2" title="Edit Hostel">
+                    Edit
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-3">
+            {% include 'components/empty_state.html' with title="No hostels found" description="No hostels matched your search criteria." %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

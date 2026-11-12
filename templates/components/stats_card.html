@@ -1,0 +1,21 @@
+<div class="card p-5 hover:border-slate-300 transition-all">
+    <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">{{ title }}</span>
+        {% if icon %}
+        <div class="w-8 h-8 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center">
+            {{ icon|safe }}
+        </div>
+        {% endif %}
+    </div>
+    <div class="mt-3 flex items-baseline justify-between">
+        <span class="text-2xl font-bold text-slate-900 tracking-tight">{{ value }}</span>
+        {% if subtitle %}
+        <span class="text-xs text-slate-500 font-medium">{{ subtitle }}</span>
+        {% endif %}
+    </div>
+    {% if progress_pct is not None %}
+    <div class="mt-3 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+        <div class="bg-teal-600 h-1.5 rounded-full" style="width: {{ progress_pct }}%;"></div>
+    </div>
+    {% endif %}
+</div>
