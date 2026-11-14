@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450" fill="none">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E2E8F0"/>
+      <stop offset="100%" stop-color="#F1F5F9"/>
+    </linearGradient>
+    <linearGradient id="bldg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#93C5FD"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+    <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#A7F3D0"/>
+      <stop offset="100%" stop-color="#34D399"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Sky -->
+  <rect width="800" height="450" fill="url(#sky)"/>
+
+  <!-- Clouds -->
+  <circle cx="160" cy="80" r="30" fill="#FFFFFF" opacity="0.7"/>
+  <circle cx="200" cy="70" r="40" fill="#FFFFFF" opacity="0.7"/>
+  <circle cx="240" cy="80" r="30" fill="#FFFFFF" opacity="0.7"/>
+  <circle cx="620" cy="90" r="35" fill="#FFFFFF" opacity="0.6"/>
+  <circle cx="660" cy="80" r="45" fill="#FFFFFF" opacity="0.6"/>
+
+  <!-- Ground / Lawn -->
+  <rect y="360" width="800" height="90" fill="url(#grass)"/>
+  <!-- Pathway -->
+  <polygon points="340,450 460,450 420,360 380,360" fill="#CBD5E1"/>
+
+  <!-- Main Residence Building -->
+  <rect x="140" y="120" width="520" height="240" rx="4" fill="url(#bldg)"/>
+
+  <!-- Architectural Canopy / Entrance -->
+  <rect x="350" y="300" width="100" height="60" fill="#0F766E"/>
+  <rect x="365" y="315" width="70" height="45" fill="#E2E8F0"/>
+  <line x1="400" y1="315" x2="400" y2="360" stroke="#0F766E" stroke-width="2"/>
+  <!-- Canopy Roof -->
+  <polygon points="330,300 470,300 450,290 350,290" fill="#115E59"/>
+
+  <!-- Left Wing Windows (4 floors, 4 columns) -->
+  <!-- Floor 4 -->
+  <rect x="170" y="145" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="220" y="145" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="270" y="145" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="320" y="145" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <!-- Floor 3 -->
+  <rect x="170" y="185" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="220" y="185" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="270" y="185" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="320" y="185" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <!-- Floor 2 -->
+  <rect x="170" y="225" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="220" y="225" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="270" y="225" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="320" y="225" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <!-- Floor 1 -->
+  <rect x="170" y="265" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="220" y="265" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="270" y="265" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="320" y="265" width="35" height="25" rx="2" fill="url(#glass)"/>
+
+  <!-- Right Wing Windows -->
+  <!-- Floor 4 -->
+  <rect x="445" y="145" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="495" y="145" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="545" y="145" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="595" y="145" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <!-- Floor 3 -->
+  <rect x="445" y="185" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="495" y="185" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="545" y="185" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="595" y="185" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <!-- Floor 2 -->
+  <rect x="445" y="225" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="495" y="225" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="545" y="225" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="595" y="225" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <!-- Floor 1 -->
+  <rect x="445" y="265" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="495" y="265" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="545" y="265" width="35" height="25" rx="2" fill="url(#glass)"/>
+  <rect x="595" y="265" width="35" height="25" rx="2" fill="url(#glass)"/>
+
+  <!-- Center Atrium Glass -->
+  <rect x="375" y="140" width="50" height="140" fill="#93C5FD" opacity="0.9" rx="2"/>
+  <line x1="400" y1="140" x2="400" y2="280" stroke="#1E293B" stroke-width="2"/>
+  <line x1="375" y1="175" x2="425" y2="175" stroke="#1E293B" stroke-width="1.5"/>
+  <line x1="375" y1="210" x2="425" y2="210" stroke="#1E293B" stroke-width="1.5"/>
+  <line x1="375" y1="245" x2="425" y2="245" stroke="#1E293B" stroke-width="1.5"/>
+
+  <!-- Campus Trees -->
+  <!-- Tree Left -->
+  <rect x="85" y="310" width="12" height="60" fill="#78350F"/>
+  <circle cx="91" cy="290" r="35" fill="#059669"/>
+  <circle cx="80" cy="270" r="28" fill="#10B981"/>
+  <circle cx="105" cy="275" r="25" fill="#047857"/>
+
+  <!-- Tree Right -->
+  <rect x="700" y="300" width="14" height="70" fill="#78350F"/>
+  <circle cx="707" cy="275" r="40" fill="#059669"/>
+  <circle cx="690" cy="255" r="30" fill="#10B981"/>
+  <circle cx="725" cy="260" r="28" fill="#047857"/>
+
+  <!-- Campus Lamp Post -->
+  <line x1="280" y1="340" x2="280" y2="390" stroke="#475569" stroke-width="3"/>
+  <circle cx="280" cy="338" r="6" fill="#FDE047"/>
+  <line x1="520" y1="340" x2="520" y2="390" stroke="#475569" stroke-width="3"/>
+  <circle cx="520" cy="338" r="6" fill="#FDE047"/>
+</svg>

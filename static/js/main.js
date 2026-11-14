@@ -82,4 +82,81 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
   });
+
+  // 5. Interactive Demo Account Quick-Fill on Login Page
+  const quickLoginBtns = document.querySelectorAll("[data-quick-login-email]");
+  quickLoginBtns.forEach((btn) => {
+    btn.addEventListener("click", function () {
+      const email = this.getAttribute("data-quick-login-email");
+      const pass = this.getAttribute("data-quick-login-password") || "RoomLoop2026!";
+      const emailInput = document.getElementById("id_email");
+      const passInput = document.getElementById("id_password");
+
+      if (emailInput && passInput) {
+        emailInput.value = email;
+        passInput.value = pass;
+
+        // Visual flash feedback
+        emailInput.classList.add("ring-2", "ring-teal-500", "bg-teal-50/50");
+        passInput.classList.add("ring-2", "ring-teal-500", "bg-teal-50/50");
+
+        setTimeout(() => {
+          emailInput.classList.remove("ring-2", "ring-teal-500", "bg-teal-50/50");
+          passInput.classList.remove("ring-2", "ring-teal-500", "bg-teal-50/50");
+        }, 600);
+      }
+    });
+  });
+
+  // 6. Real-time Client Table Search Filter
+  const tableSearchInputs = document.querySelectorAll("[data-table-filter]");
+  tableSearchInputs.forEach((input) => {
+    input.addEventListener("input", function () {
+      const targetTableId = this.getAttribute("data-table-filter");
+      const query = this.value.toLowerCase().trim();
+      const table = document.getElementById(targetTableId);
+      if (!table) return;
+
+      const rows = table.querySelectorAll("tbody tr");
+      rows.forEach((row) => {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(query)) {
+          row.style.display = "";
+        } else {
+          row.style.display = "none";
+        }
+      });
+    });
+  });
+
+  // 7. Interactive Category Filter for Cards Grid
+  const cardFilterBtns = document.querySelectorAll("[data-card-filter]");
+  cardFilterBtns.forEach((btn) => {
+    btn.addEventListener("click", function () {
+      const targetGridId = this.getAttribute("data-target-grid");
+      const category = this.getAttribute("data-card-filter");
+      const grid = document.getElementById(targetGridId);
+      if (!grid) return;
+
+      // Update button active state
+      const siblingBtns = this.parentElement.querySelectorAll("[data-card-filter]");
+      siblingBtns.forEach((b) => {
+        b.classList.remove("bg-teal-700", "text-white", "shadow-sm");
+        b.classList.add("bg-white", "text-slate-600", "hover:bg-slate-50");
+      });
+      this.classList.remove("bg-white", "text-slate-600", "hover:bg-slate-50");
+      this.classList.add("bg-teal-700", "text-white", "shadow-sm");
+
+      // Filter cards
+      const cards = grid.querySelectorAll("[data-category]");
+      cards.forEach((card) => {
+        const cardCat = card.getAttribute("data-category");
+        if (category === "all" || cardCat === category) {
+          card.style.display = "";
+        } else {
+          card.style.display = "none";
+        }
+      });
+    });
+  });
 });

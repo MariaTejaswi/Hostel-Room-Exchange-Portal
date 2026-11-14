@@ -22,10 +22,19 @@ class Hostel(TimeStampedModel):
         INACTIVE = "inactive", "Inactive"
 
     class ResidentCategory(models.TextChoices):
-        MALE = "male", "Male Residents"
-        FEMALE = "female", "Female Residents"
+        MALE = "male", "Boys' Hostel"
+        FEMALE = "female", "Girls' Hostel"
         POSTGRADUATE = "postgraduate", "Postgraduate Residents"
-        COED = "coed", "Co-educational"
+
+    class AcademicLevel(models.TextChoices):
+        ALL = "all", "All Academic Levels"
+        UNDERGRADUATE = "undergraduate", "Undergraduate"
+        POSTGRADUATE = "postgraduate", "Postgraduate / Research"
+
+    ACTIVE_RESIDENT_CATEGORIES = (
+        (ResidentCategory.MALE, "Boys' Hostel"),
+        (ResidentCategory.FEMALE, "Girls' Hostel"),
+    )
 
     institution = models.ForeignKey(
         Institution,
@@ -42,7 +51,13 @@ class Hostel(TimeStampedModel):
     resident_category = models.CharField(
         max_length=50,
         choices=ResidentCategory.choices,
-        default=ResidentCategory.COED,
+        default=ResidentCategory.MALE,
+    )
+    academic_level = models.CharField(
+        max_length=50,
+        choices=AcademicLevel.choices,
+        default=AcademicLevel.ALL,
+        help_text="Academic-level eligibility requirement (independent of residential gender category)",
     )
     address = models.CharField(max_length=500, blank=True)
     description = models.TextField(blank=True)
@@ -62,7 +77,11 @@ class Hostel(TimeStampedModel):
             models.UniqueConstraint(
                 fields=["institution", "code"],
                 name="unique_hostel_code_per_institution",
-            )
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(resident_category="coed"),
+                name="check_hostel_resident_category_not_coed",
+            ),
         ]
 
     def __str__(self):
@@ -72,6 +91,31 @@ class Hostel(TimeStampedModel):
         super().clean()
         if self.code:
             self.code = self.code.strip().upper()
+        if self.resident_category == "coed":
+            raise ValidationError({"resident_category": "Co-ed hostels are not supported. Choose Boys' Hostel or Girls' Hostel."})
+        if self.resident_category not in [self.ResidentCategory.MALE, self.ResidentCategory.FEMALE, self.ResidentCategory.POSTGRADUATE]:
+            raise ValidationError({"resident_category": f"Invalid resident category: '{self.resident_category}'."})
+
+    @property
+    def occupancy_rate(self) -> float:
+        if hasattr(self, "_occupancy_rate") and self._occupancy_rate is not None:
+            return self._occupancy_rate
+        total = getattr(self, "total_beds", None)
+        if total is None:
+            total = Bed.objects.filter(room__floor__block__hostel=self, is_active=True).count()
+        occupied = getattr(self, "occupied_beds", None)
+        if occupied is None:
+            occupied = StudentOccupancy.objects.filter(
+                bed__room__floor__block__hostel=self,
+                status=StudentOccupancy.OccupancyStatus.ACTIVE,
+            ).count()
+        if total and total > 0:
+            return round((occupied / total) * 100, 1)
+        return 0.0
+
+    @occupancy_rate.setter
+    def occupancy_rate(self, value: float):
+        self._occupancy_rate = value
 
 
 class Block(TimeStampedModel):
@@ -85,6 +129,7 @@ class Block(TimeStampedModel):
     name = models.CharField(max_length=100, help_text="e.g. Block A, East Wing")
     code = models.CharField(max_length=50, help_text="e.g. BLK-A")
     description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:
         db_table = "hostels_blocks"
@@ -117,6 +162,7 @@ class Floor(TimeStampedModel):
     )
     floor_number = models.IntegerField(help_text="Floor numeric index, e.g. 0 for Ground, 1 for 1st")
     floor_label = models.CharField(max_length=100, help_text="e.g. Ground Floor, 1st Floor")
+    is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:
         db_table = "hostels_floors"
@@ -142,12 +188,20 @@ class Room(TimeStampedModel):
         DOUBLE = "double", "Double Sharing (2 Beds)"
         TRIPLE = "triple", "Triple Sharing (3 Beds)"
         FOUR = "four", "Four Sharing (4 Beds)"
+        FIVE = "five", "Five Sharing (5 Beds)"
+        SIX = "six", "Six Sharing (6 Beds)"
+        DORMITORY = "dormitory", "Dormitory / Multi-Bed"
+        CUSTOM = "custom", "Custom Layout"
 
     ROOM_TYPE_CAPACITY = {
         RoomType.SINGLE: 1,
         RoomType.DOUBLE: 2,
         RoomType.TRIPLE: 3,
         RoomType.FOUR: 4,
+        RoomType.FIVE: 5,
+        RoomType.SIX: 6,
+        RoomType.DORMITORY: 8,
+        RoomType.CUSTOM: 1,
     }
 
     floor = models.ForeignKey(
@@ -178,6 +232,7 @@ class Room(TimeStampedModel):
         db_index=True,
     )
     description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:
         db_table = "hostels_rooms"
@@ -196,6 +251,10 @@ class Room(TimeStampedModel):
 
     @property
     def target_capacity(self) -> int:
+        if self.pk:
+            count = self.beds.filter(is_active=True).count()
+            if count > 0:
+                return count
         return self.ROOM_TYPE_CAPACITY.get(self.room_type, 1)
 
     @property
@@ -218,6 +277,7 @@ class Bed(TimeStampedModel):
         default=OperationalStatus.IN_SERVICE,
         db_index=True,
     )
+    is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:
         db_table = "hostels_beds"
@@ -241,8 +301,14 @@ class Bed(TimeStampedModel):
 
     @property
     def is_available_for_allocation(self) -> bool:
-        """Available only if operational status is IN_SERVICE and has no active occupant."""
-        if self.operational_status != OperationalStatus.IN_SERVICE:
+        """Available only if operational status is IN_SERVICE, is_active is True, and has no active occupant."""
+        if not self.is_active or self.operational_status != OperationalStatus.IN_SERVICE:
+            return False
+        if not self.room.is_active or self.room.operational_status != OperationalStatus.IN_SERVICE:
+            return False
+        if not self.room.floor.is_active or not self.room.floor.block.is_active:
+            return False
+        if self.room.floor.block.hostel.status != Hostel.Status.ACTIVE:
             return False
         return not self.is_occupied
 

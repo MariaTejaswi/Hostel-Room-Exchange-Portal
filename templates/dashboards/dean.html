@@ -1,82 +1,159 @@
 {% extends 'layouts/dashboard_base.html' %}
 
-{% block breadcrumb_current %}Executive Overview (Dean){% endblock %}
+{% block breadcrumb_current %}Executive & Infrastructure Console (Dean){% endblock %}
 
 {% block content %}
 <div class="space-y-6">
-    <!-- Header: Explicitly Read-Only Executive Summary -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-5 border-b border-slate-200">
-        <div>
-            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold mb-1">
-                Executive Read-Only Overview
-            </div>
-            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Dean of Student Welfare Analytics</h1>
-            <p class="mt-1 text-xs text-slate-500">Strategic capacity utilization, accommodation metrics, and hostel distribution for {{ current_institution.name|default:"the university" }}.</p>
+    <!-- Header: Executive Authority & Infrastructure Management -->
+    <div class="no-collision-header">
+        <div class="min-w-0 flex-1">
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight truncate">
+                Dean of Student Welfare Console
+            </h1>
+            <p class="mt-1 text-xs text-slate-500">
+                Hostel infrastructure governance, room capacity planning, accommodation policies, and executive oversight for {{ current_institution.name|default:"the university" }}.
+            </p>
         </div>
-        <div>
-            <span class="badge-neutral text-xs px-3 py-1">
-                Report Generated Live
-            </span>
+        <div class="no-collision-actions">
+            <a href="{% url 'hostels:hostel_builder' %}" class="btn-primary btn-sm flex items-center gap-1.5 shadow-2xs">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                <span>Hostel Builder</span>
+            </a>
+            <a href="{% url 'hostels:room_create' %}" class="btn-secondary btn-sm flex items-center gap-1.5">
+                <span>Add Room</span>
+            </a>
+            <a href="{% url 'hostels:hostel_list' %}" class="btn-secondary btn-sm flex items-center gap-1.5">
+                <span>Hostels</span>
+            </a>
+            <a href="{% url 'hostels:room_inventory' %}" class="btn-secondary btn-sm flex items-center gap-1.5">
+                <span>Inventory</span>
+            </a>
         </div>
     </div>
 
-    <!-- Aggregate Statistics Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {% include 'components/stats_card.html' with title="Total Residential Units" value=total_hostels subtitle=total_rooms|stringformat:"d"|add:" configured rooms" %}
-        {% include 'components/stats_card.html' with title="Total Student Capacity" value=total_beds subtitle="Total bed accommodations" %}
-        {% include 'components/stats_card.html' with title="Accommodated Students" value=occupied_beds subtitle=occupancy_pct|stringformat:".1f"|add:"% occupancy rate" progress_pct=occupancy_pct %}
-        {% include 'components/stats_card.html' with title="Available Vacancies" value=available_beds subtitle="Unallocated bed slots" %}
+    <!-- Authority Boundary Info Banner -->
+    <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+        <svg class="w-5 h-5 text-slate-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        </svg>
+        <div class="text-xs text-slate-700 leading-relaxed">
+            <span class="font-bold text-slate-900">Dean Authority Scope:</span> You hold full institutional authority to create boys' or girls' hostels, configure room capacities, edit building infrastructure, and review serious policy appeals. Routine student bed allocations are handled directly by destination Wardens without direct executive intervention.
+        </div>
     </div>
 
-    <!-- Hostel Utilization Breakdown Table -->
-    <div class="card">
-        <div class="card-header">
+    <!-- Aggregate Statistics Grid (4 Metric Cards) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {% include 'components/stats_card.html' with title="Residential Units" value=total_hostels subtitle=total_rooms|stringformat:"d"|add:" configured rooms" %}
+        {% include 'components/stats_card.html' with title="Total Capacity" value=total_beds subtitle="Total bed accommodations" %}
+        {% include 'components/stats_card.html' with title="Accommodated" value=occupied_beds subtitle=occupancy_pct|stringformat:".1f"|add:"% occupancy rate" progress_pct=occupancy_pct %}
+        {% include 'components/stats_card.html' with title="Vacancies" value=available_beds subtitle="Unallocated bed slots" %}
+    </div>
+
+    <!-- Hostel Infrastructure & Capacity Management Table -->
+    <div class="card p-5 bg-white border border-slate-200 rounded-xl">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
             <div>
-                <h2 class="text-base font-bold text-slate-900">Hostel Utilization & Capacity Breakdown</h2>
-                <p class="text-xs text-slate-500">Live operational data aggregated directly from PostgreSQL database records.</p>
+                <h2 class="text-sm font-bold text-slate-900">Hostel Infrastructure & Capacity Management</h2>
+                <p class="text-xs text-slate-500">Live inventory aggregated from actual database records (Hostel &rarr; Block &rarr; Floor &rarr; Room &rarr; Bed).</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="dashboard-filter-input">
+                    <input type="text" placeholder="Search hostel..." data-table-filter="dean-hostels-table" aria-label="Search hostels">
+                </div>
+                <a href="{% url 'hostels:hostel_builder' %}" class="btn-primary btn-sm flex items-center gap-1 shadow-2xs">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    <span>New Hostel</span>
+                </a>
             </div>
         </div>
 
-        <div class="data-table-container">
-            <table class="data-table">
+        <div class="data-table-container mt-3">
+            <table class="data-table" id="dean-hostels-table">
                 <thead>
                     <tr>
                         <th>Hostel Name</th>
                         <th>Code</th>
-                        <th>Resident Category</th>
-                        <th>Total Rooms</th>
-                        <th>Total Capacity</th>
+                        <th>Category</th>
+                        <th>Rooms</th>
+                        <th>Capacity</th>
                         <th>Occupied</th>
                         <th>Available</th>
-                        <th>Utilization Rate</th>
+                        <th>Utilization</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for hostel in hostels %}
                     <tr>
-                        <td class="font-bold text-slate-900">{{ hostel.name }}</td>
-                        <td class="font-mono text-xs">{{ hostel.code }}</td>
-                        <td>{{ hostel.resident_category }}</td>
-                        <td>{{ hostel.total_rooms }}</td>
-                        <td>{{ hostel.total_beds }}</td>
-                        <td class="font-semibold text-teal-700">{{ hostel.occupied_beds }}</td>
-                        <td class="font-semibold text-emerald-600">{{ hostel.available_beds }}</td>
+                        <td class="font-bold text-slate-900 text-xs">{{ hostel.name }}</td>
+                        <td class="font-mono text-xs text-slate-600">{{ hostel.code }}</td>
+                        <td>
+                            {% if hostel.resident_category == 'male' %}
+                            <span class="badge-category-boys">Boys</span>
+                            {% elif hostel.resident_category == 'female' %}
+                            <span class="badge-category-girls">Girls</span>
+                            {% else %}
+                            <span class="badge-neutral">{{ hostel.get_resident_category_display }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="font-mono text-xs">{{ hostel.total_rooms }}</td>
+                        <td class="font-mono text-xs font-semibold text-slate-800">{{ hostel.total_beds }}</td>
+                        <td class="font-mono text-xs font-bold text-teal-800">{{ hostel.occupied_beds }}</td>
+                        <td class="font-mono text-xs font-bold text-emerald-700">{{ hostel.available_beds }}</td>
                         <td>
                             <div class="flex items-center gap-2">
-                                <div class="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                <div class="w-14 bg-slate-100 rounded-full h-1.5 overflow-hidden">
                                     <div class="bg-teal-700 h-1.5 rounded-full" style="width: {{ hostel.occupancy_rate }}%;"></div>
                                 </div>
-                                <span class="font-mono text-xs font-semibold text-slate-800">{{ hostel.occupancy_rate }}%</span>
+                                <span class="font-mono text-[11px] font-semibold text-slate-800">{{ hostel.occupancy_rate }}%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <a href="{% url 'hostels:hostel_edit_builder' pk=hostel.id %}" class="btn-secondary btn-sm py-0.5 px-2 text-[11px]" title="Edit via Builder">
+                                    Edit
+                                </a>
+                                <a href="{% url 'hostels:hostel_detail' pk=hostel.id %}" class="text-teal-700 hover:text-teal-800 text-xs font-semibold hover:underline">
+                                    Detail &rarr;
+                                </a>
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center py-6 text-xs text-slate-500">No hostel records found.</td>
+                        <td colspan="9" class="text-center py-6 text-xs text-slate-400">No hostel records found.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Dynamic Hostel Builder Showcase Banner -->
+    <div class="card p-5 bg-white border border-slate-200 rounded-xl">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-lg bg-teal-50 border border-teal-100 text-teal-700 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <h3 class="text-sm font-bold text-slate-900">Custom Dynamic Hostel Builder</h3>
+                        <span class="badge-neutral text-[10px]">Phase 2 Facility Tool</span>
+                    </div>
+                    <p class="text-xs text-slate-500 max-w-2xl leading-relaxed">
+                        Configure non-standard building structures (custom blocks, arbitrary room counts per floor, variable bed capacities per room from single to 6-bed and dormitory layouts) in an intuitive 4-step wizard with real-time capacity validation and occupancy protections.
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <a href="{% url 'hostels:hostel_builder' %}" class="btn-primary btn-sm flex items-center gap-1.5 shadow-2xs">
+                    <span>Launch Builder</span>
+                    <span>&rarr;</span>
+                </a>
+            </div>
         </div>
     </div>
 </div>

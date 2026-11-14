@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450" fill="none">
+  <defs>
+    <linearGradient id="csky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E0F2FE"/>
+      <stop offset="100%" stop-color="#F1F5F9"/>
+    </linearGradient>
+    <linearGradient id="brick" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#991B1B"/>
+      <stop offset="100%" stop-color="#7F1D1D"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="450" fill="url(#csky)"/>
+
+  <!-- Grass -->
+  <rect y="350" width="800" height="100" fill="#34D399"/>
+  <!-- Front Yard Pathway -->
+  <polygon points="320,450 480,450 440,350 360,350" fill="#E2E8F0"/>
+
+  <!-- Classic Brick Residence Hall -->
+  <rect x="180" y="110" width="440" height="240" fill="url(#brick)" rx="2"/>
+
+  <!-- Roof Gable / Pediment -->
+  <polygon points="400,40 160,115 640,115" fill="#334155"/>
+  <!-- Decorative Clock / Medallion in Pediment -->
+  <circle cx="400" cy="85" r="16" fill="#F8FAFC" stroke="#0F172A" stroke-width="2"/>
+  <line x1="400" y1="85" x2="400" y2="76" stroke="#0F172A" stroke-width="2"/>
+  <line x1="400" y1="85" x2="408" y2="85" stroke="#0F172A" stroke-width="2"/>
+
+  <!-- Classic Columns at Entrance -->
+  <rect x="360" y="270" width="12" height="80" fill="#F8FAFC"/>
+  <rect x="428" y="270" width="12" height="80" fill="#F8FAFC"/>
+  <rect x="350" y="260" width="100" height="12" fill="#E2E8F0"/>
+  <!-- Arched Main Door -->
+  <path d="M 382 350 L 382 295 Q 400 280 418 295 L 418 350 Z" fill="#1E293B"/>
+
+  <!-- Windows Grid with White Trim (Arched top) -->
+  <!-- Floor 3 -->
+  <rect x="220" y="140" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+  <rect x="280" y="140" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+  <rect x="340" y="140" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+  <rect x="430" y="140" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+  <rect x="490" y="140" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+  <rect x="550" y="140" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+
+  <!-- Floor 2 -->
+  <rect x="220" y="200" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+  <rect x="280" y="200" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+  <rect x="340" y="200" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+  <rect x="430" y="200" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+  <rect x="490" y="200" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+  <rect x="550" y="200" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+
+  <!-- Floor 1 -->
+  <rect x="220" y="260" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+  <rect x="280" y="260" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+  <rect x="490" y="260" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+  <rect x="550" y="260" width="30" height="35" rx="3" fill="#BAE6FD" stroke="#F8FAFC" stroke-width="3"/>
+
+  <!-- Flanking Trees -->
+  <circle cx="100" cy="270" r="45" fill="#047857"/>
+  <rect x="95" y="310" width="10" height="50" fill="#78350F"/>
+  <circle cx="700" cy="270" r="45" fill="#047857"/>
+  <rect x="695" y="310" width="10" height="50" fill="#78350F"/>
+</svg>

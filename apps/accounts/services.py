@@ -44,6 +44,7 @@ def create_user_with_role(
     password: str | None = None,
     registration_number: str | None = None,
     phone_number: str = "",
+    residential_eligibility: str = User.ResidentialEligibility.UNVERIFIED,
     is_staff: bool = False,
     acting_user: User | None = None,
     ip_address: str | None = None,
@@ -62,6 +63,7 @@ def create_user_with_role(
         institution=institution,
         registration_number=registration_number.strip().upper() if registration_number else None,
         phone_number=phone_number.strip(),
+        residential_eligibility=residential_eligibility,
         is_staff=is_staff or role_name in (ROLE_SYSADMIN, ROLE_HOSTEL_ADMIN),
     )
     if password:

@@ -51,6 +51,7 @@ def pytest_sessionfinish(session, exitstatus):
     db_name = settings.DATABASES["default"]["NAME"]
     if not str(db_name).startswith("test_"):
         call_command("seed_demo")
+        call_command("seed_hostel_inventory", institution_code="DEMO-UNIV")
 
 
 @pytest.fixture(autouse=True)
@@ -111,6 +112,7 @@ def student_user(institution, roles):
         institution=institution,
         password="TestPassword123!",
         registration_number="REG-001",
+        residential_eligibility=User.ResidentialEligibility.MALE,
     )
 
 
@@ -123,6 +125,7 @@ def other_student_user(institution, roles):
         institution=institution,
         password="TestPassword123!",
         registration_number="REG-002",
+        residential_eligibility=User.ResidentialEligibility.MALE,
     )
 
 

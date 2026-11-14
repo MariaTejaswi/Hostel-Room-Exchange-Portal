@@ -6,8 +6,10 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
+from django.db.models import Q
 
 from .forms import LoginForm, UserProfileForm
+from .models import User
 from .selectors import get_dashboard_url_for_user
 from .services import update_user_profile
 from apps.core.models import AuditLog
@@ -174,6 +176,8 @@ def chief_warden_dashboard_view(request):
 @login_required
 def hostel_admin_dashboard_view(request):
     """Hostel Administrator Dashboard for full inventory and occupancy control."""
+    if request.user.is_sysadmin_role:
+        return redirect("accounts:dashboard_sysadmin")
     if not (request.user.is_hostel_admin_role or request.user.is_superuser):
         raise PermissionDenied("Access restricted to Hostel Administrators.")
 
@@ -184,9 +188,56 @@ def hostel_admin_dashboard_view(request):
 
 
 @login_required
+def sysadmin_dashboard_view(request):
+    """System Administrator Technical Dashboard (Accounts, Security, Audit Logs, Health)."""
+    if not (request.user.is_sysadmin_role or request.user.is_superuser):
+        raise PermissionDenied("Access restricted to System Administrators.")
+
+    from apps.core.models import AuditLog
+    # Restrict audit stream strictly to technical, authentication, and provisioning events.
+    # Exclude operational student occupancy allocations, releases, and welfare payloads.
+    technical_actions = [
+        "USER_LOGIN",
+        "USER_LOGOUT",
+        "PASSWORD_CHANGED",
+        "USER_CREATED",
+        "PROFILE_UPDATED",
+    ]
+    recent_audit_logs = (
+        AuditLog.objects.filter(
+            Q(action__in=technical_actions) | Q(target_type__in=["User", "System", "Configuration"])
+        )
+        .exclude(target_type="StudentOccupancy")
+        .select_related("acting_user", "institution")
+        .order_by("-timestamp")[:12]
+    )
+    total_users = User.objects.count()
+    active_users = User.objects.filter(is_active=True).count()
+    roles_summary = [
+        {"name": "Students", "count": User.objects.filter(groups__name="Student").count()},
+        {"name": "Wardens", "count": User.objects.filter(groups__name="Warden").count()},
+        {"name": "Chief Wardens", "count": User.objects.filter(groups__name="Chief Warden").count()},
+        {"name": "Hostel Admins", "count": User.objects.filter(groups__name="Hostel Administrator").count()},
+        {"name": "Deans", "count": User.objects.filter(groups__name="Dean of Student Welfare").count()},
+        {"name": "System Admins", "count": User.objects.filter(groups__name="System Administrator").count()},
+    ]
+
+    context = {
+        "active_nav": "dashboard",
+        "recent_audit_logs": recent_audit_logs,
+        "total_users": total_users,
+        "active_users": active_users,
+        "roles_summary": roles_summary,
+        "db_backend": "PostgreSQL 16 (psycopg)",
+        "system_status": "Operational",
+    }
+    return render(request, "dashboards/sysadmin.html", context)
+
+
+@login_required
 def dean_dashboard_view(request):
-    """Dean of Student Welfare Executive Overview Dashboard (Read-only)."""
-    if not (request.user.is_dean_role or request.user.is_hostel_admin_role or request.user.is_superuser):
+    """Dean of Student Welfare Executive & Infrastructure Overview Dashboard."""
+    if not (request.user.is_dean_role or request.user.is_superuser):
         raise PermissionDenied("Access restricted to Deans of Student Welfare.")
 
     from apps.hostels.selectors import get_dean_dashboard_context

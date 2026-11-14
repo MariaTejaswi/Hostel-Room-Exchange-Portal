@@ -168,6 +168,7 @@ class Command(BaseCommand):
                 defaults={
                     "name": "Scholars Hall",
                     "resident_category": Hostel.ResidentCategory.POSTGRADUATE,
+                    "academic_level": Hostel.AcademicLevel.POSTGRADUATE,
                     "address": "Research Park Enclave, East Campus",
                     "description": "Postgraduate and doctoral residential apartments with quiet study areas.",
                     "status": Hostel.Status.ACTIVE,
@@ -221,16 +222,23 @@ class Command(BaseCommand):
 
             # 5. Student Accounts & Allocations
             students_data = [
-                ("arun.kumar@student.roomloop.edu", "Arun Kumar", "2024-NR-001", r_na_101, "Bed A"),
-                ("vikram.aditya@student.roomloop.edu", "Vikram Aditya", "2024-NR-002", r_na_101, "Bed B"),
-                ("karthik.raja@student.roomloop.edu", "Karthik Raja", "2024-NR-003", r_na_102, "Bed A"),
-                ("priya.sharma@student.roomloop.edu", "Priya Sharma", "2024-SR-101", r_sc_301, "Bed A"),
-                ("ananya.reddy@student.roomloop.edu", "Ananya Reddy", "2024-SR-102", r_sc_301, "Bed B"),
-                ("deepika.padman@student.roomloop.edu", "Deepika Padman", "2024-SR-103", r_sc_302, "Bed A"),
-                ("siddharth.roy@student.roomloop.edu", "Siddharth Roy (PhD)", "2024-SH-501", r_sp_401, "Bed A"),
+                ("arun.kumar@student.roomloop.edu", "Arun Kumar", "2024-NR-001", r_na_101, "Bed A", User.ResidentialEligibility.MALE),
+                ("vikram.aditya@student.roomloop.edu", "Vikram Aditya", "2024-NR-002", r_na_101, "Bed B", User.ResidentialEligibility.MALE),
+                ("karthik.raja@student.roomloop.edu", "Karthik Raja", "2024-NR-003", r_na_102, "Bed A", User.ResidentialEligibility.MALE),
+                ("priya.sharma@student.roomloop.edu", "Priya Sharma", "2024-SR-101", r_sc_301, "Bed A", User.ResidentialEligibility.FEMALE),
+                ("ananya.reddy@student.roomloop.edu", "Ananya Reddy", "2024-SR-102", r_sc_301, "Bed B", User.ResidentialEligibility.FEMALE),
+                ("deepika.padman@student.roomloop.edu", "Deepika Padman", "2024-SR-103", r_sc_302, "Bed A", User.ResidentialEligibility.FEMALE),
+                ("siddharth.roy@student.roomloop.edu", "Siddharth Roy (PhD)", "2024-SH-501", r_sp_401, "Bed A", User.ResidentialEligibility.MALE),
             ]
 
-            for email, name, reg_no, room, bed_label in students_data:
+            # Map hostel to its assigned destination warden
+            warden_map = {
+                h_north.id: warden_north,
+                h_south.id: warden_south,
+                h_scholars.id: warden_scholars,
+            }
+
+            for email, name, reg_no, room, bed_label, elig in students_data:
                 student = self._get_or_create_user(
                     email=email,
                     full_name=name,
@@ -238,15 +246,17 @@ class Command(BaseCommand):
                     institution=institution,
                     password=default_pwd,
                     registration_number=reg_no,
+                    residential_eligibility=elig,
                 )
                 bed = room.beds.filter(bed_label=bed_label).first()
                 if bed and not StudentOccupancy.objects.filter(student=student, status="active").exists():
                     if not StudentOccupancy.objects.filter(bed=bed, status="active").exists():
+                        assigned_warden = warden_map.get(bed.room.floor.block.hostel_id, warden_north)
                         assign_student_to_bed(
                             student=student,
                             bed=bed,
                             source=StudentOccupancy.AllocationSource.SEED,
-                            created_by=hostel_admin,
+                            created_by=assigned_warden,
                         )
 
             # Create unallocated students for live assignment testing
@@ -257,6 +267,7 @@ class Command(BaseCommand):
                 institution=institution,
                 password=default_pwd,
                 registration_number="2024-NR-099",
+                residential_eligibility=User.ResidentialEligibility.MALE,
             )
             self._get_or_create_user(
                 email="sneha.patel@student.roomloop.edu",
@@ -265,13 +276,23 @@ class Command(BaseCommand):
                 institution=institution,
                 password=default_pwd,
                 registration_number="2024-SR-099",
+                residential_eligibility=User.ResidentialEligibility.FEMALE,
+            )
+            self._get_or_create_user(
+                email="tarun.verma@student.roomloop.edu",
+                full_name="Tarun Verma (Unverified)",
+                role_name=ROLE_STUDENT,
+                institution=institution,
+                password=default_pwd,
+                registration_number="2024-UNV-001",
+                residential_eligibility=User.ResidentialEligibility.UNVERIFIED,
             )
 
             self.stdout.write("✓ Seeded active student occupants and unallocated testing students.")
 
         self.stdout.write(self.style.SUCCESS("✓ Demo data successfully seeded for RoomLoop Phase 1!"))
 
-    def _get_or_create_user(self, email, full_name, role_name, institution, password, registration_number=None, is_staff=False, is_superuser=False):
+    def _get_or_create_user(self, email, full_name, role_name, institution, password, registration_number=None, residential_eligibility=User.ResidentialEligibility.UNVERIFIED, is_staff=False, is_superuser=False):
         user = User.objects.filter(email=email.strip().lower()).first()
         if not user:
             user = create_user_with_role(
@@ -281,11 +302,15 @@ class Command(BaseCommand):
                 institution=institution,
                 password=password,
                 registration_number=registration_number,
+                residential_eligibility=residential_eligibility,
                 is_staff=is_staff,
             )
             if is_superuser:
                 user.is_superuser = True
                 user.save(update_fields=["is_superuser"])
+        elif user.residential_eligibility != residential_eligibility and residential_eligibility != User.ResidentialEligibility.UNVERIFIED:
+            user.residential_eligibility = residential_eligibility
+            user.save(update_fields=["residential_eligibility"])
         return user
 
     def _get_or_create_room(self, floor, room_number, room_type):

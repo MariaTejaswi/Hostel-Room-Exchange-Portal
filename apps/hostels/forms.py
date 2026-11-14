@@ -22,9 +22,22 @@ class HostelForm(forms.ModelForm):
             "status": forms.Select(attrs={"class": "form-select"}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["resident_category"].choices = Hostel.ACTIVE_RESIDENT_CATEGORIES
+
     def clean_code(self):
         code = self.cleaned_data.get("code")
         return code.strip().upper() if code else ""
+
+    def clean_resident_category(self):
+        cat = self.cleaned_data.get("resident_category")
+        if cat == "coed":
+            raise forms.ValidationError("Co-ed hostels are not supported. Choose Boys' Hostel or Girls' Hostel.")
+        if cat not in [Hostel.ResidentCategory.MALE, Hostel.ResidentCategory.FEMALE]:
+            if not (self.instance and self.instance.pk and cat == self.instance.resident_category):
+                raise forms.ValidationError("Please select either Boys' Hostel or Girls' Hostel.")
+        return cat
 
 
 class RoomForm(forms.ModelForm):
@@ -107,11 +120,38 @@ class OccupancyAssignForm(forms.Form):
         widget=forms.Select(attrs={"class": "form-select"}),
     )
 
-    def __init__(self, *args, institution=None, **kwargs):
+    def __init__(self, *args, institution=None, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         if institution:
             self.fields["student"].queryset = get_eligible_unallocated_students(institution)
-            self.fields["bed"].queryset = get_vacant_beds(institution)
+            vacant_beds = get_vacant_beds(institution)
+            # Restrict bed choices to assigned hostels for wardens
+            if user and user.is_warden_role and not (user.is_chief_warden_role or user.is_hostel_admin_role):
+                from .models import WardenAssignment
+                assigned_hostel_ids = WardenAssignment.objects.filter(warden=user).values_list("hostel_id", flat=True)
+                vacant_beds = vacant_beds.filter(room__floor__block__hostel_id__in=assigned_hostel_ids)
+            self.fields["bed"].queryset = vacant_beds
+
+    def clean(self):
+        cleaned_data = super().clean()
+        student = cleaned_data.get("student")
+        bed = cleaned_data.get("bed")
+        if student and bed:
+            hostel = bed.room.floor.block.hostel
+            eligibility = getattr(student, "residential_eligibility", None)
+            if hostel.resident_category in [Hostel.ResidentCategory.MALE, Hostel.ResidentCategory.FEMALE]:
+                if not eligibility or eligibility == "unverified":
+                    raise forms.ValidationError(
+                        f"Student {student.full_name} does not have verified residential eligibility. "
+                        "Verification is required before allocation."
+                    )
+                if eligibility != hostel.resident_category:
+                    raise forms.ValidationError(
+                        f"Student {student.full_name} is verified for "
+                        f"'{student.get_residential_eligibility_display()}', which does not match "
+                        f"'{hostel.get_resident_category_display()}'."
+                    )
+        return cleaned_data
 
 
 class OccupancyReleaseForm(forms.Form):

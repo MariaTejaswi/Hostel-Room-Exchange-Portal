@@ -1,39 +1,113 @@
 {% extends 'layouts/dashboard_base.html' %}
+{% load static %}
 
 {% block breadcrumb_current %}Hostels{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-slate-200">
+    <div class="no-collision-header">
         <div>
-            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Hostel Inventory</h1>
-            <p class="mt-1 text-xs text-slate-500">Overview of residential facilities, block hierarchies, and occupancy across campus.</p>
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Hostel Inventory</h1>
+            <p class="mt-1 text-xs text-slate-500">Explore residential facilities, room hierarchies, and operational capacity across campus.</p>
         </div>
         {% if can_manage_inventory %}
-        <div>
-            <a href="{% url 'hostels:hostel_create' %}" class="btn-primary btn-sm">
-                + Add New Hostel
+        <div class="no-collision-actions">
+            <a href="{% url 'hostels:hostel_builder' %}" class="btn-primary btn-sm flex items-center gap-1.5 shadow-2xs">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                <span>Hostel Builder</span>
             </a>
         </div>
         {% endif %}
     </div>
 
-    <!-- Filters & Search Toolbar -->
-    <div class="card p-4">
-        <form method="get" class="flex flex-col sm:flex-row items-center gap-3">
+    <!-- Student Eligibility Banner -->
+    {% if is_student %}
+        {% if is_eligibility_verified %}
+        <div class="p-3.5 rounded-xl border border-teal-200 bg-teal-50/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+            <div class="flex items-center gap-2.5">
+                <div class="w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center flex-shrink-0">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <div>
+                    <span class="font-bold text-teal-950">Verified Residential Eligibility:</span>
+                    <span class="text-teal-800 ml-1">
+                        Authoritative record confirms eligibility for
+                        <strong>{% if student_verified_eligibility == 'male' %}Boys' Hostels{% elif student_verified_eligibility == 'female' %}Girls' Hostels{% else %}{{ student_verified_eligibility }}{% endif %}</strong>.
+                        Hostel directory is automatically scoped.
+                    </span>
+                </div>
+            </div>
+            <div>
+                <span class="badge-brand text-[10px]">Verified Active</span>
+            </div>
+        </div>
+        {% else %}
+        <div class="p-3.5 rounded-xl border border-amber-200 bg-amber-50/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+            <div class="flex items-center gap-2.5">
+                <div class="w-6 h-6 rounded-full bg-amber-600 text-white flex items-center justify-center flex-shrink-0">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                </div>
+                <div>
+                    <p class="font-bold text-amber-950">Residential Eligibility Pending Institutional Verification</p>
+                    <p class="text-amber-800 text-[11px] mt-0.5">
+                        Your student profile currently lacks an authoritative residential eligibility designation.
+                        Bed selection and exchange requests are locked until your category is verified.
+                    </p>
+                </div>
+            </div>
+            <div>
+                <span class="badge-warning text-[10px]">Verification Required</span>
+            </div>
+        </div>
+        {% endif %}
+    {% endif %}
+
+    <!-- Filter & Category Toolbar -->
+    <div class="card p-3 sm:p-4 bg-white border border-slate-200 rounded-xl space-y-3">
+        <!-- Category Tabs -->
+        <div class="flex items-center gap-1.5 border-b border-slate-100 pb-2.5 overflow-x-auto text-xs">
+            <a href="{% url 'hostels:hostel_list' %}{% if search_query %}?q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}"
+               class="px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-colors {% if not category_filter %}bg-teal-700 text-white font-semibold{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+                <span>All Hostels</span>
+                <span class="text-[10px] px-1.5 py-0.2 rounded-full {% if not category_filter %}bg-teal-800 text-teal-100{% else %}bg-slate-200 text-slate-700{% endif %} font-mono">{{ total_count }}</span>
+            </a>
+
+            {% if not is_student or student_verified_eligibility == 'male' %}
+            <a href="{% url 'hostels:hostel_list' %}?category=male{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}"
+               class="px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-colors {% if category_filter == 'male' %}bg-slate-800 text-white font-semibold{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+                <span>Boys' Hostels</span>
+                <span class="text-[10px] px-1.5 py-0.2 rounded-full {% if category_filter == 'male' %}bg-slate-700 text-slate-200{% else %}bg-slate-200 text-slate-700{% endif %} font-mono">{{ boys_count }}</span>
+            </a>
+            {% endif %}
+
+            {% if not is_student or student_verified_eligibility == 'female' %}
+            <a href="{% url 'hostels:hostel_list' %}?category=female{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}"
+               class="px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-colors {% if category_filter == 'female' %}bg-slate-800 text-white font-semibold{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+                <span>Girls' Hostels</span>
+                <span class="text-[10px] px-1.5 py-0.2 rounded-full {% if category_filter == 'female' %}bg-slate-700 text-slate-200{% else %}bg-slate-200 text-slate-700{% endif %} font-mono">{{ girls_count }}</span>
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Search Bar and Status Filter -->
+        <form method="get" class="flex flex-col sm:flex-row items-center gap-2.5">
+            {% if category_filter %}
+            <input type="hidden" name="category" value="{{ category_filter }}">
+            {% endif %}
+
             <div class="relative flex-1 w-full">
-                <input type="text" name="q" value="{{ search_query }}" placeholder="Search hostels by name..." class="form-input text-xs pl-9">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search by hostel name or code (e.g. BH-01, GH-02)..." class="form-input text-xs pl-8">
+                <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 </div>
             </div>
 
-            <div class="w-full sm:w-48">
+            <div class="w-full sm:w-44">
                 <select name="status" class="form-select text-xs">
                     <option value="">All Statuses</option>
-                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
-                    <option value="maintenance" {% if status_filter == 'maintenance' %}selected{% endif %}>Under Maintenance</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Operational</option>
+                    <option value="maintenance" {% if status_filter == 'maintenance' %}selected{% endif %}>Maintenance</option>
                     <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
                 </select>
             </div>
@@ -41,8 +115,8 @@
             <button type="submit" class="btn-secondary btn-sm w-full sm:w-auto">
                 Filter
             </button>
-            {% if search_query or status_filter %}
-            <a href="{% url 'hostels:hostel_list' %}" class="text-xs text-slate-500 hover:text-slate-800">
+            {% if search_query or status_filter or category_filter %}
+            <a href="{% url 'hostels:hostel_list' %}" class="text-xs text-slate-500 hover:text-slate-800 transition-colors">
                 Clear
             </a>
             {% endif %}
@@ -50,71 +124,117 @@
     </div>
 
     <!-- Hostels Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {% for hostel in hostels %}
-        <div class="card p-6 flex flex-col justify-between hover:shadow-md transition-all">
+        <div class="card card-interactive flex flex-col justify-between overflow-hidden bg-white border border-slate-200 rounded-xl">
             <div>
-                <div class="flex items-center justify-between mb-3">
-                    <span class="badge-brand font-mono font-bold">{{ hostel.code }}</span>
-                    {% if hostel.status == 'active' %}
-                    <span class="badge-success">Operational</span>
-                    {% elif hostel.status == 'maintenance' %}
-                    <span class="badge-warning">Maintenance</span>
+                <!-- Cover Image with "Illustrative photo" Badge -->
+                <div class="relative w-full h-40 bg-slate-100 overflow-hidden border-b border-slate-200">
+                    {% if forloop.counter|divisibleby:2 %}
+                    <img src="{% static 'images/accommodation/exterior_classic.svg' %}"
+                         alt="Illustrative exterior photo for {{ hostel.name }}"
+                         width="400" height="160"
+                         loading="lazy"
+                         class="w-full h-full object-cover">
                     {% else %}
-                    <span class="badge-danger">Inactive</span>
+                    <img src="{% static 'images/accommodation/exterior_modern.svg' %}"
+                         alt="Illustrative exterior photo for {{ hostel.name }}"
+                         width="400" height="160"
+                         loading="lazy"
+                         class="w-full h-full object-cover">
                     {% endif %}
-                </div>
 
-                <h3 class="text-lg font-bold text-slate-900 tracking-tight">{{ hostel.name }}</h3>
-                <p class="text-xs text-slate-500 mt-0.5">{{ hostel.resident_category }}</p>
-                <p class="text-xs text-slate-600 mt-2 line-clamp-2">{{ hostel.address|default:"Campus residential area" }}</p>
+                    <!-- Illustrative Photo Badge -->
+                    <span class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-900/80 text-white shadow-xs">
+                        Illustrative photo
+                    </span>
 
-                <!-- Statistics Metrics -->
-                <div class="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-slate-100 text-xs">
-                    <div class="p-2.5 bg-slate-50 rounded-lg">
-                        <span class="text-slate-400 block text-[11px]">Total Rooms</span>
-                        <span class="font-bold text-slate-800 text-sm">{{ hostel.total_rooms }}</span>
-                    </div>
-                    <div class="p-2.5 bg-slate-50 rounded-lg">
-                        <span class="text-slate-400 block text-[11px]">Total Beds</span>
-                        <span class="font-bold text-slate-800 text-sm">{{ hostel.total_beds }}</span>
-                    </div>
-                    <div class="p-2.5 bg-slate-50 rounded-lg">
-                        <span class="text-slate-400 block text-[11px]">Occupied</span>
-                        <span class="font-bold text-teal-700 text-sm">{{ hostel.occupied_beds }}</span>
-                    </div>
-                    <div class="p-2.5 bg-slate-50 rounded-lg">
-                        <span class="text-slate-400 block text-[11px]">Available</span>
-                        <span class="font-bold text-emerald-600 text-sm">{{ hostel.available_beds }}</span>
+                    <!-- Category Pill Overlaid on Image Bottom Left -->
+                    <div class="absolute bottom-2.5 left-2.5 flex items-center gap-1.5">
+                        <span class="badge-neutral font-mono font-bold text-[10px] bg-white/90 shadow-2xs">{{ hostel.code }}</span>
+                        {% if hostel.resident_category == 'male' %}
+                        <span class="badge-category-boys bg-white/90 shadow-2xs">Boys' Hostel</span>
+                        {% elif hostel.resident_category == 'female' %}
+                        <span class="badge-category-girls bg-white/90 shadow-2xs">Girls' Hostel</span>
+                        {% else %}
+                        <span class="badge-neutral bg-white/90 shadow-2xs">{{ hostel.get_resident_category_display }}</span>
+                        {% endif %}
                     </div>
                 </div>
 
-                <!-- Utilization Bar -->
-                <div class="mt-4">
-                    <div class="flex justify-between text-xs text-slate-500 mb-1">
-                        <span>Occupancy Rate</span>
-                        <span class="font-bold text-slate-900">{{ hostel.occupancy_rate }}%</span>
+                <!-- Card Body -->
+                <div class="p-4 sm:p-5">
+                    <!-- Title and Status -->
+                    <div class="flex items-start justify-between gap-2 mb-1">
+                        <h3 class="text-base font-bold text-slate-900 tracking-tight leading-snug">{{ hostel.name }}</h3>
+                        {% if hostel.status == 'active' %}
+                        <span class="badge-success text-[10px] flex-shrink-0">Operational</span>
+                        {% elif hostel.status == 'maintenance' %}
+                        <span class="badge-warning text-[10px] flex-shrink-0">Maintenance</span>
+                        {% else %}
+                        <span class="badge-danger text-[10px] flex-shrink-0">Inactive</span>
+                        {% endif %}
                     </div>
-                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-teal-700 h-1.5 rounded-full" style="width: {{ hostel.occupancy_rate }}%;"></div>
+                    <p class="text-xs text-slate-500 line-clamp-1 mb-3">
+                        {{ hostel.address|default:"Campus Residential Zone" }}
+                    </p>
+
+                    <!-- Metrics Grid -->
+                    <div class="grid grid-cols-3 gap-1.5 pt-3 border-t border-slate-100 text-center">
+                        <div class="p-2 bg-slate-50 rounded-lg">
+                            <span class="text-[10px] text-slate-500 uppercase tracking-wider block">Floors</span>
+                            <span class="text-xs font-bold text-slate-800 font-mono">{{ hostel.total_floors }}</span>
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded-lg">
+                            <span class="text-[10px] text-slate-500 uppercase tracking-wider block">Rooms</span>
+                            <span class="text-xs font-bold text-slate-800 font-mono">{{ hostel.total_rooms }}</span>
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded-lg">
+                            <span class="text-[10px] text-slate-500 uppercase tracking-wider block">Total Beds</span>
+                            <span class="text-xs font-bold text-slate-800 font-mono">{{ hostel.total_beds }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Occupied / Available Counts -->
+                    <div class="grid grid-cols-2 gap-1.5 mt-1.5 text-xs">
+                        <div class="p-2 bg-slate-50 rounded-lg flex items-center justify-between">
+                            <span class="text-[10px] text-slate-500">Occupied</span>
+                            <span class="font-bold text-teal-800 font-mono">{{ hostel.occupied_beds }}</span>
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded-lg flex items-center justify-between">
+                            <span class="text-[10px] text-slate-500">Available</span>
+                            <span class="font-bold text-emerald-700 font-mono">{{ hostel.available_beds }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Occupancy Progress Bar -->
+                    <div class="mt-3">
+                        <div class="flex items-center justify-between text-[11px] mb-1 text-slate-500">
+                            <span>{{ hostel.occupancy_status_label }}</span>
+                            <span class="font-semibold text-slate-800 font-mono">{{ hostel.occupancy_rate }}%</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                            <div class="bg-teal-700 h-1.5 rounded-full" style="width: {{ hostel.occupancy_rate }}%;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Footer Action Buttons -->
-            <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                <a href="{% url 'hostels:hostel_detail' pk=hostel.id %}" class="btn-primary btn-sm flex-1 text-center justify-center">
-                    View Details & Blocks
+            <div class="p-4 pt-0 flex items-center gap-2">
+                <a href="{% url 'hostels:hostel_detail' pk=hostel.id %}" class="btn-primary btn-sm flex-1 text-center justify-center text-xs">
+                    <span>View Rooms & Beds</span>
+                    <span>&rarr;</span>
                 </a>
                 {% if can_manage_inventory %}
-                <a href="{% url 'hostels:hostel_edit' pk=hostel.id %}" class="btn-secondary btn-sm ml-2" title="Edit Hostel">
+                <a href="{% url 'hostels:hostel_edit_builder' pk=hostel.id %}" class="btn-secondary btn-sm text-xs" title="Edit in Custom Hostel Builder">
                     Edit
                 </a>
                 {% endif %}
             </div>
         </div>
         {% empty %}
-        <div class="col-span-3">
+        <div class="col-span-full">
             {% include 'components/empty_state.html' with title="No hostels found" description="No hostels matched your search criteria." %}
         </div>
         {% endfor %}

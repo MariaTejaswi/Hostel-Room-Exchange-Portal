@@ -32,7 +32,7 @@ def run_audits():
 
     print("\n=== AUDIT 2: ROLE LOGIN AND DASHBOARD FLOWS ===")
     test_roles = [
-        ("System Administrator", "admin@roomloop.edu", "/dashboard/admin/"),
+        ("System Administrator", "admin@roomloop.edu", "/dashboard/sysadmin/"),
         ("Hostel Administrator", "hostel.admin@roomloop.edu", "/dashboard/admin/"),
         ("Chief Warden", "chief.warden@roomloop.edu", "/dashboard/chief-warden/"),
         ("Warden (Assigned)", "warden.north@roomloop.edu", "/dashboard/warden/"),

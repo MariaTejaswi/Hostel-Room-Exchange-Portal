@@ -51,6 +51,11 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         SUSPENDED = "suspended", "Suspended"
         INACTIVE = "inactive", "Inactive"
 
+    class ResidentialEligibility(models.TextChoices):
+        MALE = "male", "Boys' Hostel Eligible"
+        FEMALE = "female", "Girls' Hostel Eligible"
+        UNVERIFIED = "unverified", "Pending Institutional Verification"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(
         unique=True,
@@ -76,6 +81,13 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     )
     phone_number = models.CharField(max_length=20, blank=True, help_text="Primary phone number")
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)
+    residential_eligibility = models.CharField(
+        max_length=20,
+        choices=ResidentialEligibility.choices,
+        default=ResidentialEligibility.UNVERIFIED,
+        db_index=True,
+        help_text="Authoritative verified residential eligibility (set by Registrar / Student Welfare)",
+    )
     account_status = models.CharField(
         max_length=20,
         choices=AccountStatus.choices,
@@ -124,19 +136,19 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     @property
     def primary_role(self) -> str:
         """Return the primary role name based on group membership or superuser status."""
-        if self.is_superuser:
-            return "System Administrator"
         group_names = set(self.groups.values_list("name", flat=True))
         for role in [
-            "System Administrator",
+            "Dean of Student Welfare",
             "Hostel Administrator",
             "Chief Warden",
             "Warden",
-            "Dean of Student Welfare",
+            "System Administrator",
             "Student",
         ]:
             if role in group_names:
                 return role
+        if self.is_superuser:
+            return "System Administrator"
         return "Student"
 
     @property
@@ -153,8 +165,12 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
 
     @property
     def is_hostel_admin_role(self) -> bool:
-        return self.primary_role in ("Hostel Administrator", "System Administrator")
+        return self.primary_role == "Hostel Administrator"
 
     @property
     def is_dean_role(self) -> bool:
         return self.primary_role == "Dean of Student Welfare"
+
+    @property
+    def is_sysadmin_role(self) -> bool:
+        return self.primary_role == "System Administrator"

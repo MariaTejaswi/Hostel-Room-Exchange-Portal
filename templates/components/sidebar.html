@@ -1,50 +1,65 @@
 {% load static %}
 <aside id="app-sidebar" class="sidebar">
-    <!-- Brand / Institution Header -->
-    <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+    <!-- Brand / Header -->
+    <div class="p-4 border-b border-slate-700/60 flex items-center justify-between">
         <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-3">
-            <img src="{% static 'images/logo.svg' %}" alt="RoomLoop" class="w-8 h-8 rounded-md">
+            <img src="{% static 'images/logo.svg' %}" alt="RoomLoop" class="w-7 h-7 rounded">
             <div>
-                <span class="font-bold text-lg text-slate-900 tracking-tight leading-none block">RoomLoop</span>
-                <span class="text-xs text-teal-700 font-medium leading-none">Accommodation</span>
+                <span class="font-bold text-base text-white tracking-tight leading-none block">RoomLoop</span>
+                <span class="text-[10px] text-teal-300 font-medium leading-none mt-0.5 block">Accommodation Portal</span>
             </div>
         </a>
     </div>
 
-    <!-- Institution Context Pill -->
-    <div class="px-5 py-3 bg-slate-50 border-b border-slate-100">
-        <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Institution</div>
-        <div class="text-xs font-medium text-slate-800 truncate" title="{{ current_institution.name|default:'Demo University' }}">
-            {{ current_institution.name|default:"Demo University" }}
+    <!-- Institution Context -->
+    <div class="px-4 py-2.5 bg-slate-900/40 border-b border-slate-700/40 flex items-center gap-2">
+        <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+        </svg>
+        <div class="min-w-0 flex-1">
+            <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Institution</div>
+            <div class="text-xs font-medium text-slate-200 truncate" title="{{ current_institution.name|default:'Apex University' }}">
+                {{ current_institution.name|default:"Apex University" }}
+            </div>
         </div>
     </div>
 
-    <!-- Navigation List -->
+    <!-- Navigation List with SVG Icons -->
     <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
-        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-2 pb-1">Core Modules</div>
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-2 pb-1">
+            Core Modules
+        </div>
         
         <!-- Dashboard Link -->
         <a href="{% url 'accounts:dashboard' %}" class="sidebar-nav-item {% if active_nav == 'dashboard' %}active{% endif %}">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+            </svg>
             <span>Dashboard</span>
         </a>
 
         <!-- Hostels (M8) -->
         <a href="{% url 'hostels:hostel_list' %}" class="sidebar-nav-item {% if active_nav == 'hostels' %}active{% endif %}">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-            <span>Hostels</span>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+            </svg>
+            <span>Hostels Explorer</span>
         </a>
 
         <!-- Room Inventory (M8) -->
         <a href="{% url 'hostels:room_inventory' %}" class="sidebar-nav-item {% if active_nav == 'rooms' %}active{% endif %}">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
+            </svg>
             <span>Room Inventory</span>
         </a>
 
         <!-- Bed Management (M8) -->
         {% if can_manage_inventory or is_warden %}
         <a href="{% url 'hostels:bed_list' %}" class="sidebar-nav-item {% if active_nav == 'beds' %}active{% endif %}">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+            </svg>
             <span>Beds & Status</span>
         </a>
         {% endif %}
@@ -52,38 +67,57 @@
         <!-- Occupancy Management (M8) - Authorized Staff -->
         {% if not is_student %}
         <a href="{% url 'hostels:occupancy_list' %}" class="sidebar-nav-item {% if active_nav == 'occupancy' %}active{% endif %}">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+            </svg>
             <span>Occupancy Roster</span>
         </a>
         {% endif %}
 
-        <!-- Future Phase Placeholders (Explicitly marked) -->
-        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-4 pb-1">Swap Modules</div>
+        {% if is_sysadmin %}
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">Technical Admin</div>
+        <a href="{% url 'accounts:dashboard_sysadmin' %}" class="sidebar-nav-item {% if active_nav == 'sysadmin' %}active{% endif %}">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+            </svg>
+            <span>System Console</span>
+        </a>
+        {% endif %}
+
+        <!-- Swap Modules (Phase 2 Preview) -->
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-4 pb-1 flex items-center justify-between">
+            <span>Exchange Modules</span>
+            <span class="text-[9px] bg-slate-800 text-teal-400 px-1.5 py-0.5 rounded font-medium">Phase 2</span>
+        </div>
         
-        <div class="sidebar-nav-item opacity-50 cursor-not-allowed text-slate-400" title="Coming in Phase 2">
-            <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-            <span class="flex-1">Room Exchange</span>
-            <span class="text-[9px] bg-slate-100 text-slate-500 rounded px-1.5 py-0.5 font-medium">Phase 2</span>
+        <div class="sidebar-nav-item opacity-50 cursor-not-allowed text-slate-400" title="Available in Phase 2">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+            </svg>
+            <span class="flex-1 text-xs">Room Exchange</span>
+            <span class="text-[9px] bg-slate-800 text-slate-400 rounded px-1.5 py-0.5">Soon</span>
         </div>
 
-        <div class="sidebar-nav-item opacity-50 cursor-not-allowed text-slate-400" title="Coming in Phase 2">
-            <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-            <span class="flex-1">Warden Approvals</span>
-            <span class="text-[9px] bg-slate-100 text-slate-500 rounded px-1.5 py-0.5 font-medium">Phase 2</span>
+        <div class="sidebar-nav-item opacity-50 cursor-not-allowed text-slate-400" title="Available in Phase 2">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span class="flex-1 text-xs">Multi-Party Swaps</span>
+            <span class="text-[9px] bg-slate-800 text-slate-400 rounded px-1.5 py-0.5">Soon</span>
         </div>
     </nav>
 
     <!-- Bottom User Bar -->
-    <div class="p-3 border-t border-slate-200 bg-slate-50">
-        <div class="flex items-center gap-3 p-2 rounded-lg bg-white border border-slate-200">
-            <div class="w-8 h-8 rounded-full bg-teal-100 text-teal-800 font-semibold flex items-center justify-center text-xs flex-shrink-0">
+    <div class="p-3 border-t border-slate-700/60 bg-slate-900/50">
+        <div class="flex items-center gap-2.5 p-2 rounded-lg bg-slate-800/80 border border-slate-700/60">
+            <div class="w-7 h-7 rounded bg-teal-700 text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
                 {{ request.user.full_name|slice:":2"|upper }}
             </div>
             <div class="min-w-0 flex-1">
-                <div class="text-xs font-semibold text-slate-900 truncate">{{ request.user.full_name }}</div>
-                <div class="text-[11px] text-teal-700 font-medium truncate">{{ user_role_label }}</div>
+                <div class="text-xs font-semibold text-slate-200 truncate">{{ request.user.full_name }}</div>
+                <div class="text-[10px] text-teal-300 font-medium truncate">{{ user_role_label|default:user_role }}</div>
             </div>
-            <a href="{% url 'accounts:logout' %}" class="text-slate-400 hover:text-red-600 p-1" title="Sign out">
+            <a href="{% url 'accounts:logout' %}" class="text-slate-400 hover:text-red-400 p-1 rounded transition-colors flex-shrink-0" title="Sign out" aria-label="Sign out">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
             </a>
         </div>

@@ -17,7 +17,9 @@ def get_dashboard_url_for_user(user: User) -> str:
 
     role = user.primary_role
 
-    if role in (ROLE_SYSADMIN, ROLE_HOSTEL_ADMIN):
+    if role == ROLE_SYSADMIN:
+        return reverse("accounts:dashboard_sysadmin")
+    elif role == ROLE_HOSTEL_ADMIN:
         return reverse("accounts:dashboard_admin")
     elif role == ROLE_CHIEF_WARDEN:
         return reverse("accounts:dashboard_chief_warden")

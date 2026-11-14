@@ -14,6 +14,7 @@ urlpatterns = [
     path("dashboard/warden/", views.warden_dashboard_view, name="dashboard_warden"),
     path("dashboard/chief-warden/", views.chief_warden_dashboard_view, name="dashboard_chief_warden"),
     path("dashboard/admin/", views.hostel_admin_dashboard_view, name="dashboard_admin"),
+    path("dashboard/sysadmin/", views.sysadmin_dashboard_view, name="dashboard_sysadmin"),
     path("dashboard/dean/", views.dean_dashboard_view, name="dashboard_dean"),
     # Profile & Password Management
     path("profile/", views.profile_view, name="profile"),

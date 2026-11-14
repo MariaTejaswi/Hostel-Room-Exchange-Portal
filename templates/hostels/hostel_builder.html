@@ -1,0 +1,924 @@
+{% extends 'layouts/dashboard_base.html' %}
+{% load static %}
+
+{% block breadcrumb_current %}
+{% if is_edit %}Edit {{ hostel.name }} (Custom Builder){% else %}Custom Hostel Builder{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6" id="builder-app">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-slate-200">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <a href="{% url 'hostels:hostel_list' %}" class="text-xs text-teal-700 hover:text-teal-800 font-medium">
+                    &larr; Hostels Directory
+                </a>
+                <span class="text-slate-300">•</span>
+                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 text-[11px] font-semibold border border-teal-200">
+                    Phase 2 Custom Builder
+                </span>
+                {% if is_edit %}
+                <span class="badge-neutral font-mono">{{ hostel.code }}</span>
+                {% endif %}
+            </div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">
+                {% if is_edit %}Edit Infrastructure: {{ hostel.name }}{% else %}Custom Hostel Inventory Builder{% endif %}
+            </h1>
+            <p class="mt-1 text-xs text-slate-500">
+                Configure custom blocks, independent floor numbers, variable room quantities, and arbitrary bed capacities.
+            </p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-xs text-slate-500 hidden sm:inline">Institution: <strong>{{ current_institution.code|default:"Global" }}</strong></span>
+            <a href="{% url 'hostels:hostel_list' %}" class="btn-secondary btn-sm">
+                Cancel
+            </a>
+        </div>
+    </div>
+
+    <!-- Error Banner (if validation failed on server) -->
+    {% if error_message %}
+    <div class="p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3">
+        <svg class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <div class="text-xs text-red-900">
+            <span class="font-bold">Validation Error:</span> {{ error_message }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Stepper Navigation -->
+    <div class="card p-2 sm:p-3 bg-white">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-medium">
+            <button type="button" class="step-nav-btn py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-2 border"
+                    data-step="1" id="step-btn-1">
+                <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">1</span>
+                <span>Hostel Details</span>
+            </button>
+            <button type="button" class="step-nav-btn py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-2 border"
+                    data-step="2" id="step-btn-2">
+                <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">2</span>
+                <span>Blocks & Floors</span>
+            </button>
+            <button type="button" class="step-nav-btn py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-2 border"
+                    data-step="3" id="step-btn-3">
+                <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">3</span>
+                <span>Rooms & Beds</span>
+            </button>
+            <button type="button" class="step-nav-btn py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-2 border"
+                    data-step="4" id="step-btn-4">
+                <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">4</span>
+                <span>Review & Commit</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN BUILDER FORM CONTAINER -->
+    <form method="post" id="custom-builder-form" class="space-y-6">
+        {% csrf_token %}
+        <input type="hidden" name="configuration_json" id="configuration_json_input">
+        <input type="hidden" name="change_reason" id="change_reason_hidden">
+
+        <!-- ========================================== -->
+        <!-- STEP 1: HOSTEL DETAILS                     -->
+        <!-- ========================================== -->
+        <div class="step-panel space-y-6" id="step-panel-1">
+            <div class="card p-6 space-y-5">
+                <div class="border-b border-slate-100 pb-3">
+                    <h2 class="text-base font-bold text-slate-900">Step 1: Facility Information</h2>
+                    <p class="text-xs text-slate-500">Define the core identification, resident category, and physical location of the hostel.</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="input-hostel-name" class="form-label required">Hostel Name</label>
+                        <input type="text" id="input-hostel-name" class="form-input text-xs" placeholder="e.g. Himalaya Residence, Ganga Block" required>
+                        <p class="text-[11px] text-slate-400 mt-1">Official displayed residential hall name.</p>
+                    </div>
+
+                    <div>
+                        <label for="input-hostel-code" class="form-label required">Hostel Code</label>
+                        <input type="text" id="input-hostel-code" class="form-input text-xs font-mono uppercase" placeholder="e.g. HR-01, GB-02" required>
+                        <p class="text-[11px] text-slate-400 mt-1">Unique alphanumeric code within {{ current_institution.name|default:"institution" }}.</p>
+                    </div>
+
+                    <div>
+                        <label for="input-resident-category" class="form-label required">Resident Category</label>
+                        <select id="input-resident-category" class="form-select text-xs">
+                            {% for val, label in resident_categories %}
+                            <option value="{{ val }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if is_edit %}
+                        <p class="text-[11px] text-amber-600 mt-1">Category changes are blocked if active student occupants currently reside in the hostel.</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="input-hostel-status" class="form-label required">Operational Status</label>
+                        <select id="input-hostel-status" class="form-select text-xs">
+                            {% for val, label in hostel_statuses %}
+                            <option value="{{ val }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if is_edit %}
+                        <p class="text-[11px] text-amber-600 mt-1">Cannot deactivate facility while active bed allocations exist.</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="input-hostel-address" class="form-label">Physical Address / Sector Location</label>
+                        <input type="text" id="input-hostel-address" class="form-input text-xs" placeholder="e.g. North Campus, Sector 4, Near Sports Complex">
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="input-hostel-description" class="form-label">Description & Amenities</label>
+                        <textarea id="input-hostel-description" rows="2" class="form-input text-xs" placeholder="Optional notes regarding Wi-Fi, study halls, mess facilities, or accessibility."></textarea>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-3 border-t border-slate-100">
+                    <button type="button" class="btn-primary btn-sm next-step-btn" data-target="2">
+                        Next: Configure Blocks & Floors &rarr;
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- STEP 2: BLOCKS & FLOORS                    -->
+        <!-- ========================================== -->
+        <div class="step-panel space-y-6 hidden" id="step-panel-2">
+            <div class="card p-6 space-y-5">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900">Step 2: Blocks & Floor Levels</h2>
+                        <p class="text-xs text-slate-500">Configure building wings and the independent floors inside each block.</p>
+                    </div>
+                    <button type="button" id="btn-add-block" class="btn-secondary btn-sm">
+                        + Add Another Block / Wing
+                    </button>
+                </div>
+
+                <!-- Blocks Container -->
+                <div id="blocks-container" class="space-y-6">
+                    <!-- Populated dynamically via JS -->
+                </div>
+
+                <div class="flex justify-between pt-4 border-t border-slate-100">
+                    <button type="button" class="btn-secondary btn-sm prev-step-btn" data-target="1">
+                        &larr; Back to Facility Info
+                    </button>
+                    <button type="button" class="btn-primary btn-sm next-step-btn" data-target="3">
+                        Next: Configure Rooms & Beds &rarr;
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- STEP 3: ROOMS & BEDS INVENTORY             -->
+        <!-- ========================================== -->
+        <div class="step-panel space-y-6 hidden" id="step-panel-3">
+            <div class="card p-6 space-y-5">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900">Step 3: Rooms & Bed Capacities</h2>
+                        <p class="text-xs text-slate-500">Customize room numbers, sharing types, and individual bed labels on every floor independently.</p>
+                    </div>
+                    <!-- Quick Floor Selector Tabs -->
+                    <div class="flex items-center gap-2 overflow-x-auto" id="floor-tabs-bar">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Active Floor Rooms Workspace -->
+                <div id="floor-rooms-workspace" class="space-y-5">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <div class="flex justify-between pt-4 border-t border-slate-100">
+                    <button type="button" class="btn-secondary btn-sm prev-step-btn" data-target="2">
+                        &larr; Back to Blocks & Floors
+                    </button>
+                    <button type="button" class="btn-primary btn-sm next-step-btn" data-target="4">
+                        Next: Review & Capacity Preview &rarr;
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- STEP 4: REVIEW & COMMIT                    -->
+        <!-- ========================================== -->
+        <div class="step-panel space-y-6 hidden" id="step-panel-4">
+            <!-- Overall Capacity Metrics Preview -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div class="card p-4">
+                    <span class="text-xs text-slate-500 block">Configured Blocks</span>
+                    <span class="text-2xl font-bold text-slate-900 mt-1 block" id="preview-total-blocks">0</span>
+                    <span class="text-[11px] text-slate-400 mt-0.5 block">Residential wings</span>
+                </div>
+                <div class="card p-4">
+                    <span class="text-xs text-slate-500 block">Total Floors</span>
+                    <span class="text-2xl font-bold text-slate-900 mt-1 block" id="preview-total-floors">0</span>
+                    <span class="text-[11px] text-slate-400 mt-0.5 block">Independent levels</span>
+                </div>
+                <div class="card p-4">
+                    <span class="text-xs text-slate-500 block">Total Rooms</span>
+                    <span class="text-2xl font-bold text-teal-700 mt-1 block" id="preview-total-rooms">0</span>
+                    <span class="text-[11px] text-slate-400 mt-0.5 block">Configured inventory</span>
+                </div>
+                <div class="card p-4 bg-teal-50/50 border-teal-200">
+                    <span class="text-xs text-teal-800 font-semibold block">Total Active Bed Capacity</span>
+                    <span class="text-2xl font-bold text-teal-900 mt-1 block" id="preview-total-beds">0</span>
+                    <span class="text-[11px] text-teal-700 mt-0.5 block">Allocatable student slots</span>
+                </div>
+            </div>
+
+            <!-- Floor-by-Floor Breakdown Table -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">Floor-by-Floor Capacity Breakdown</h3>
+                        <p class="text-xs text-slate-500">Verified distribution of rooms and beds across all levels.</p>
+                    </div>
+                </div>
+                <div class="data-table-container">
+                    <table class="data-table" id="preview-breakdown-table">
+                        <thead>
+                            <tr>
+                                <th>Block Wing</th>
+                                <th>Floor Level</th>
+                                <th>Room Quantity</th>
+                                <th>Active Bed Capacity</th>
+                                <th>Configured Rooms</th>
+                            </tr>
+                        </thead>
+                        <tbody id="preview-breakdown-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Safe Editing Inspection Card (if editing existing hostel) -->
+            {% if is_edit %}
+            <div class="card p-5 space-y-4 border-amber-200 bg-amber-50/30">
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <div>
+                        <h4 class="text-sm font-bold text-amber-900">Safe Editing & Occupancy Protection Verification</h4>
+                        <p class="text-xs text-amber-800 mt-0.5">
+                            Existing IDs and historical occupancy references are preserved. Omitted or downsized beds are safely soft-deactivated only if no active occupant resides in them.
+                        </p>
+                    </div>
+                </div>
+
+                <div id="safety-warnings-container" class="space-y-2">
+                    <!-- Populated dynamically if occupied beds are detected in proposed removals -->
+                </div>
+
+                <div>
+                    <label for="input-change-reason" class="form-label required">Administrative Reason for Modification</label>
+                    <textarea id="input-change-reason" rows="2" class="form-input text-xs" placeholder="e.g. Expanding 2nd floor room capacity, adding 3rd floor wing, or renumbering rooms for academic year 2026." required></textarea>
+                    <p class="text-[11px] text-slate-500 mt-1">This explanation is permanently recorded in the immutable audit log.</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Submission Actions -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-slate-100 border border-slate-200">
+                <button type="button" class="btn-secondary btn-sm prev-step-btn w-full sm:w-auto" data-target="3">
+                    &larr; Back to Rooms & Beds
+                </button>
+
+                <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+                    <button type="submit" id="btn-submit-builder" class="btn-primary btn-sm w-full sm:w-auto">
+                        <span id="btn-submit-spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        <span id="btn-submit-text">{% if is_edit %}Confirm & Commit Infrastructure Updates{% else %}Confirm & Create Hostel Facility{% endif %}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Raw Initial Data Injection -->
+<script id="raw-initial-config" type="application/json">
+{{ initial_config_json|safe }}
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    // 1. Load Initial Configuration
+    let config = {};
+    try {
+        const rawEl = document.getElementById("raw-initial-config");
+        config = JSON.parse(rawEl.textContent);
+    } catch (e) {
+        console.error("Failed to parse initial configuration:", e);
+        config = {
+            name: "", code: "", resident_category: "male", status: "active",
+            address: "", description: "", initial_updated_at: "",
+            blocks: [{ name: "Main Block", code: "BLK-M", description: "", is_active: true, floors: [] }]
+        };
+    }
+
+    let activeStep = 1;
+    let activeFloorKey = null;
+
+    // DOM Elements
+    const inputName = document.getElementById("input-hostel-name");
+    const inputCode = document.getElementById("input-hostel-code");
+    const inputCategory = document.getElementById("input-resident-category");
+    const inputStatus = document.getElementById("input-hostel-status");
+    const inputAddress = document.getElementById("input-hostel-address");
+    const inputDescription = document.getElementById("input-hostel-description");
+    const inputChangeReason = document.getElementById("input-change-reason");
+    const configHiddenInput = document.getElementById("configuration_json_input");
+    const changeReasonHidden = document.getElementById("change_reason_hidden");
+    const blocksContainer = document.getElementById("blocks-container");
+    const floorTabsBar = document.getElementById("floor-tabs-bar");
+    const floorRoomsWorkspace = document.getElementById("floor-rooms-workspace");
+    const submitBtn = document.getElementById("btn-submit-builder");
+    const submitText = document.getElementById("btn-submit-text");
+    const submitSpinner = document.getElementById("btn-submit-spinner");
+
+    // Initialize Step 1 Fields
+    if (inputName) inputName.value = config.name || "";
+    if (inputCode) inputCode.value = config.code || "";
+    if (inputCategory) inputCategory.value = config.resident_category || "male";
+    if (inputStatus) inputStatus.value = config.status || "active";
+    if (inputAddress) inputAddress.value = config.address || "";
+    if (inputDescription) inputDescription.value = config.description || "";
+
+    // Sync input handlers
+    inputName.addEventListener("input", e => { config.name = e.target.value.trim(); });
+    inputCode.addEventListener("input", e => { config.code = e.target.value.trim().toUpperCase(); e.target.value = config.code; });
+    inputCategory.addEventListener("change", e => { config.resident_category = e.target.value; });
+    inputStatus.addEventListener("change", e => { config.status = e.target.value; });
+    inputAddress.addEventListener("input", e => { config.address = e.target.value.trim(); });
+    inputDescription.addEventListener("input", e => { config.description = e.target.value.trim(); });
+
+    // Step Navigation Handlers
+    function goToStep(step) {
+        activeStep = step;
+        document.querySelectorAll(".step-panel").forEach(p => p.classList.add("hidden"));
+        document.getElementById(`step-panel-${step}`).classList.remove("hidden");
+
+        // Update step buttons styling
+        for (let i = 1; i <= 4; i++) {
+            const btn = document.getElementById(`step-btn-${i}`);
+            const badge = btn.querySelector("span:first-child");
+            if (i === step) {
+                btn.className = "step-nav-btn py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-2 border bg-teal-50 border-teal-500 text-teal-900 font-bold shadow-sm";
+                badge.className = "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold bg-teal-700 text-white";
+            } else if (i < step) {
+                btn.className = "step-nav-btn py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-2 border bg-white border-slate-200 text-slate-800";
+                badge.className = "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold bg-emerald-100 text-emerald-800";
+            } else {
+                btn.className = "step-nav-btn py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-2 border bg-slate-50/50 border-slate-200 text-slate-400";
+                badge.className = "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold bg-slate-200 text-slate-600";
+            }
+        }
+
+        if (step === 2) renderBlocks();
+        if (step === 3) renderRoomsWorkspace();
+        if (step === 4) renderReviewAndCapacity();
+    }
+
+    document.querySelectorAll(".step-nav-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const target = parseInt(btn.getAttribute("data-step"));
+            goToStep(target);
+        });
+    });
+
+    document.querySelectorAll(".next-step-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const target = parseInt(btn.getAttribute("data-target"));
+            goToStep(target);
+        });
+    });
+
+    document.querySelectorAll(".prev-step-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const target = parseInt(btn.getAttribute("data-target"));
+            goToStep(target);
+        });
+    });
+
+    // -------------------------------------------------------------
+    // STEP 2: BLOCKS & FLOORS BUILDER
+    // -------------------------------------------------------------
+    function renderBlocks() {
+        blocksContainer.innerHTML = "";
+        if (!config.blocks || config.blocks.length === 0) {
+            config.blocks = [{
+                name: "Main Block", code: "BLK-M", description: "", is_active: true, floors: []
+            }];
+        }
+
+        config.blocks.forEach((block, bIdx) => {
+            const blockCard = document.createElement("div");
+            blockCard.className = "p-4 sm:p-5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-4";
+            blockCard.innerHTML = `
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-200">
+                    <div class="flex items-center gap-3">
+                        <span class="w-7 h-7 rounded-lg bg-teal-100 text-teal-800 font-bold text-xs flex items-center justify-center">
+                            B${bIdx + 1}
+                        </span>
+                        <div>
+                            <input type="text" class="form-input text-xs font-bold block-name-input w-48" value="${block.name || 'Block ' + (bIdx + 1)}" placeholder="Block Name">
+                        </div>
+                        <div>
+                            <input type="text" class="form-input text-xs font-mono uppercase block-code-input w-28" value="${block.code || 'BLK-' + (bIdx + 1)}" placeholder="Code">
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="btn-secondary btn-sm add-floor-btn" data-bidx="${bIdx}">
+                            + Add Floor
+                        </button>
+                        ${config.blocks.length > 1 ? `
+                        <button type="button" class="btn-danger btn-sm remove-block-btn" data-bidx="${bIdx}">
+                            Delete Block
+                        </button>` : ''}
+                    </div>
+                </div>
+
+                <!-- Floors List inside Block -->
+                <div class="space-y-3" id="floors-container-${bIdx}">
+                    <div class="text-xs font-bold text-slate-700 flex justify-between items-center px-1">
+                        <span>Configured Floors (${block.floors ? block.floors.length : 0})</span>
+                        <span class="text-[11px] text-slate-400">Configure room count per floor in Step 3</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 floors-grid-${bIdx}"></div>
+                </div>
+            `;
+
+            // Bind block input events
+            const nameInput = blockCard.querySelector(".block-name-input");
+            nameInput.addEventListener("input", e => { block.name = e.target.value.trim(); });
+            const codeInput = blockCard.querySelector(".block-code-input");
+            codeInput.addEventListener("input", e => {
+                block.code = e.target.value.trim().toUpperCase();
+                e.target.value = block.code;
+            });
+
+            // Add floor button
+            blockCard.querySelector(".add-floor-btn").addEventListener("click", () => {
+                if (!block.floors) block.floors = [];
+                const nextNum = block.floors.length === 0 ? 1 : Math.max(...block.floors.map(f => f.floor_number)) + 1;
+                block.floors.push({
+                    floor_number: nextNum,
+                    floor_label: `${nextNum}${getOrdinal(nextNum)} Floor`,
+                    is_active: true,
+                    rooms: []
+                });
+                renderBlocks();
+            });
+
+            // Remove block button
+            if (config.blocks.length > 1) {
+                blockCard.querySelector(".remove-block-btn").addEventListener("click", () => {
+                    config.blocks.splice(bIdx, 1);
+                    renderBlocks();
+                });
+            }
+
+            // Render Floor Chips inside block
+            const floorsGrid = blockCard.querySelector(`.floors-grid-${bIdx}`);
+            if (!block.floors || block.floors.length === 0) {
+                floorsGrid.innerHTML = `
+                    <div class="col-span-full p-4 rounded-lg border border-dashed border-slate-300 text-center text-xs text-slate-400 bg-white">
+                        No floors added yet. Click <strong>+ Add Floor</strong> to create the first floor level.
+                    </div>
+                `;
+            } else {
+                block.floors.forEach((floor, fIdx) => {
+                    const floorCard = document.createElement("div");
+                    floorCard.className = "p-3 rounded-lg border border-slate-200 bg-white shadow-xs space-y-2";
+                    floorCard.innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <span class="badge-neutral font-mono text-[10px]">#${floor.floor_number}</span>
+                            <button type="button" class="text-slate-400 hover:text-red-600 text-xs remove-floor-btn" title="Remove floor">
+                                &times;
+                            </button>
+                        </div>
+                        <div>
+                            <input type="text" class="form-input text-xs font-medium floor-label-input" value="${floor.floor_label}">
+                        </div>
+                        <div class="text-[11px] text-slate-500 flex justify-between pt-1 border-t border-slate-100">
+                            <span>Rooms: <strong>${floor.rooms ? floor.rooms.length : 0}</strong></span>
+                            <span>Beds: <strong>${calculateFloorBeds(floor)}</strong></span>
+                        </div>
+                    `;
+
+                    floorCard.querySelector(".floor-label-input").addEventListener("input", e => {
+                        floor.floor_label = e.target.value.trim();
+                    });
+
+                    floorCard.querySelector(".remove-floor-btn").addEventListener("click", () => {
+                        block.floors.splice(fIdx, 1);
+                        renderBlocks();
+                    });
+
+                    floorsGrid.appendChild(floorCard);
+                });
+            }
+
+            blocksContainer.appendChild(blockCard);
+        });
+    }
+
+    document.getElementById("btn-add-block").addEventListener("click", () => {
+        const nextIdx = config.blocks.length + 1;
+        config.blocks.push({
+            name: `Block ${String.fromCharCode(64 + nextIdx)}`,
+            code: `BLK-${String.fromCharCode(64 + nextIdx)}`,
+            description: "",
+            is_active: true,
+            floors: [
+                { floor_number: 1, floor_label: "1st Floor", is_active: true, rooms: [] }
+            ]
+        });
+        renderBlocks();
+    });
+
+    // -------------------------------------------------------------
+    // STEP 3: ROOMS & BEDS WORKSPACE
+    // -------------------------------------------------------------
+    function renderRoomsWorkspace() {
+        floorTabsBar.innerHTML = "";
+        floorRoomsWorkspace.innerHTML = "";
+
+        // Collect all floors across blocks
+        const allFloors = [];
+        config.blocks.forEach((block, bIdx) => {
+            (block.floors || []).forEach((floor, fIdx) => {
+                allFloors.push({ block, floor, bIdx, fIdx, key: `${bIdx}-${fIdx}` });
+            });
+        });
+
+        if (allFloors.length === 0) {
+            floorRoomsWorkspace.innerHTML = `
+                <div class="card p-8 text-center text-xs text-slate-500">
+                    No floors available. Please return to <strong>Step 2</strong> and add at least one floor.
+                </div>
+            `;
+            return;
+        }
+
+        if (!activeFloorKey || !allFloors.find(f => f.key === activeFloorKey)) {
+            activeFloorKey = allFloors[0].key;
+        }
+
+        // Render Tabs Bar
+        allFloors.forEach(item => {
+            const isActive = item.key === activeFloorKey;
+            const tabBtn = document.createElement("button");
+            tabBtn.type = "button";
+            tabBtn.className = `px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border ${
+                isActive
+                ? "bg-teal-700 text-white border-teal-700 shadow-xs"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+            }`;
+            tabBtn.innerHTML = `
+                ${item.block.code} • ${item.floor.floor_label}
+                <span class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-teal-800 text-teal-100' : 'bg-slate-100 text-slate-600'}">
+                    ${item.floor.rooms ? item.floor.rooms.length : 0}r / ${calculateFloorBeds(item.floor)}b
+                </span>
+            `;
+            tabBtn.addEventListener("click", () => {
+                activeFloorKey = item.key;
+                renderRoomsWorkspace();
+            });
+            floorTabsBar.appendChild(tabBtn);
+        });
+
+        // Render Workspace for active floor
+        const activeItem = allFloors.find(f => f.key === activeFloorKey);
+        const activeFloor = activeItem.floor;
+        const activeBlock = activeItem.block;
+
+        const floorHeader = document.createElement("div");
+        floorHeader.className = "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200";
+        floorHeader.innerHTML = `
+            <div>
+                <span class="text-xs text-slate-500 font-medium">${activeBlock.name} (${activeBlock.code})</span>
+                <h3 class="text-base font-bold text-slate-900">${activeFloor.floor_label} Rooms</h3>
+                <span class="text-xs text-teal-700 font-semibold">${activeFloor.rooms ? activeFloor.rooms.length : 0} rooms configured • ${calculateFloorBeds(activeFloor)} beds capacity</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" class="btn-secondary btn-sm" id="btn-batch-add-rooms">
+                    + Batch Generate Rooms
+                </button>
+                <button type="button" class="btn-primary btn-sm" id="btn-add-single-room">
+                    + Add Single Room
+                </button>
+            </div>
+        `;
+        floorRoomsWorkspace.appendChild(floorHeader);
+
+        // Rooms Grid
+        const roomsGrid = document.createElement("div");
+        roomsGrid.className = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4";
+
+        if (!activeFloor.rooms || activeFloor.rooms.length === 0) {
+            roomsGrid.innerHTML = `
+                <div class="col-span-full card p-8 text-center text-xs text-slate-500">
+                    No rooms configured on this floor yet. Click <strong>+ Add Single Room</strong> or <strong>+ Batch Generate Rooms</strong>.
+                </div>
+            `;
+        } else {
+            activeFloor.rooms.forEach((room, rIdx) => {
+                const roomCard = document.createElement("div");
+                const hasOccupiedBed = (room.beds || []).some(b => b.is_occupied);
+                roomCard.className = `p-4 rounded-xl border bg-white shadow-xs space-y-3 ${hasOccupiedBed ? 'border-teal-300 ring-1 ring-teal-200' : 'border-slate-200'}`;
+
+                const bedCount = room.beds ? room.beds.length : 0;
+
+                roomCard.innerHTML = `
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-slate-500">Room</span>
+                            <input type="text" class="form-input text-xs font-bold w-24 room-number-input" value="${room.room_number}">
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            ${hasOccupiedBed ? `<span class="badge-success text-[10px]">Occupied</span>` : ''}
+                            <button type="button" class="text-slate-400 hover:text-red-600 text-xs remove-room-btn" title="Delete Room">
+                                &times;
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Bed Count Stepper & Presets -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1 text-xs">
+                            <span class="text-slate-600 font-medium">Beds Capacity: <strong class="bed-count-text">${bedCount}</strong></span>
+                            <span class="text-[11px] text-teal-700 font-semibold">${getRoomTypeLabel(bedCount)}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" class="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-bold hover:bg-slate-100 btn-bed-minus">-</button>
+                            <input type="number" min="1" max="24" class="form-input text-xs text-center w-14 bed-count-input font-bold" value="${bedCount}">
+                            <button type="button" class="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-bold hover:bg-slate-100 btn-bed-plus">+</button>
+                            <div class="flex items-center gap-1 ml-auto">
+                                <button type="button" class="btn-xs border rounded px-1.5 py-0.5 text-[10px] preset-btn" data-beds="1">1</button>
+                                <button type="button" class="btn-xs border rounded px-1.5 py-0.5 text-[10px] preset-btn" data-beds="2">2</button>
+                                <button type="button" class="btn-xs border rounded px-1.5 py-0.5 text-[10px] preset-btn" data-beds="3">3</button>
+                                <button type="button" class="btn-xs border rounded px-1.5 py-0.5 text-[10px] preset-btn" data-beds="4">4</button>
+                                <button type="button" class="btn-xs border rounded px-1.5 py-0.5 text-[10px] preset-btn" data-beds="6">6</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Editable Bed Labels Tags -->
+                    <div class="space-y-1.5 pt-2 border-t border-slate-100">
+                        <span class="text-[11px] text-slate-500 font-medium block">Bed Labels:</span>
+                        <div class="flex flex-wrap gap-1.5 bed-labels-container"></div>
+                    </div>
+                `;
+
+                // Bind Room Number
+                roomCard.querySelector(".room-number-input").addEventListener("input", e => {
+                    room.room_number = e.target.value.trim();
+                });
+
+                // Render Bed Labels
+                const bedLabelsContainer = roomCard.querySelector(".bed-labels-container");
+                (room.beds || []).forEach((b, bItemIdx) => {
+                    const bedTag = document.createElement("div");
+                    bedTag.className = `inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
+                        b.is_occupied
+                        ? 'bg-teal-50 border-teal-300 text-teal-900 font-semibold'
+                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                    }`;
+                    bedTag.innerHTML = `
+                        <input type="text" class="bg-transparent border-none p-0 text-[11px] font-mono w-14 focus:outline-hidden" value="${b.bed_label}">
+                        ${b.is_occupied ? `<span title="Occupied by ${b.occupant_name || 'student'}" class="w-1.5 h-1.5 rounded-full bg-teal-600"></span>` : ''}
+                    `;
+                    bedTag.querySelector("input").addEventListener("input", e => {
+                        b.bed_label = e.target.value.trim();
+                    });
+                    bedLabelsContainer.appendChild(bedTag);
+                });
+
+                // Update Bed Quantity Function
+                function updateRoomBeds(newCount) {
+                    newCount = Math.max(1, Math.min(24, parseInt(newCount) || 1));
+                    if (!room.beds) room.beds = [];
+
+                    // Safety Check: Count occupied beds in this room
+                    const occupiedBedsCount = room.beds.filter(b => b.is_occupied).length;
+                    if (newCount < occupiedBedsCount) {
+                        alert(`Cannot reduce room to ${newCount} beds: ${occupiedBedsCount} bed(s) in this room currently have active student occupants.`);
+                        return;
+                    }
+
+                    if (newCount > room.beds.length) {
+                        // Add new beds
+                        const needed = newCount - room.beds.length;
+                        for (let k = 0; k < needed; k++) {
+                            const nextIndex = room.beds.length + 1;
+                            const nextLabel = nextIndex <= 26 ? `Bed ${String.fromCharCode(64 + nextIndex)}` : `Bed ${nextIndex}`;
+                            room.beds.push({
+                                bed_label: nextLabel,
+                                operational_status: "in_service",
+                                is_active: true,
+                                is_occupied: false
+                            });
+                        }
+                    } else if (newCount < room.beds.length) {
+                        // Remove vacant beds from end (never remove occupied beds)
+                        let removeCount = room.beds.length - newCount;
+                        for (let k = room.beds.length - 1; k >= 0 && removeCount > 0; k--) {
+                            if (!room.beds[k].is_occupied) {
+                                room.beds.splice(k, 1);
+                                removeCount--;
+                            }
+                        }
+                    }
+                    renderRoomsWorkspace();
+                }
+
+                roomCard.querySelector(".btn-bed-minus").addEventListener("click", () => updateRoomBeds(room.beds.length - 1));
+                roomCard.querySelector(".btn-bed-plus").addEventListener("click", () => updateRoomBeds(room.beds.length + 1));
+                roomCard.querySelector(".bed-count-input").addEventListener("change", e => updateRoomBeds(e.target.value));
+
+                roomCard.querySelectorAll(".preset-btn").forEach(pBtn => {
+                    pBtn.addEventListener("click", () => updateRoomBeds(pBtn.getAttribute("data-beds")));
+                });
+
+                // Remove room handler
+                roomCard.querySelector(".remove-room-btn").addEventListener("click", () => {
+                    if (hasOccupiedBed) {
+                        alert(`Cannot delete Room ${room.room_number}: It currently contains active student occupants.`);
+                        return;
+                    }
+                    activeFloor.rooms.splice(rIdx, 1);
+                    renderRoomsWorkspace();
+                });
+
+                roomsGrid.appendChild(roomCard);
+            });
+        }
+        floorRoomsWorkspace.appendChild(roomsGrid);
+
+        // Bind Single Room Add
+        document.getElementById("btn-add-single-room").addEventListener("click", () => {
+            if (!activeFloor.rooms) activeFloor.rooms = [];
+            const rCount = activeFloor.rooms.length + 1;
+            const floorNum = activeFloor.floor_number || 1;
+            const rNum = `${floorNum * 100 + rCount}`;
+            activeFloor.rooms.push({
+                room_number: rNum,
+                room_type: "double",
+                occupancy_category: "Standard",
+                operational_status: "in_service",
+                is_active: true,
+                beds: [
+                    { bed_label: "Bed A", operational_status: "in_service", is_active: true, is_occupied: false },
+                    { bed_label: "Bed B", operational_status: "in_service", is_active: true, is_occupied: false }
+                ]
+            });
+            renderRoomsWorkspace();
+        });
+
+        // Bind Batch Room Generate
+        document.getElementById("btn-batch-add-rooms").addEventListener("click", () => {
+            const countStr = prompt("How many rooms would you like to generate for this floor?", "5");
+            if (!countStr) return;
+            const count = parseInt(countStr);
+            if (isNaN(count) || count < 1 || count > 50) {
+                alert("Please enter a valid count between 1 and 50.");
+                return;
+            }
+            const bedsStr = prompt("How many beds per room?", "2");
+            const bedsPerRoom = Math.max(1, Math.min(12, parseInt(bedsStr) || 2));
+
+            if (!activeFloor.rooms) activeFloor.rooms = [];
+            const floorNum = activeFloor.floor_number || 1;
+            const startIdx = activeFloor.rooms.length + 1;
+
+            for (let i = 0; i < count; i++) {
+                const rNum = `${floorNum * 100 + startIdx + i}`;
+                const bedsList = [];
+                for (let b = 1; b <= bedsPerRoom; b++) {
+                    bedsList.push({
+                        bed_label: b <= 26 ? `Bed ${String.fromCharCode(64 + b)}` : `Bed ${b}`,
+                        operational_status: "in_service",
+                        is_active: true,
+                        is_occupied: false
+                    });
+                }
+                activeFloor.rooms.push({
+                    room_number: rNum,
+                    room_type: bedsPerRoom === 1 ? "single" : (bedsPerRoom === 2 ? "double" : (bedsPerRoom === 3 ? "triple" : (bedsPerRoom === 4 ? "four" : "five"))),
+                    occupancy_category: "Standard",
+                    operational_status: "in_service",
+                    is_active: true,
+                    beds: bedsList
+                });
+            }
+            renderRoomsWorkspace();
+        });
+    }
+
+    // -------------------------------------------------------------
+    // STEP 4: REVIEW & CAPACITY PREVIEW
+    // -------------------------------------------------------------
+    function renderReviewAndCapacity() {
+        let totalBlocks = 0;
+        let totalFloors = 0;
+        let totalRooms = 0;
+        let totalBeds = 0;
+        const breakdownTbody = document.getElementById("preview-breakdown-tbody");
+        breakdownTbody.innerHTML = "";
+
+        (config.blocks || []).forEach(block => {
+            if (!block.is_active) return;
+            totalBlocks++;
+            (block.floors || []).forEach(floor => {
+                if (!floor.is_active) return;
+                totalFloors++;
+                const floorRooms = (floor.rooms || []).filter(r => r.is_active !== false);
+                const floorBeds = floorRooms.reduce((acc, r) => acc + (r.beds ? r.beds.filter(b => b.is_active !== false).length : 0), 0);
+
+                totalRooms += floorRooms.length;
+                totalBeds += floorBeds;
+
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td class="font-medium text-slate-900">${block.name} (${block.code})</td>
+                    <td class="font-semibold text-slate-800">${floor.floor_label}</td>
+                    <td class="font-mono text-xs">${floorRooms.length}</td>
+                    <td class="font-mono text-xs font-bold text-teal-700">${floorBeds}</td>
+                    <td class="text-xs text-slate-500 max-w-xs truncate" title="${floorRooms.map(r => r.room_number).join(', ')}">
+                        ${floorRooms.map(r => r.room_number).slice(0, 10).join(', ')}${floorRooms.length > 10 ? '...' : ''}
+                    </td>
+                `;
+                breakdownTbody.appendChild(row);
+            });
+        });
+
+        document.getElementById("preview-total-blocks").textContent = totalBlocks;
+        document.getElementById("preview-total-floors").textContent = totalFloors;
+        document.getElementById("preview-total-rooms").textContent = totalRooms;
+        document.getElementById("preview-total-beds").textContent = totalBeds;
+    }
+
+    // Helper functions
+    function calculateFloorBeds(floor) {
+        if (!floor || !floor.rooms) return 0;
+        return floor.rooms.reduce((acc, r) => acc + (r.beds ? r.beds.length : 0), 0);
+    }
+
+    function getOrdinal(n) {
+        const s = ["th", "st", "nd", "rd"];
+        const v = n % 100;
+        return s[(v - 20) % 10] || s[v] || s[0];
+    }
+
+    function getRoomTypeLabel(count) {
+        if (count === 1) return "Single Sharing";
+        if (count === 2) return "Double Sharing";
+        if (count === 3) return "Triple Sharing";
+        if (count === 4) return "Four Sharing";
+        if (count === 5) return "Five Sharing";
+        if (count === 6) return "Six Sharing";
+        return `${count}-Bed Multi`;
+    }
+
+    // Form Submission Handling
+    const builderForm = document.getElementById("custom-builder-form");
+    builderForm.addEventListener("submit", function (e) {
+        // Collect latest values
+        config.name = inputName.value.trim();
+        config.code = inputCode.value.trim().toUpperCase();
+        config.resident_category = inputCategory.value;
+        config.status = inputStatus.value;
+        config.address = inputAddress.value.trim();
+        config.description = inputDescription.value.trim();
+
+        const changeReasonVal = inputChangeReason ? inputChangeReason.value.trim() : "";
+        changeReasonHidden.value = changeReasonVal;
+        config.change_reason = changeReasonVal;
+
+        configHiddenInput.value = JSON.stringify(config);
+
+        // UI progress
+        submitBtn.disabled = true;
+        submitSpinner.classList.remove("hidden");
+        submitText.textContent = "Validating & Committing Changes...";
+    });
+
+    // Initial load to Step 1
+    goToStep(1);
+});
+</script>
+{% endblock %}

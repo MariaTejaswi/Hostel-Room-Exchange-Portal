@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450" fill="none">
+  <defs>
+    <linearGradient id="comm-wall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F1F5F9"/>
+      <stop offset="100%" stop-color="#E2E8F0"/>
+    </linearGradient>
+    <linearGradient id="comm-floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#CBD5E1"/>
+      <stop offset="100%" stop-color="#94A3B8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="280" fill="url(#comm-wall)"/>
+  <rect y="280" width="800" height="170" fill="url(#comm-floor)"/>
+
+  <!-- Notice / Announcement Board on Wall -->
+  <rect x="60" y="50" width="180" height="110" rx="4" fill="#B45309" stroke="#78350F" stroke-width="3"/>
+  <rect x="70" y="60" width="160" height="90" fill="#FEF3C7"/>
+  <!-- Pinned Notes -->
+  <rect x="80" y="70" width="35" height="30" fill="#FEF08A" rx="1"/>
+  <rect x="125" y="75" width="40" height="35" fill="#BFDBFE" rx="1"/>
+  <rect x="175" y="70" width="35" height="28" fill="#FBCFE8" rx="1"/>
+  <rect x="85" y="110" width="45" height="25" fill="#A7F3D0" rx="1"/>
+  <rect x="140" y="115" width="40" height="25" fill="#FDE68A" rx="1"/>
+
+  <!-- Wall Clock -->
+  <circle cx="400" cy="80" r="30" fill="#FFFFFF" stroke="#475569" stroke-width="4"/>
+  <circle cx="400" cy="80" r="3" fill="#0F172A"/>
+  <line x1="400" y1="80" x2="400" y2="62" stroke="#0F172A" stroke-width="3"/>
+  <line x1="400" y1="80" x2="415" y2="80" stroke="#0F172A" stroke-width="2"/>
+
+  <!-- Artwork Frame -->
+  <rect x="560" y="45" width="180" height="120" rx="3" fill="#FFFFFF" stroke="#334155" stroke-width="4"/>
+  <path d="M 570 145 L 610 95 L 650 135 L 680 110 L 730 155 Z" fill="#0D9488"/>
+  <circle cx="680" cy="75" r="12" fill="#F59E0B"/>
+
+  <!-- Large Communal Sofa / Couch -->
+  <rect x="240" y="220" width="320" height="80" rx="12" fill="#0F766E"/>
+  <!-- Sofa Backrest -->
+  <rect x="230" y="170" width="340" height="60" rx="10" fill="#115E59"/>
+  <!-- Sofa Cushions -->
+  <rect x="250" y="225" width="95" height="65" rx="6" fill="#134E4A"/>
+  <rect x="352" y="225" width="95" height="65" rx="6" fill="#134E4A"/>
+  <rect x="455" y="225" width="95" height="65" rx="6" fill="#134E4A"/>
+  <!-- Pillows on Sofa -->
+  <rect x="245" y="200" width="35" height="35" rx="4" fill="#FEF08A"/>
+  <rect x="520" y="200" width="35" height="35" rx="4" fill="#93C5FD"/>
+  <!-- Sofa Legs -->
+  <rect x="250" y="295" width="10" height="25" fill="#1E293B"/>
+  <rect x="540" y="295" width="10" height="25" fill="#1E293B"/>
+
+  <!-- Coffee Table -->
+  <rect x="310" y="325" width="180" height="15" rx="3" fill="#D97706"/>
+  <rect x="330" y="340" width="8" height="35" fill="#78350F"/>
+  <rect x="462" y="340" width="8" height="35" fill="#78350F"/>
+  <!-- Mug on Coffee Table -->
+  <rect x="380" y="312" width="15" height="14" rx="2" fill="#FFFFFF" stroke="#0F766E" stroke-width="2"/>
+  <path d="M 395 315 C 400 315 400 323 395 323" stroke="#0F766E" stroke-width="2" fill="none"/>
+
+  <!-- Modern Lounge Rug -->
+  <ellipse cx="400" cy="380" rx="220" ry="40" fill="#E8F5F2" stroke="#99F6E4" stroke-width="2"/>
+</svg>

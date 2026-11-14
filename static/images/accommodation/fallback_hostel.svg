@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450" fill="none">
+  <defs>
+    <linearGradient id="fb-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#EEF2F6"/>
+      <stop offset="100%" stop-color="#E2E8F0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="450" fill="url(#fb-bg)"/>
+
+  <!-- Subtle Blueprint Grid Pattern -->
+  <g stroke="#CBD5E1" stroke-width="0.5" opacity="0.4">
+    <line x1="0" y1="50" x2="800" y2="50"/>
+    <line x1="0" y1="100" x2="800" y2="100"/>
+    <line x1="0" y1="150" x2="800" y2="150"/>
+    <line x1="0" y1="200" x2="800" y2="200"/>
+    <line x1="0" y1="250" x2="800" y2="250"/>
+    <line x1="0" y1="300" x2="800" y2="300"/>
+    <line x1="0" y1="350" x2="800" y2="350"/>
+    <line x1="0" y1="400" x2="800" y2="400"/>
+    <line x1="100" y1="0" x2="100" y2="450"/>
+    <line x1="200" y1="0" x2="200" y2="450"/>
+    <line x1="300" y1="0" x2="300" y2="450"/>
+    <line x1="400" y1="0" x2="400" y2="450"/>
+    <line x1="500" y1="0" x2="500" y2="450"/>
+    <line x1="600" y1="0" x2="600" y2="450"/>
+    <line x1="700" y1="0" x2="700" y2="450"/>
+  </g>
+
+  <!-- Architectural Icon in Center -->
+  <g transform="translate(325, 125)">
+    <!-- Building Outline -->
+    <rect x="0" y="40" width="150" height="150" rx="6" fill="#FFFFFF" stroke="#0F766E" stroke-width="4"/>
+    <!-- Roof / Top Gable -->
+    <polygon points="75,0 -10,42 160,42" fill="#0F766E"/>
+    <!-- Door -->
+    <rect x="55" y="130" width="40" height="60" rx="3" fill="#142635"/>
+    <!-- Windows -->
+    <rect x="25" y="60" width="28" height="24" rx="2" fill="#E8F5F2" stroke="#0F766E" stroke-width="2"/>
+    <rect x="97" y="60" width="28" height="24" rx="2" fill="#E8F5F2" stroke="#0F766E" stroke-width="2"/>
+    <rect x="25" y="98" width="28" height="24" rx="2" fill="#E8F5F2" stroke="#0F766E" stroke-width="2"/>
+    <rect x="97" y="98" width="28" height="24" rx="2" fill="#E8F5F2" stroke="#0F766E" stroke-width="2"/>
+  </g>
+
+  <text x="400" y="340" text-anchor="middle" font-family="'Inter', sans-serif" font-size="14" font-weight="600" fill="#526477" letter-spacing="0.5">ROOM LOOP RESIDENCE HALL</text>
+  <text x="400" y="362" text-anchor="middle" font-family="'Inter', sans-serif" font-size="11" font-weight="500" fill="#94A3B8">Campus Accommodation Facility</text>
+</svg>

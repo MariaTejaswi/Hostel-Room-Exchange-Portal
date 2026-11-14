@@ -1,0 +1,118 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block breadcrumb_current %}System Administration{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header with System Health Status -->
+    <div class="no-collision-header">
+        <div class="min-w-0 flex-1">
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight truncate">
+                Technical Administration Console
+            </h1>
+            <p class="mt-1 text-xs text-slate-500">
+                Platform infrastructure monitoring, account provisioning, role governance, and security audit logs.
+            </p>
+        </div>
+        <div class="no-collision-actions">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold">
+                <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                <span>{{ system_status }}</span>
+            </span>
+            <a href="/admin/" target="_blank" class="btn-secondary btn-sm flex items-center gap-1.5">
+                <span>Django Admin &rarr;</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Technical Boundary Notice -->
+    <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+        <svg class="w-5 h-5 text-slate-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        </svg>
+        <div class="text-xs text-slate-700 leading-relaxed">
+            <span class="font-bold text-slate-900">Role Authority Boundary:</span> System Administrators oversee technical operations, user directory accounts, and platform security. Operational accommodation actions (student bed allocations, room transfers, and approvals) are strictly restricted to assigned Wardens and authorized escalation bodies. System Administrator accounts do not possess business authority to assign rooms or approve exchanges.
+        </div>
+    </div>
+
+    <!-- Technical Metric Cards (4 Metric Cards) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {% include 'components/stats_card.html' with title="Total Accounts" value=total_users subtitle=active_users|stringformat:"d"|add:" active accounts" %}
+        {% include 'components/stats_card.html' with title="Database Engine" value="PostgreSQL 16" subtitle="Connected via psycopg" %}
+        {% include 'components/stats_card.html' with title="Institution Scope" value=current_institution.code|default:"Global" subtitle=current_institution.name|default:"Multi-institution enabled" %}
+        {% include 'components/stats_card.html' with title="Security Status" value="Enforced" subtitle="CSRF & RBAC active" %}
+    </div>
+
+    <!-- Role Distribution Overview (6 Cards) -->
+    <div class="card p-5 bg-white border border-slate-200 rounded-xl">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+                <h2 class="text-sm font-bold text-slate-900">User Account Distribution by Role</h2>
+                <p class="text-xs text-slate-500">Live breakdown of authorized system identities across groups.</p>
+            </div>
+            <span class="text-xs text-slate-500 font-mono">{{ total_users }} Total Users</span>
+        </div>
+        
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-4">
+            {% for r in roles_summary %}
+            <div class="p-3 rounded-lg border border-slate-200 bg-slate-50/50">
+                <span class="text-[11px] font-semibold text-slate-600 block truncate" title="{{ r.name }}">{{ r.name }}</span>
+                <span class="text-xl font-bold text-slate-900 block font-mono mt-1">{{ r.count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Security & Operational Audit Log Table -->
+    <div class="card p-5 bg-white border border-slate-200 rounded-xl">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
+            <div>
+                <h2 class="text-sm font-bold text-slate-900">Recent Security & Technical Audit Trail</h2>
+                <p class="text-xs text-slate-500">Immutable ledger of technical, authentication, and user account management events (operational student records and private welfare payloads are strictly isolated).</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="dashboard-filter-input">
+                    <input type="text" placeholder="Filter audit trail..." data-table-filter="sysadmin-audit-table" aria-label="Filter audit logs">
+                </div>
+            </div>
+        </div>
+
+        {% if recent_audit_logs %}
+        <div class="data-table-container mt-3">
+            <table class="data-table" id="sysadmin-audit-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Action</th>
+                        <th>Acting User</th>
+                        <th>Target</th>
+                        <th>Summary</th>
+                        <th>IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in recent_audit_logs %}
+                    <tr>
+                        <td class="font-mono text-xs text-slate-500 whitespace-nowrap">{{ log.timestamp|date:"Y-m-d H:i:s" }}</td>
+                        <td>
+                            <span class="badge-neutral font-mono text-[10px] font-semibold">{{ log.action }}</span>
+                        </td>
+                        <td class="font-semibold text-slate-900 text-xs">
+                            {{ log.acting_user.email|default:"System / Anonymous" }}
+                        </td>
+                        <td class="text-xs text-slate-600 font-medium">{{ log.target_type }} #{{ log.target_id|truncatechars:12 }}</td>
+                        <td class="text-xs text-slate-700 max-w-xs truncate" title="{{ log.change_summary }}">{{ log.change_summary }}</td>
+                        <td class="font-mono text-xs text-slate-500">{{ log.ip_address|default:"-" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-8 px-4">
+            <p class="text-xs text-slate-400">No audit log records recorded yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
