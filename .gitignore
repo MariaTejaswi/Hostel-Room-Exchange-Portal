@@ -8,9 +8,9 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
+/build/
 develop-eggs/
-dist/
+/dist/
 downloads/
 eggs/
 .eggs/
@@ -43,6 +43,7 @@ env/
 # Media uploads & static build
 media/
 staticfiles/
+!static/css/dist/
 
 # Node & Frontend
 node_modules/
