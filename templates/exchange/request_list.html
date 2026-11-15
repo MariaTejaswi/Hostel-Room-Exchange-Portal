@@ -1,0 +1,43 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block title %}My Exchange Requests — RoomLoop{% endblock %}
+{% block breadcrumb_current %}My Exchange Requests{% endblock %}
+
+{% block content %}
+<div class="student-page w-full max-w-[980px] mx-auto space-y-6">
+    <header class="student-welcome flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p class="student-eyebrow">Exchange centre</p>
+            <h1 class="student-title">My exchange requests</h1>
+            <p class="student-subtitle">Track your requests and update an open request when your plans change.</p>
+        </div>
+        <a href="{% url 'exchange:request_create' %}" class="btn-primary">Start exchange request <span aria-hidden="true">&rarr;</span></a>
+    </header>
+
+    {% if exchange_requests %}
+    <div class="student-request-list">
+        {% for exchange_request in exchange_requests %}
+        <a href="{% url 'exchange:request_detail' pk=exchange_request.pk %}" class="student-request-row">
+            <span>
+                <strong>Request {{ exchange_request.pk }}</strong>
+                <small>
+                    {% if exchange_request.preferred_bed %}
+                    {{ exchange_request.preferred_bed.room.floor.block.hostel.name }} · Room {{ exchange_request.preferred_bed.room.room_number }} · {{ exchange_request.preferred_bed.bed_label }}
+                    {% else %}
+                    Room preference · Submitted {{ exchange_request.submitted_at|date:"M d, Y" }}
+                    {% endif %}
+                </small>
+            </span>
+            <span class="student-status-pill student-status-{{ exchange_request.status }}">{{ exchange_request.get_status_display }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="student-empty card p-10">
+        <h2 class="student-section-title">No exchange requests yet</h2>
+        <p>Choose an eligible hostel room and bed to begin.</p>
+        <a href="{% url 'exchange:request_create' %}" class="btn-primary btn-sm">Start your request</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -29,9 +29,25 @@ from apps.hostels.models import (
     StudentOccupancy,
     OperationalStatus,
 )
+from apps.exchange.models import (
+    Approval,
+    ExchangeProposal,
+    ExchangeRequest,
+    Notification,
+    PolicyRule,
+    ProposalParticipant,
+    TransferRecord,
+)
 
 
 def _do_cleanup():
+    Notification.objects.all().delete()
+    TransferRecord.objects.all().delete()
+    Approval.objects.all().delete()
+    ProposalParticipant.objects.all().delete()
+    ExchangeProposal.objects.all().delete()
+    ExchangeRequest.objects.all().delete()
+    PolicyRule.objects.all().delete()
     StudentOccupancy.objects.all().delete()
     WardenAssignment.objects.all().delete()
     Bed.objects.all().delete()
@@ -46,6 +62,8 @@ def _do_cleanup():
 
 def pytest_sessionfinish(session, exitstatus):
     """Restore demo seed data if tests ran against the primary development database."""
+    if os.getenv("SKIP_DEMO_SEED") == "1":
+        return
     from django.conf import settings
     from django.core.management import call_command
     db_name = settings.DATABASES["default"]["NAME"]

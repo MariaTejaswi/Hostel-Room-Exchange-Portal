@@ -14,6 +14,7 @@ urlpatterns = [
     path("", RedirectView.as_view(pattern_name="accounts:dashboard", permanent=False), name="home"),
     path("", include("apps.accounts.urls", namespace="accounts")),
     path("", include("apps.hostels.urls", namespace="hostels")),
+    path("", include("apps.exchange.urls", namespace="exchange")),
 ]
 
 if settings.DEBUG:

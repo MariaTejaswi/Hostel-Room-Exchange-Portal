@@ -1,185 +1,85 @@
 {% extends 'layouts/dashboard_base.html' %}
-{% load static %}
 
-{% block breadcrumb_current %}Student Dashboard{% endblock %}
+{% block title %}Student Dashboard — RoomLoop{% endblock %}
+{% block breadcrumb_current %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <!-- Header with Student Profile Badges -->
-    <div class="no-collision-header">
-        <div class="min-w-0 flex-1">
-            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight truncate">
-                Welcome back, {{ request.user.full_name }}
-            </h1>
-            <p class="mt-1 text-xs text-slate-500">
-                Your university accommodation status, room details, and residential services.
-            </p>
+<div class="student-page space-y-6">
+    <header class="student-welcome flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p class="student-eyebrow">RoomLoop student portal</p>
+            <h1 class="student-title">Welcome back, {{ request.user.full_name }}</h1>
+            <p class="student-subtitle">Everything you need for your university accommodation, in one place.</p>
         </div>
-        <div class="no-collision-actions">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-mono font-medium">
-                <span>Roll:</span>
-                <span class="font-bold">{{ request.user.registration_number|default:"N/A" }}</span>
-            </span>
-            {% if request.user.residential_eligibility == 'male' %}
-            <span class="badge-category-boys">Boys' Hostels Eligible</span>
-            {% elif request.user.residential_eligibility == 'female' %}
-            <span class="badge-category-girls">Girls' Hostels Eligible</span>
-            {% else %}
-            <span class="badge-warning">Eligibility Pending</span>
-            {% endif %}
-        </div>
-    </div>
+        <a href="{% url 'exchange:request_create' %}" class="btn-primary student-primary-action">
+            Start Exchange Request
+            <span aria-hidden="true">&rarr;</span>
+        </a>
+    </header>
 
-    <!-- Primary Accommodation Card -->
-    {% if current_occupancy %}
-    <div class="card overflow-hidden bg-white border border-slate-200 rounded-xl shadow-xs">
-        <div class="flex flex-col md:flex-row">
-            <!-- Illustrative Room Photo on Left -->
-            <div class="relative md:w-72 h-48 md:h-auto bg-slate-100 border-b md:border-b-0 md:border-r border-slate-200 flex-shrink-0">
-                <img src="{% static 'images/accommodation/room_standard.svg' %}"
-                     alt="Illustrative accommodation room interior"
-                     width="300" height="225"
-                     class="w-full h-full object-cover">
-                <span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-900/80 text-white">
-                    Illustrative photo
-                </span>
-                <div class="absolute bottom-2.5 left-2.5 right-2.5">
-                    <span class="badge-brand text-[10px] bg-white/95 shadow-2xs font-semibold">
-                        {{ current_occupancy.bed.room.floor.block.hostel.code }}
-                    </span>
-                </div>
+    <div class="student-dashboard-grid">
+    <section class="student-accommodation card">
+        <div class="card-header">
+            <div>
+                <p class="student-eyebrow">Your accommodation</p>
+                <h2 class="student-section-title">Current room</h2>
             </div>
-
-            <!-- Allocation Content on Right -->
-            <div class="p-5 sm:p-6 flex-1 flex flex-col justify-between space-y-4">
+            {% if current_occupancy %}<span class="student-status-pill">Active Allocation</span>{% endif %}
+        </div>
+        {% if current_occupancy %}
+        <div class="card-body">
+            <div class="student-location">
+                <div class="student-location-mark" aria-hidden="true">⌂</div>
                 <div>
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-slate-100">
-                        <div>
-                            <span class="text-[11px] font-bold text-teal-700 uppercase tracking-wider block">Active Allocation</span>
-                            <h2 class="text-lg sm:text-xl font-bold text-slate-900 mt-0.5 truncate">
-                                {{ current_occupancy.bed.room.floor.block.hostel.name }}
-                            </h2>
-                            <p class="text-xs text-slate-500 mt-0.5">
-                                {{ current_occupancy.bed.room.floor.block.hostel.address|default:"Campus Residential Facility" }}
-                            </p>
-                        </div>
-                        <div class="flex-shrink-0">
-                            <span class="badge-success text-xs font-semibold">
-                                Verified Resident
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- 4-Grid Room Details -->
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3">
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                            <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Block / Wing</span>
-                            <span class="font-bold text-slate-800 text-sm mt-0.5 block truncate">
-                                {{ current_occupancy.bed.room.floor.block.name }}
-                            </span>
-                        </div>
-
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                            <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Floor Level</span>
-                            <span class="font-bold text-slate-800 text-sm mt-0.5 block truncate">
-                                {{ current_occupancy.bed.room.floor.floor_label }}
-                            </span>
-                        </div>
-
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                            <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Room Number</span>
-                            <span class="font-bold text-slate-800 text-sm mt-0.5 block truncate font-mono">
-                                Room {{ current_occupancy.bed.room.room_number }}
-                            </span>
-                        </div>
-
-                        <div class="p-3 bg-teal-50/70 rounded-lg border border-teal-200">
-                            <span class="text-[10px] font-semibold text-teal-800 uppercase tracking-wider block">Assigned Bed</span>
-                            <span class="font-bold text-teal-900 text-sm mt-0.5 block truncate font-mono">
-                                {{ current_occupancy.bed.bed_label }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Footer Meta & Actions -->
-                <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-slate-500 gap-3">
-                    <div>
-                        Allocated on <strong class="text-slate-700 font-semibold">{{ current_occupancy.start_date|date:"F d, Y" }}</strong> via {{ current_occupancy.get_source_display }}
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <a href="{% url 'hostels:room_detail' pk=current_occupancy.bed.room.id %}" class="btn-secondary btn-sm flex items-center gap-1">
-                            <span>Room Specifications</span>
-                            <span>&rarr;</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% else %}
-    <!-- Empty State for Unallocated Student -->
-    <div class="card p-8 sm:p-10 text-center flex flex-col items-center justify-center bg-white border border-slate-200 rounded-xl shadow-xs">
-        <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
-            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-            </svg>
-        </div>
-        <h3 class="text-base font-bold text-slate-900">No Accommodation Currently Allocated</h3>
-        <p class="mt-1.5 text-xs text-slate-500 max-w-md leading-relaxed">
-            You do not currently hold an active bed allocation in {{ current_institution.name|default:"the university" }}. You can browse eligible campus hostels below and contact your hostel office for assignment.
-        </p>
-        <div class="mt-5">
-            <a href="{% url 'hostels:hostel_list' %}" class="btn-primary btn-sm flex items-center gap-1.5">
-                <span>Browse Campus Hostels</span>
-                <span>&rarr;</span>
-            </a>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Room Exchange Feature Showcase (Phase 2 Preview) -->
-    <div class="card p-5 bg-white border border-slate-200 rounded-xl">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div class="flex items-start gap-3">
-                <div class="w-10 h-10 rounded-lg bg-teal-50 border border-teal-100 text-teal-700 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
-                    </svg>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2 mb-1">
-                        <h3 class="text-sm font-bold text-slate-900">Peer Room Exchange & Multi-Party Swap Platform</h3>
-                        <span class="badge-neutral text-[10px]">Phase 2 Preview</span>
-                    </div>
-                    <p class="text-xs text-slate-500 max-w-2xl leading-relaxed">
-                        Once Phase 2 launches, eligible residents will be able to propose direct 1-to-1 room swaps or discover multi-party swap loops (A &rarr; B &rarr; C &rarr; A) with automated warden authorization workflows.
+                    <p class="student-location-name">{{ current_occupancy.bed.room.floor.block.hostel.name }}</p>
+                    <p class="student-location-meta">
+                        Block {{ current_occupancy.bed.room.floor.block.name }} ·
+                        {{ current_occupancy.bed.room.floor.floor_label }} ·
+                        Room {{ current_occupancy.bed.room.room_number }}
                     </p>
                 </div>
-            </div>
-            <div class="flex-shrink-0">
-                <button type="button" disabled class="btn-secondary btn-sm opacity-50 cursor-not-allowed">
-                    Locked for Phase 2
-                </button>
+                <div class="student-bed-summary">
+                    <span>Bed</span>
+                    <strong>{{ current_occupancy.bed.bed_label }}</strong>
+                </div>
             </div>
         </div>
-    </div>
+        {% else %}
+        <div class="card-body student-empty">
+            <h3>No Accommodation Currently Allocated</h3>
+            <p>Contact your hostel office if you need help with your allocation.</p>
+        </div>
+        {% endif %}
+    </section>
 
-    <!-- Quick Navigation to Permitted Hostel Directory -->
-    <div class="card p-5 bg-white border border-slate-200 rounded-xl">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
+    <section class="student-request-panel card">
+        <div class="student-panel-heading">
             <div>
-                <h3 class="text-sm font-bold text-slate-900">Campus Hostels Directory</h3>
-                <p class="text-xs text-slate-500">Explore residential facilities, floor layouts, room configurations, and resident guidelines.</p>
+                <p class="student-eyebrow">Exchange centre</p>
+                <h2 class="student-section-title">Your exchange requests</h2>
             </div>
-            <a href="{% url 'hostels:hostel_list' %}" class="btn-secondary btn-sm flex items-center gap-1.5 flex-shrink-0">
-                <span>View All Hostels</span>
-                <span>&rarr;</span>
+            <a href="{% url 'exchange:request_list' %}" class="student-text-link">View all</a>
+        </div>
+        {% if exchange_requests %}
+        <div class="student-request-list">
+            {% for exchange_request in exchange_requests %}
+            <a href="{% url 'exchange:request_detail' pk=exchange_request.pk %}" class="student-request-row">
+                <span>
+                    <strong>Request {{ exchange_request.pk|slice:":8" }}</strong>
+                    <small>Submitted {{ exchange_request.submitted_at|date:"M d, Y" }}</small>
+                </span>
+                <span class="student-status-pill student-status-{{ exchange_request.status }}">{{ exchange_request.get_status_display }}</span>
             </a>
+            {% endfor %}
         </div>
-        <div class="pt-3 text-xs text-slate-500">
-            For room maintenance requests, health advisories, or inventory inquiries, visit your hostel administration desk.
+        {% else %}
+        <div class="student-empty card">
+            <h3>Ready for a change?</h3>
+            <p>Choose an eligible hostel room and bed that suits you.</p>
+            <a href="{% url 'exchange:request_create' %}" class="btn-primary btn-sm">Start your request</a>
         </div>
+        {% endif %}
+    </section>
     </div>
 </div>
 {% endblock %}

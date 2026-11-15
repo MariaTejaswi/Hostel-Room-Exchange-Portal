@@ -1,0 +1,32 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block title %}Notifications — RoomLoop{% endblock %}
+{% block breadcrumb_current %}Notifications{% endblock %}
+
+{% block content %}
+<div class="student-page w-full max-w-[980px] mx-auto space-y-6">
+    <header>
+        <p class="student-eyebrow">RoomLoop updates</p>
+        <h1 class="student-title">Notifications</h1>
+        <p class="student-subtitle">Important updates about your accommodation and exchange activity.</p>
+    </header>
+    {% if notifications %}
+    <div class="student-request-list">
+        {% for notification in notifications %}
+        <div class="student-request-row">
+            <span>
+                <strong>{{ notification.get_notification_type_display }}</strong>
+                <small>{{ notification.message }} · {{ notification.created_at|date:"M d, Y" }}</small>
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="student-empty card p-10">
+        <div class="student-empty-icon" aria-hidden="true">✓</div>
+        <h2 class="student-section-title">You're all caught up</h2>
+        <p>New exchange and accommodation updates will appear here.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

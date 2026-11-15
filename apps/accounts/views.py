@@ -106,6 +106,7 @@ def profile_view(request):
             "form": form,
             "current_occupancy": current_occupancy,
             "active_tab": "profile",
+            "active_nav": "profile",
         },
     )
 
@@ -144,7 +145,9 @@ def password_change_view(request):
 def student_dashboard_view(request):
     """Student Accommodation Dashboard."""
     from apps.hostels.selectors import get_student_dashboard_context
+    from apps.exchange.selectors import get_student_exchange_requests
     context = get_student_dashboard_context(request.user)
+    context["exchange_requests"] = get_student_exchange_requests(request.user)[:3]
     context["active_nav"] = "dashboard"
     return render(request, "dashboards/student.html", context)
 

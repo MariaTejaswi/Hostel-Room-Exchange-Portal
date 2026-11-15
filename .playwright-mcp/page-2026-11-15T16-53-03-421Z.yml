@@ -1,0 +1,52 @@
+- generic [ref=f1e2]:
+  - generic [ref=f1e3]:
+    - generic [ref=f1e4]:
+      - generic [ref=f1e5]:
+        - img "RoomLoop Logo" [ref=f1e6]
+        - generic [ref=f1e7]:
+          - generic [ref=f1e8]: RoomLoop
+          - text: Accommodation & Swap Platform
+      - generic [ref=f1e9]: University Portal
+    - generic [ref=f1e11]:
+      - heading "University Accommodation Management Platform" [level=1] [ref=f1e12]
+      - paragraph [ref=f1e13]: A verified, role-governed system for transparent hostel inventory, live occupancy tracking, and multi-party room exchange.
+      - generic [ref=f1e14]:
+        - generic [ref=f1e15]: Campus-Wide Residential Hostels & Bed Inventory
+        - generic [ref=f1e19]: Strict Role Governance (6 Scoped Roles)
+        - generic [ref=f1e23]: Direct & Multi-Party Room Exchange
+    - generic [ref=f1e27]:
+      - generic [ref=f1e28]: Verified Institutional Access
+      - generic [ref=f1e29]: PostgreSQL 16
+  - generic [ref=f1e32]:
+    - generic [ref=f1e33]:
+      - heading "Sign in to RoomLoop" [level=2] [ref=f1e34]
+      - paragraph [ref=f1e35]: Enter your university credentials to access your accommodation console.
+    - generic [ref=f1e36]:
+      - generic [ref=f1e37]:
+        - generic [ref=f1e38]: Institutional Email Address
+        - textbox "Institutional Email Address" [ref=f1e43]:
+          - /placeholder: name@university.edu
+      - generic [ref=f1e44]:
+        - generic [ref=f1e45]:
+          - generic [ref=f1e46]: Password
+          - link "Forgot password?" [ref=f1e47] [cursor=pointer]:
+            - /url: /password-reset/
+        - generic [ref=f1e48]:
+          - textbox "Password" [ref=f1e52]:
+            - /placeholder: Enter your password
+          - button "Toggle password visibility" [ref=f1e53]
+      - generic [ref=f1e57]:
+        - checkbox "Remember this workstation" [ref=f1e58] [cursor=pointer]
+        - generic [ref=f1e59]: Remember this workstation
+      - button "Sign In →" [ref=f1e61] [cursor=pointer]
+    - generic [ref=f1e62]:
+      - generic [ref=f1e63]:
+        - generic [ref=f1e64]: Quick Role Autofill
+        - generic [ref=f1e65]: Click to fill
+      - generic [ref=f1e66]:
+        - button "Student" [ref=f1e67] [cursor=pointer]
+        - button "Warden" [ref=f1e69] [cursor=pointer]
+        - button "Chief Warden" [ref=f1e71] [cursor=pointer]
+        - button "Hostel Admin" [ref=f1e73] [cursor=pointer]
+        - button "Dean" [ref=f1e75] [cursor=pointer]
+        - button "Sysadmin" [ref=f1e77] [cursor=pointer]

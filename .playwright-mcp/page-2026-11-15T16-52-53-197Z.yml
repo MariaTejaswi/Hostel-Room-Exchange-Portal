@@ -1,0 +1,144 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - heading "Page not found (404)" [level=1] [ref=e3]
+    - table [ref=e4]:
+      - rowgroup [ref=e5]:
+        - row [ref=e6]:
+          - rowheader "Request Method:" [ref=e7]
+          - cell "GET" [ref=e8]
+        - row [ref=e9]:
+          - rowheader "Request URL:" [ref=e10]
+          - cell "http://127.0.0.1:8000/accounts/login/" [ref=e11]
+  - main [ref=e12]:
+    - paragraph [ref=e13]:
+      - text: Using the URLconf defined in
+      - code [ref=e14]: config.urls
+      - text: ", Django tried these URL patterns, in this order:"
+    - list [ref=e15]:
+      - listitem [ref=e16]:
+        - code [ref=e17]: admin/
+      - listitem [ref=e18]:
+        - code [ref=e19]: favicon.ico [name='favicon']
+      - listitem [ref=e20]:
+        - code [ref=e21]: "[name='home']"
+      - listitem [ref=e22]:
+        - code
+        - code [ref=e23]: login/ [name='login']
+      - listitem [ref=e24]:
+        - code
+        - code [ref=e25]: logout/ [name='logout']
+      - listitem [ref=e26]:
+        - code
+        - code [ref=e27]: dashboard/ [name='dashboard']
+      - listitem [ref=e28]:
+        - code
+        - code [ref=e29]: dashboard/student/ [name='dashboard_student']
+      - listitem [ref=e30]:
+        - code
+        - code [ref=e31]: dashboard/warden/ [name='dashboard_warden']
+      - listitem [ref=e32]:
+        - code
+        - code [ref=e33]: dashboard/chief-warden/ [name='dashboard_chief_warden']
+      - listitem [ref=e34]:
+        - code
+        - code [ref=e35]: dashboard/admin/ [name='dashboard_admin']
+      - listitem [ref=e36]:
+        - code
+        - code [ref=e37]: dashboard/sysadmin/ [name='dashboard_sysadmin']
+      - listitem [ref=e38]:
+        - code
+        - code [ref=e39]: dashboard/dean/ [name='dashboard_dean']
+      - listitem [ref=e40]:
+        - code
+        - code [ref=e41]: profile/ [name='profile']
+      - listitem [ref=e42]:
+        - code
+        - code [ref=e43]: password-change/ [name='password_change']
+      - listitem [ref=e44]:
+        - code
+        - code [ref=e45]: password-reset/ [name='password_reset']
+      - listitem [ref=e46]:
+        - code
+        - code [ref=e47]: password-reset/done/ [name='password_reset_done']
+      - listitem [ref=e48]:
+        - code
+        - code [ref=e49]: password-reset-confirm/<uidb64>/<token>/ [name='password_reset_confirm']
+      - listitem [ref=e50]:
+        - code
+        - code [ref=e51]: password-reset/complete/ [name='password_reset_complete']
+      - listitem [ref=e52]:
+        - code
+        - code [ref=e53]: hostels/ [name='hostel_list']
+      - listitem [ref=e54]:
+        - code
+        - code [ref=e55]: hostels/create/ [name='hostel_create']
+      - listitem [ref=e56]:
+        - code
+        - code [ref=e57]: hostels/builder/ [name='hostel_builder']
+      - listitem [ref=e58]:
+        - code
+        - code [ref=e59]: hostels/<int:pk>/ [name='hostel_detail']
+      - listitem [ref=e60]:
+        - code
+        - code [ref=e61]: hostels/<int:pk>/edit/ [name='hostel_edit']
+      - listitem [ref=e62]:
+        - code
+        - code [ref=e63]: hostels/<int:pk>/builder/ [name='hostel_edit_builder']
+      - listitem [ref=e64]:
+        - code
+        - code [ref=e65]: rooms/ [name='room_inventory']
+      - listitem [ref=e66]:
+        - code
+        - code [ref=e67]: rooms/create/ [name='room_create']
+      - listitem [ref=e68]:
+        - code
+        - code [ref=e69]: rooms/<int:pk>/ [name='room_detail']
+      - listitem [ref=e70]:
+        - code
+        - code [ref=e71]: beds/ [name='bed_list']
+      - listitem [ref=e72]:
+        - code
+        - code [ref=e73]: beds/<int:pk>/status/ [name='bed_status_update']
+      - listitem [ref=e74]:
+        - code
+        - code [ref=e75]: occupancy/ [name='occupancy_list']
+      - listitem [ref=e76]:
+        - code
+        - code [ref=e77]: occupancy/assign/ [name='occupancy_assign']
+      - listitem [ref=e78]:
+        - code
+        - code [ref=e79]: occupancy/<int:pk>/ [name='occupancy_detail']
+      - listitem [ref=e80]:
+        - code
+        - code [ref=e81]: occupancy/<int:pk>/release/ [name='occupancy_release']
+      - listitem [ref=e82]:
+        - code
+        - code [ref=e83]: exchange/requests/ [name='request_list']
+      - listitem [ref=e84]:
+        - code
+        - code [ref=e85]: exchange/notifications/ [name='notifications']
+      - listitem [ref=e86]:
+        - code
+        - code [ref=e87]: exchange/requests/create/ [name='request_create']
+      - listitem [ref=e88]:
+        - code
+        - code [ref=e89]: exchange/requests/<uuid:pk>/ [name='request_detail']
+      - listitem [ref=e90]:
+        - code
+        - code [ref=e91]: exchange/requests/<uuid:pk>/edit/ [name='request_edit']
+      - listitem [ref=e92]:
+        - code
+        - code [ref=e93]: exchange/requests/<uuid:pk>/withdraw/ [name='request_withdraw']
+      - listitem [ref=e94]:
+        - code [ref=e95]: ^media/(?P<path>.*)$
+    - paragraph [ref=e96]:
+      - text: The current path,
+      - code [ref=e97]: accounts/login/
+      - text: ", didn’t match any of these."
+  - contentinfo [ref=e98]:
+    - paragraph [ref=e99]:
+      - text: You’re seeing this error because you have
+      - code [ref=e100]: DEBUG = True
+      - text: in your Django settings file. Change that to
+      - code [ref=e101]: "False"
+      - text: ", and Django will display a standard 404 page."

@@ -1,0 +1,60 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block title %}Exchange Request — RoomLoop{% endblock %}
+{% block breadcrumb_current %}Exchange Request{% endblock %}
+
+{% block content %}
+<div class="student-page w-full max-w-[980px] mx-auto space-y-6">
+    <header class="student-welcome flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p class="student-eyebrow">Exchange centre</p>
+            <h1 class="student-title">Your exchange request</h1>
+            <p class="student-subtitle">Request {{ exchange_request.pk }}</p>
+        </div>
+        {% if exchange_request.status == 'open' %}
+        <div class="flex gap-2">
+            <a href="{% url 'exchange:request_edit' pk=exchange_request.pk %}" class="btn-secondary btn-sm">Edit request</a>
+            <form method="post" action="{% url 'exchange:request_withdraw' pk=exchange_request.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-danger btn-sm">Withdraw</button>
+            </form>
+        </div>
+        {% endif %}
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <section class="card">
+            <div class="card-header"><h2 class="student-section-title">Request status</h2><span class="student-status-pill">{{ exchange_request.get_status_display }}</span></div>
+            <div class="card-body">
+                <dl class="data-list">
+                    <div class="data-row"><dt class="data-label">Submitted</dt><dd class="data-value">{{ exchange_request.submitted_at|date:"M d, Y H:i" }}</dd></div>
+                    <div class="data-row"><dt class="data-label">Expires</dt><dd class="data-value">{{ exchange_request.expires_at|date:"M d, Y"|default:"No expiry" }}</dd></div>
+                </dl>
+            </div>
+        </section>
+        <section class="card">
+            <div class="card-header"><h2 class="student-section-title">Current accommodation</h2></div>
+            <div class="card-body">
+                <dl class="data-list">
+                    <div class="data-row"><dt class="data-label">Hostel</dt><dd class="data-value">{{ exchange_request.current_occupancy.bed.room.floor.block.hostel.name }}</dd></div>
+                    <div class="data-row"><dt class="data-label">Room & bed</dt><dd class="data-value">Room {{ exchange_request.current_occupancy.bed.room.room_number }} · {{ exchange_request.current_occupancy.bed.bed_label }}</dd></div>
+                </dl>
+            </div>
+        </section>
+    </div>
+
+    <section class="card">
+        <div class="card-header"><h2 class="student-section-title">Preferred accommodation</h2></div>
+        <div class="card-body">
+            <dl class="data-list">
+                <div class="data-row"><dt class="data-label">Hostel</dt><dd class="data-value">{{ exchange_request.preferred_hostel.name|default:"No preference" }}</dd></div>
+                <div class="data-row"><dt class="data-label">Block</dt><dd class="data-value">{{ exchange_request.preferred_block.name|default:"No preference" }}</dd></div>
+                <div class="data-row"><dt class="data-label">Floor</dt><dd class="data-value">{{ exchange_request.preferred_floor.floor_label|default:"No preference" }}</dd></div>
+                <div class="data-row"><dt class="data-label">Selected bed</dt><dd class="data-value">{% if exchange_request.preferred_bed %}{{ exchange_request.preferred_bed.room.floor.block.hostel.name }} · Block {{ exchange_request.preferred_bed.room.floor.block.name }} · Room {{ exchange_request.preferred_bed.room.room_number }} · {{ exchange_request.preferred_bed.bed_label }}{% else %}No exact bed selected{% endif %}</dd></div>
+                <div class="data-row"><dt class="data-label">Room type</dt><dd class="data-value">{{ exchange_request.get_preferred_room_type_display|default:"No preference" }}</dd></div>
+                <div class="data-row"><dt class="data-label">Reason</dt><dd class="data-value whitespace-pre-line">{{ exchange_request.reason }}</dd></div>
+            </dl>
+        </div>
+    </section>
+</div>
+{% endblock %}

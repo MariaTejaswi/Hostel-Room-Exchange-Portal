@@ -35,6 +35,7 @@ LOCAL_APPS = [
     "apps.core.apps.CoreConfig",
     "apps.accounts.apps.AccountsConfig",
     "apps.hostels.apps.HostelsConfig",
+    "apps.exchange.apps.ExchangeConfig",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

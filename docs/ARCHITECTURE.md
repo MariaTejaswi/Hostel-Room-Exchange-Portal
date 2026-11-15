@@ -75,7 +75,43 @@ roomloop/
 
 ---
 
-## 3. Preparation for Phase 2 Module Integration
+## 3. Exchange Schema Foundation
+
+Phase 1 of the exchange implementation adds the schema foundation in `apps.exchange`.
+`ExchangeRequest` reuses the existing active `StudentOccupancy` record and can target
+hostel, block, floor, room type, occupancy category, and accessibility preferences.
+`ExchangeProposal` and `ProposalParticipant` support direct swaps and cycles from two
+through five participants. Active participant reservations use conditional unique
+constraints on student, occupancy, and request so overlapping proposals cannot reserve
+the same records.
+
+`Approval`, `TransferRecord`, `PolicyRule`, and `Notification` provide the persistent
+relationships required by later workflow phases. This phase intentionally does not add
+matching, acceptance, approval, transfer, expiry, or notification delivery.
+
+Phase 2 adds student-owned request management in `apps.exchange.services` and thin
+student views. Creation and editing require an active, institution-scoped occupancy,
+verified residential eligibility, compatible hostel preferences, and the configured
+cooling-off policy. Fee clearance and disciplinary holds are checked through the
+`ExternalEligibilityAdapter` interface in `apps.exchange.eligibility`; the default
+adapter fails closed when an institution has enabled a check without supplying an
+integration, so no external status is invented.
+
+Phase 3 adds the directed graph matcher in `apps.exchange.matching`. Open eligible
+requests are vertices, and an edge from request A to request B means A can receive
+B's current bed. Canonical simple cycles from two through five requests become
+pending-acceptance proposals after eligibility is revalidated. Proposal participants
+reserve requests and students through the existing conditional constraints; no
+occupancy transfer occurs during matching. Active proposals also store a canonical
+cycle signature to prevent duplicate cycles.
+
+The request form also supports an optional exact `preferred_bed` selection. It reuses
+the existing hostel inventory hierarchy and allows occupied, in-service beds as swap
+targets while excluding maintenance, inactive, cross-institution, and residentially
+incompatible beds. The selected bed remains a preference only; no occupancy is changed
+until a later transfer workflow.
+
+## 4. Preparation for Future Module Integration
 
 In Phase 1, we implemented:
 - **M0**: Authentication and User Management (Custom User, Groups, Scoped Roles)
@@ -83,7 +119,9 @@ In Phase 1, we implemented:
 
 ### How Future Exchange Modules Will Connect:
 1. **M1 — Exchange Request Management**:
-   A student initiating a swap request will query `apps.hostels.selectors.get_student_active_occupancy(student)`. If no active occupancy exists, the exchange request creation is rejected by policy validation (M2).
+   Student request creation, listing, detail, editing, and withdrawal are implemented.
+   The service reuses the existing active `StudentOccupancy` record and rejects requests
+   without an eligible occupancy or with an ownership mismatch.
 2. **M3 — Matching Engine**:
    The graph-based matching algorithm will query vacant beds or compatible student preferences, without altering active occupancy until final approval.
 3. **M5 & M6 — Approval Workflow & Transfer Execution**:

@@ -1,0 +1,196 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block title %}{{ page_title }} — RoomLoop{% endblock %}
+{% block breadcrumb_current %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="student-page max-w-4xl mx-auto space-y-6">
+    <div class="student-welcome">
+        <p class="student-eyebrow">Exchange centre</p>
+        <h1 class="student-title">{{ page_title }}</h1>
+        <p class="student-subtitle">A simple guided process to find a room that works for you.</p>
+    </div>
+
+    <div class="student-steps" aria-label="Exchange request steps">
+        <span class="student-step active"><b>1</b> Choose location</span>
+        <span class="student-step active"><b>2</b> Select a bed</span>
+        <span class="student-step"><b>3</b> Review & submit</span>
+    </div>
+
+    <div class="card p-5 sm:p-6">
+        {% if form.non_field_errors %}
+        <div class="mb-5 p-3.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+            {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+        </div>
+        {% endif %}
+        <div class="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div class="flex flex-col gap-1 mb-4">
+                <h2 class="student-section-title">Choose your preferred room and bed</h2>
+                <p class="text-xs text-slate-500">Occupied in-service beds can be selected for an exchange. Maintenance and unavailable beds cannot.</p>
+            </div>
+            <form method="get" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+                <div>
+                    <label for="browser_hostel" class="block text-[11px] font-semibold text-slate-600 mb-1">Hostel</label>
+                    <select id="browser_hostel" name="hostel_id" class="form-select">
+                        {% for hostel in browser_hostels %}
+                        <option value="{{ hostel.id }}" {% if selected_hostel.id == hostel.id %}selected{% endif %}>{{ hostel.name }}</option>
+                        {% empty %}<option>No eligible hostels</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="browser_block" class="block text-[11px] font-semibold text-slate-600 mb-1">Block</label>
+                    <select id="browser_block" name="block_id" class="form-select">
+                        {% for block in browser_blocks %}
+                        <option value="{{ block.id }}" {% if selected_block.id == block.id %}selected{% endif %}>{{ block.name }}</option>
+                        {% empty %}<option>No blocks available</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="browser_floor" class="block text-[11px] font-semibold text-slate-600 mb-1">Floor</label>
+                    <select id="browser_floor" name="floor_id" class="form-select">
+                        {% for floor in browser_floors %}
+                        <option value="{{ floor.id }}" {% if selected_floor.id == floor.id %}selected{% endif %}>{{ floor.floor_label }}</option>
+                        {% empty %}<option>No floors available</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="browser_room" class="block text-[11px] font-semibold text-slate-600 mb-1">Room number</label>
+                    <select id="browser_room" name="room_id" class="form-select">
+                        <option value="">All rooms on floor</option>
+                        {% for room_data in browser_rooms %}
+                        <option value="{{ room_data.room.id }}" {% if selected_room_id|slugify == room_data.room.id|slugify %}selected{% endif %}>Room {{ room_data.room.room_number }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <input type="hidden" name="bed_id" value="{{ selected_bed_id|default:'' }}">
+                <div class="sm:col-span-2 lg:col-span-4 flex justify-end">
+                    <button type="submit" class="btn-secondary btn-sm">Load rooms and beds</button>
+                </div>
+            </form>
+
+            <div class="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-600">
+                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-white border border-slate-300"></span>Free</span>
+                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-300 border border-slate-400"></span>Occupied</span>
+                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-emerald-500 border border-emerald-600"></span>Selected</span>
+                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-red-200 border border-red-400"></span>Unavailable</span>
+            </div>
+
+            <div class="mt-4 space-y-4">
+                {% for room_data in browser_rooms %}
+                <section class="rounded-lg border border-slate-200 bg-white p-4">
+                    <div class="flex items-center justify-between gap-3 mb-3">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900">Room {{ room_data.room.room_number }}</h3>
+                            <p class="text-[11px] text-slate-500">{{ room_data.room.get_room_type_display }} · {{ room_data.room.occupancy_category }}</p>
+                        </div>
+                        <span class="text-[11px] text-slate-400">{{ room_data.beds|length }} beds</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                        {% for bed_data in room_data.beds %}
+                        {% if bed_data.selectable %}
+                        <button type="button"
+                                class="bed-choice rounded-lg border px-3 py-3 text-left transition-colors {% if bed_data.selected %}bg-emerald-500 border-emerald-600 text-white{% elif bed_data.occupied %}bg-slate-300 border-slate-400 text-slate-800 hover:bg-emerald-50 hover:border-emerald-400{% else %}bg-white border-slate-300 text-slate-800 hover:bg-emerald-50 hover:border-emerald-400{% endif %}"
+                                data-bed-id="{{ bed_data.bed.id }}"
+                                data-bed-label="{{ bed_data.bed.bed_label }}"
+                                data-room-number="{{ room_data.room.room_number }}"
+                                data-hostel-name="{{ room_data.room.floor.block.hostel.name }}"
+                                data-block-name="{{ room_data.room.floor.block.name }}"
+                                data-hostel-id="{{ room_data.room.floor.block.hostel.id }}"
+                                data-block-id="{{ room_data.room.floor.block.id }}"
+                                data-floor-id="{{ room_data.room.floor.id }}">
+                            <span class="block text-xs font-bold">{{ bed_data.bed.bed_label }}</span>
+                            <span class="block text-[10px] mt-1 opacity-75">{% if bed_data.occupied %}Occupied{% else %}Free{% endif %}</span>
+                        </button>
+                        {% elif bed_data.current or bed_data.occupied and not bed_data.unavailable %}
+                        <span class="rounded-lg border border-slate-400 bg-slate-300 px-3 py-3 text-left text-slate-800">
+                            <span class="block text-xs font-bold">{{ bed_data.bed.bed_label }}</span>
+                            <span class="block text-[10px] mt-1">Your current bed</span>
+                        </span>
+                        {% else %}
+                        <span class="rounded-lg border border-red-300 bg-red-100 px-3 py-3 text-left text-red-800">
+                            <span class="block text-xs font-bold">{{ bed_data.bed.bed_label }}</span>
+                            <span class="block text-[10px] mt-1">{% if bed_data.occupied %}Occupied{% else %}Unavailable{% endif %}</span>
+                        </span>
+                        {% endif %}
+                        {% empty %}
+                        <p class="text-xs text-slate-500">No bed records found for this room.</p>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% empty %}
+                <div class="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-xs text-slate-500">
+                    Select an eligible hostel, block, floor, and room to browse target beds.
+                </div>
+                {% endfor %}
+            </div>
+
+            <div id="selected-bed-summary" class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 {% if not selected_bed %}hidden{% endif %}">
+                Selected target:
+                <strong id="selected-bed-label">{{ selected_bed.bed_label|default:'' }}</strong>
+                <span id="selected-bed-location">
+                    {% if selected_bed %}· Room {{ selected_bed.room.room_number }} · {{ selected_bed.room.floor.block.hostel.name }} · {{ selected_bed.room.floor.block.name }}{% endif %}
+                </span>
+                <button type="button" id="clear-bed-selection" class="ml-2 font-semibold underline hover:no-underline">Clear selection</button>
+            </div>
+        </div>
+
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            {{ form.preferred_bed }}
+            {% for field in form.visible_fields %}
+            <div>
+                <label for="{{ field.id_for_label }}" class="block text-xs font-semibold text-slate-700 mb-1.5">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<p class="mt-1 text-[11px] text-slate-400">{{ field.help_text }}</p>{% endif %}
+                {% if field.errors %}<p class="mt-1 text-xs text-red-600">{{ field.errors.0 }}</p>{% endif %}
+            </div>
+            {% endfor %}
+            <div class="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+                <a href="{% url 'exchange:request_list' %}" class="btn-secondary">Cancel</a>
+                <button type="submit" class="btn-primary">Save Exchange Request</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+    (function () {
+        const hiddenBed = document.getElementById("id_preferred_bed");
+        const summary = document.getElementById("selected-bed-summary");
+        const summaryLabel = document.getElementById("selected-bed-label");
+        const summaryLocation = document.getElementById("selected-bed-location");
+        const clearButton = document.getElementById("clear-bed-selection");
+        const choices = Array.from(document.querySelectorAll(".bed-choice"));
+
+        function selectBed(choice) {
+            hiddenBed.value = choice.dataset.bedId;
+            choices.forEach((item) => {
+                item.classList.remove("bg-emerald-500", "border-emerald-600", "text-white");
+                if (item === choice) {
+                    item.classList.add("bg-emerald-500", "border-emerald-600", "text-white");
+                } else if (item.dataset.occupied === "true") {
+                    item.classList.add("bg-slate-300", "border-slate-400", "text-slate-800");
+                } else {
+                    item.classList.add("bg-white", "border-slate-300", "text-slate-800");
+                }
+            });
+            summaryLabel.textContent = choice.dataset.bedLabel;
+            summaryLocation.textContent = " · Room " + choice.dataset.roomNumber + " · " + choice.dataset.hostelName + " · " + choice.dataset.blockName;
+            summary.classList.remove("hidden");
+        }
+
+        choices.forEach((choice) => {
+            choice.dataset.occupied = choice.textContent.indexOf("Occupied") >= 0 ? "true" : "false";
+            choice.addEventListener("click", () => selectBed(choice));
+        });
+        if (clearButton) {
+            clearButton.addEventListener("click", () => {
+                hiddenBed.value = "";
+                summary.classList.add("hidden");
+                choices.forEach((choice) => {
+                    choice.classList.remove("bg-emerald-500", "border-emerald-600", "text-white");
+                });
+            });
+        }
+    }());
+</script>
+{% endblock %}
