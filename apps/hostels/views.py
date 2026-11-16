@@ -33,6 +33,7 @@ from .selectors import (
     calculate_configuration_metrics,
     get_student_active_occupancy,
     get_student_verified_eligibility,
+    get_warden_assigned_hostel_ids,
 )
 from .services import (
     create_hostel,
@@ -483,7 +484,13 @@ def room_inventory_view(request):
     page_obj = paginator.get_page(page_number)
 
     # Filter dropdown lists
-    filter_hostels = Hostel.objects.filter(institution=institution) if institution else Hostel.objects.all()
+    if user.is_warden_role:
+        assigned_ids = get_warden_assigned_hostel_ids(user)
+        filter_hostels = Hostel.objects.filter(id__in=assigned_ids)
+    elif institution:
+        filter_hostels = Hostel.objects.filter(institution=institution)
+    else:
+        filter_hostels = Hostel.objects.all()
 
     return render(
         request,
@@ -552,7 +559,7 @@ def room_detail_view(request, pk):
         raise PermissionDenied("You do not have permission to view rooms outside your institution.")
 
     # Warden scoping check
-    if user.is_warden_role and not (user.is_chief_warden_role or user.is_hostel_admin_role):
+    if user.is_warden_role:
         from .models import WardenAssignment
         if not WardenAssignment.objects.filter(warden=user, hostel=room.floor.block.hostel).exists():
             raise PermissionDenied("You are not assigned to manage this hostel.")
@@ -604,11 +611,13 @@ def bed_list_view(request):
     operational_status = request.GET.get("status")
     search_query = request.GET.get("q", "").strip()
 
-    beds_qs = (
-        Bed.objects.filter(room__floor__block__hostel__institution=institution)
-        if institution
-        else Bed.objects.all()
-    )
+    if user.is_warden_role:
+        assigned_hostels = get_warden_assigned_hostel_ids(user)
+        beds_qs = Bed.objects.filter(room__floor__block__hostel_id__in=assigned_hostels)
+    elif institution:
+        beds_qs = Bed.objects.filter(room__floor__block__hostel__institution=institution)
+    else:
+        beds_qs = Bed.objects.all()
     beds_qs = beds_qs.select_related("room__floor__block__hostel").prefetch_related("occupancies")
 
     if operational_status:
@@ -678,9 +687,8 @@ def occupancy_list_view(request):
     if institution:
         qs = qs.filter(institution=institution)
 
-    if user.is_warden_role and not (user.is_chief_warden_role or user.is_hostel_admin_role):
-        from .models import WardenAssignment
-        assigned_hostels = WardenAssignment.objects.filter(warden=user).values_list("hostel_id", flat=True)
+    if user.is_warden_role:
+        assigned_hostels = get_warden_assigned_hostel_ids(user)
         qs = qs.filter(bed__room__floor__block__hostel_id__in=assigned_hostels)
 
     if status_filter and status_filter != "all":
@@ -763,6 +771,12 @@ def occupancy_detail_view(request, pk):
     # Privacy check
     if user.is_student_role and occupancy.student_id != user.id:
         raise PermissionDenied("You can only view your own occupancy records.")
+
+    # Warden assignment check
+    if user.is_warden_role:
+        from .models import WardenAssignment
+        if not WardenAssignment.objects.filter(warden=user, hostel=occupancy.bed.room.floor.block.hostel).exists():
+            raise PermissionDenied("You are not assigned to manage this hostel.")
 
     return render(
         request,

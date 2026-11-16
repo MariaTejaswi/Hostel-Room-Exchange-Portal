@@ -1,196 +1,891 @@
 {% extends 'layouts/dashboard_base.html' %}
+{% load static %}
 
 {% block title %}{{ page_title }} — RoomLoop{% endblock %}
 {% block breadcrumb_current %}{{ page_title }}{% endblock %}
 
 {% block content %}
-<div class="student-page max-w-4xl mx-auto space-y-6">
-    <div class="student-welcome">
-        <p class="student-eyebrow">Exchange centre</p>
-        <h1 class="student-title">{{ page_title }}</h1>
-        <p class="student-subtitle">A simple guided process to find a room that works for you.</p>
+<div class="student-page max-w-5xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="student-welcome flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <p class="student-eyebrow">RoomLoop Exchange Centre</p>
+            <h1 class="student-title text-xl sm:text-2xl font-bold">{{ page_title }}</h1>
+            <p class="student-subtitle text-xs sm:text-sm text-slate-500 mt-0.5">A simple, guided process to request an accommodation exchange.</p>
+        </div>
+        <a href="{% url 'exchange:request_list' %}" class="btn-secondary btn-sm inline-flex items-center gap-1.5 self-start sm:self-auto">
+            <span>&larr;</span>
+            <span>Back to Requests</span>
+        </a>
     </div>
 
-    <div class="student-steps" aria-label="Exchange request steps">
-        <span class="student-step active"><b>1</b> Choose location</span>
-        <span class="student-step active"><b>2</b> Select a bed</span>
-        <span class="student-step"><b>3</b> Review & submit</span>
+    <!-- Step Progress Indicator -->
+    <div class="student-steps" aria-label="Exchange request progress">
+        <span id="step-pill-1" class="student-step active"><b>1</b> Choose location & room</span>
+        <span id="step-pill-2" class="student-step"><b>2</b> Select bed</span>
+        <span id="step-pill-3" class="student-step"><b>3</b> Reason & review</span>
     </div>
 
-    <div class="card p-5 sm:p-6">
+    <!-- Main Container Card -->
+    <div class="card p-4 sm:p-6 bg-white border border-slate-200 rounded-xl shadow-xs space-y-6">
         {% if form.non_field_errors %}
-        <div class="mb-5 p-3.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
-            {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+        <div class="p-3.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 space-y-1" role="alert">
+            {% for error in form.non_field_errors %}
+            <p class="font-medium">{{ error }}</p>
+            {% endfor %}
         </div>
         {% endif %}
-        <div class="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div class="flex flex-col gap-1 mb-4">
-                <h2 class="student-section-title">Choose your preferred room and bed</h2>
-                <p class="text-xs text-slate-500">Occupied in-service beds can be selected for an exchange. Maintenance and unavailable beds cannot.</p>
+
+        <!-- Mode Toggle: Specific Bed (Default) vs General Preferences -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+            <div>
+                <span class="text-xs font-bold text-slate-800 block">Exchange Mode</span>
+                <span class="text-[11px] text-slate-500">Choose an exact room & bed or submit general preferences.</span>
             </div>
-            <form method="get" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+            <div class="inline-flex rounded-lg bg-slate-200/70 p-1 text-xs font-medium" role="tablist" aria-label="Exchange Mode">
+                <button type="button" id="tab-specific-bed" role="tab" aria-selected="true"
+                        class="px-3 py-1.5 rounded-md transition-all font-semibold bg-white text-slate-900 shadow-xs flex items-center gap-1.5">
+                    <span>Specific Bed</span>
+                    <span class="text-[9px] px-1.5 py-0.2 bg-[#702C3B] text-white rounded font-normal">Recommended</span>
+                </button>
+                <button type="button" id="tab-preferences" role="tab" aria-selected="false"
+                        class="px-3 py-1.5 rounded-md transition-all text-slate-600 hover:text-slate-900">
+                    Find by Preferences
+                </button>
+            </div>
+        </div>
+
+        <!-- Sticky Location & Selected Room/Bed Bar (Specific Bed Mode) -->
+        <div id="sticky-selection-bar" class="sticky top-14 z-20 bg-white/95 backdrop-blur-md border border-slate-200 p-3 rounded-xl shadow-xs flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2 text-xs min-w-0">
+                <span class="w-2 h-2 rounded-full bg-teal-600 flex-shrink-0"></span>
+                <span class="text-slate-500 font-medium">Browsing:</span>
+                <strong id="sticky-location-label" class="text-slate-800 truncate">
+                    {{ selected_hostel.name|default:"Select Hostel" }}
+                    {% if selected_block %} &bull; {{ selected_block.name }}{% endif %}
+                    {% if selected_floor %} &bull; {{ selected_floor.floor_label }}{% endif %}
+                </strong>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+                <span class="text-slate-500 font-medium">Target Bed:</span>
+                <span id="sticky-bed-badge" class="px-2 py-0.5 rounded font-mono font-semibold {% if selected_bed %}bg-emerald-100 text-emerald-800 border border-emerald-300{% else %}bg-slate-100 text-slate-500 border border-slate-200{% endif %}">
+                    {% if selected_bed %}Room {{ selected_bed.room.room_number }} · Bed {{ selected_bed.bed_label }}{% else %}None selected{% endif %}
+                </span>
+            </div>
+        </div>
+
+        <!-- SPECIFIC BED BROWSER SECTION -->
+        <section id="specific-bed-section" class="space-y-5">
+            <!-- Location Selectors (Auto-updating without submit button) -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-slate-50/70 border border-slate-200 rounded-xl">
                 <div>
-                    <label for="browser_hostel" class="block text-[11px] font-semibold text-slate-600 mb-1">Hostel</label>
-                    <select id="browser_hostel" name="hostel_id" class="form-select">
+                    <label for="select_hostel" class="block text-xs font-semibold text-slate-700 mb-1">Hostel</label>
+                    <select id="select_hostel" class="form-select w-full text-xs">
                         {% for hostel in browser_hostels %}
                         <option value="{{ hostel.id }}" {% if selected_hostel.id == hostel.id %}selected{% endif %}>{{ hostel.name }}</option>
-                        {% empty %}<option>No eligible hostels</option>{% endfor %}
+                        {% empty %}
+                        <option value="">No eligible hostels available</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div>
-                    <label for="browser_block" class="block text-[11px] font-semibold text-slate-600 mb-1">Block</label>
-                    <select id="browser_block" name="block_id" class="form-select">
+                    <label for="select_block" class="block text-xs font-semibold text-slate-700 mb-1">Block</label>
+                    <select id="select_block" class="form-select w-full text-xs" {% if not browser_blocks %}disabled{% endif %}>
                         {% for block in browser_blocks %}
                         <option value="{{ block.id }}" {% if selected_block.id == block.id %}selected{% endif %}>{{ block.name }}</option>
-                        {% empty %}<option>No blocks available</option>{% endfor %}
+                        {% empty %}
+                        <option value="">No blocks available</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div>
-                    <label for="browser_floor" class="block text-[11px] font-semibold text-slate-600 mb-1">Floor</label>
-                    <select id="browser_floor" name="floor_id" class="form-select">
+                    <label for="select_floor" class="block text-xs font-semibold text-slate-700 mb-1">Floor</label>
+                    <select id="select_floor" class="form-select w-full text-xs" {% if not browser_floors %}disabled{% endif %}>
                         {% for floor in browser_floors %}
                         <option value="{{ floor.id }}" {% if selected_floor.id == floor.id %}selected{% endif %}>{{ floor.floor_label }}</option>
-                        {% empty %}<option>No floors available</option>{% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label for="browser_room" class="block text-[11px] font-semibold text-slate-600 mb-1">Room number</label>
-                    <select id="browser_room" name="room_id" class="form-select">
-                        <option value="">All rooms on floor</option>
-                        {% for room_data in browser_rooms %}
-                        <option value="{{ room_data.room.id }}" {% if selected_room_id|slugify == room_data.room.id|slugify %}selected{% endif %}>Room {{ room_data.room.room_number }}</option>
+                        {% empty %}
+                        <option value="">No floors available</option>
                         {% endfor %}
                     </select>
                 </div>
-                <input type="hidden" name="bed_id" value="{{ selected_bed_id|default:'' }}">
-                <div class="sm:col-span-2 lg:col-span-4 flex justify-end">
-                    <button type="submit" class="btn-secondary btn-sm">Load rooms and beds</button>
-                </div>
-            </form>
-
-            <div class="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-600">
-                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-white border border-slate-300"></span>Free</span>
-                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-300 border border-slate-400"></span>Occupied</span>
-                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-emerald-500 border border-emerald-600"></span>Selected</span>
-                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-red-200 border border-red-400"></span>Unavailable</span>
             </div>
 
-            <div class="mt-4 space-y-4">
-                {% for room_data in browser_rooms %}
-                <section class="rounded-lg border border-slate-200 bg-white p-4">
-                    <div class="flex items-center justify-between gap-3 mb-3">
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900">Room {{ room_data.room.room_number }}</h3>
-                            <p class="text-[11px] text-slate-500">{{ room_data.room.get_room_type_display }} · {{ room_data.room.occupancy_category }}</p>
+            <!-- Legend -->
+            <div class="flex flex-wrap items-center gap-4 text-[11px] text-slate-600 px-1">
+                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500 border border-emerald-600"></span>Vacant (Immediate swap)</span>
+                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-slate-400 border border-slate-500"></span>Occupied — exchange target</span>
+                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-teal-700 border border-teal-800"></span>Your current bed</span>
+                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-slate-200 border border-slate-300"></span>Unavailable</span>
+            </div>
+
+            <!-- Room Selection Instruction -->
+            <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                <div>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Rooms on this floor</h3>
+                    <p class="text-[11px] text-slate-500">Click any room number to view bed layout and select your exchange target.</p>
+                </div>
+                <span id="room-count-badge" class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                    {{ room_summaries|length }} Room{{ room_summaries|length|pluralize }}
+                </span>
+            </div>
+
+            <!-- Room Tiles Grid Container -->
+            <div id="room-tiles-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 relative">
+                {% for room in room_summaries %}
+                <div class="room-tile {% if selected_room_id == room.id|stringformat:'s' %}active{% endif %}"
+                     data-room-id="{{ room.id }}"
+                     data-room-number="{{ room.room_number }}"
+                     tabindex="0"
+                     role="button"
+                     aria-expanded="{% if selected_room_id == room.id|stringformat:'s' %}true{% else %}false{% endif %}"
+                     aria-controls="bed-inline-panel">
+                    <div class="flex items-center justify-between gap-1">
+                        <span class="font-mono text-sm font-bold text-slate-900">Room {{ room.room_number }}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">{{ room.room_type_display }}</span>
+                    </div>
+                    <div class="mt-2 text-[11px] text-slate-500 space-y-0.5">
+                        <div>{{ room.total_beds }} bed{{ room.total_beds|pluralize }}</div>
+                        <div class="text-[10px] text-slate-400">
+                            {% if room.vacant_beds > 0 %}<span class="text-emerald-700 font-semibold">{{ room.vacant_beds }} vacant</span>{% endif %}
+                            {% if room.occupied_target_beds > 0 %}{% if room.vacant_beds > 0 %}, {% endif %}<span class="text-slate-600">{{ room.occupied_target_beds }} target{{ room.occupied_target_beds|pluralize }}</span>{% endif %}
                         </div>
-                        <span class="text-[11px] text-slate-400">{{ room_data.beds|length }} beds</span>
                     </div>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-                        {% for bed_data in room_data.beds %}
-                        {% if bed_data.selectable %}
-                        <button type="button"
-                                class="bed-choice rounded-lg border px-3 py-3 text-left transition-colors {% if bed_data.selected %}bg-emerald-500 border-emerald-600 text-white{% elif bed_data.occupied %}bg-slate-300 border-slate-400 text-slate-800 hover:bg-emerald-50 hover:border-emerald-400{% else %}bg-white border-slate-300 text-slate-800 hover:bg-emerald-50 hover:border-emerald-400{% endif %}"
-                                data-bed-id="{{ bed_data.bed.id }}"
-                                data-bed-label="{{ bed_data.bed.bed_label }}"
-                                data-room-number="{{ room_data.room.room_number }}"
-                                data-hostel-name="{{ room_data.room.floor.block.hostel.name }}"
-                                data-block-name="{{ room_data.room.floor.block.name }}"
-                                data-hostel-id="{{ room_data.room.floor.block.hostel.id }}"
-                                data-block-id="{{ room_data.room.floor.block.id }}"
-                                data-floor-id="{{ room_data.room.floor.id }}">
-                            <span class="block text-xs font-bold">{{ bed_data.bed.bed_label }}</span>
-                            <span class="block text-[10px] mt-1 opacity-75">{% if bed_data.occupied %}Occupied{% else %}Free{% endif %}</span>
-                        </button>
-                        {% elif bed_data.current or bed_data.occupied and not bed_data.unavailable %}
-                        <span class="rounded-lg border border-slate-400 bg-slate-300 px-3 py-3 text-left text-slate-800">
-                            <span class="block text-xs font-bold">{{ bed_data.bed.bed_label }}</span>
-                            <span class="block text-[10px] mt-1">Your current bed</span>
-                        </span>
-                        {% else %}
-                        <span class="rounded-lg border border-red-300 bg-red-100 px-3 py-3 text-left text-red-800">
-                            <span class="block text-xs font-bold">{{ bed_data.bed.bed_label }}</span>
-                            <span class="block text-[10px] mt-1">{% if bed_data.occupied %}Occupied{% else %}Unavailable{% endif %}</span>
-                        </span>
-                        {% endif %}
-                        {% empty %}
-                        <p class="text-xs text-slate-500">No bed records found for this room.</p>
-                        {% endfor %}
+                    {% if room.has_current_bed %}
+                    <div class="mt-2 pt-1 border-t border-teal-100">
+                        <span class="text-[9px] font-bold text-teal-700 uppercase tracking-wide">Your room</span>
                     </div>
-                </section>
+                    {% endif %}
+                </div>
                 {% empty %}
-                <div class="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-xs text-slate-500">
-                    Select an eligible hostel, block, floor, and room to browse target beds.
+                <div class="col-span-full py-8 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-xl">
+                    No rooms found for this floor. Please select another floor or block.
                 </div>
                 {% endfor %}
             </div>
 
-            <div id="selected-bed-summary" class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 {% if not selected_bed %}hidden{% endif %}">
-                Selected target:
-                <strong id="selected-bed-label">{{ selected_bed.bed_label|default:'' }}</strong>
-                <span id="selected-bed-location">
-                    {% if selected_bed %}· Room {{ selected_bed.room.room_number }} · {{ selected_bed.room.floor.block.hostel.name }} · {{ selected_bed.room.floor.block.name }}{% endif %}
-                </span>
-                <button type="button" id="clear-bed-selection" class="ml-2 font-semibold underline hover:no-underline">Clear selection</button>
-            </div>
-        </div>
+            <!-- In-Row Dynamic Bed Panel (Re-located dynamically by JS) -->
+            <div id="bed-inline-panel" class="room-inline-panel {% if not initial_room_details %}hidden{% endif %}">
+                <div class="flex items-center justify-between border-b border-slate-200/80 pb-3 mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-[#FAF4F5] border border-[#E8DED4] text-[#702C3B] font-bold flex items-center justify-center text-xs font-mono">
+                            <span id="panel-room-num">{{ initial_room_details.room.room_number|default:"" }}</span>
+                        </div>
+                        <div>
+                            <h4 id="panel-room-title" class="text-xs font-bold text-slate-900">
+                                {% if initial_room_details %}Room {{ initial_room_details.room.room_number }} · {{ initial_room_details.room.room_type_display }}{% endif %}
+                            </h4>
+                            <p id="panel-room-meta" class="text-[11px] text-slate-500">
+                                {% if initial_room_details %}Capacity: {{ initial_room_details.room.capacity }} &bull; {{ initial_room_details.room.occupancy_category }} &bull; {{ initial_room_details.room.hostel_name }}{% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" id="panel-close-btn" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors" aria-label="Close bed panel">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
 
-        <form method="post" class="space-y-4">
-            {% csrf_token %}
-            {{ form.preferred_bed }}
-            {% for field in form.visible_fields %}
-            <div>
-                <label for="{{ field.id_for_label }}" class="block text-xs font-semibold text-slate-700 mb-1.5">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}<p class="mt-1 text-[11px] text-slate-400">{{ field.help_text }}</p>{% endif %}
-                {% if field.errors %}<p class="mt-1 text-xs text-red-600">{{ field.errors.0 }}</p>{% endif %}
+                <!-- Beds Grid inside panel -->
+                <div id="panel-beds-container" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                    {% if initial_room_details %}
+                    {% for bed in initial_room_details.beds %}
+                    {% if bed.selectable %}
+                    <button type="button"
+                            class="bed-card rounded-xl border p-3 text-left transition-all flex flex-col justify-between h-24 {% if selected_bed_id == bed.id|stringformat:'s' %}bg-emerald-500 border-emerald-600 text-white shadow-xs ring-2 ring-emerald-500{% elif bed.is_occupied %}bg-white border-slate-300 hover:border-emerald-500 hover:bg-emerald-50/50{% else %}bg-white border-emerald-200 hover:border-emerald-500 hover:bg-emerald-50{% endif %}"
+                            data-bed-id="{{ bed.id }}"
+                            data-bed-label="{{ bed.bed_label }}"
+                            data-room-number="{{ initial_room_details.room.room_number }}"
+                            data-hostel-name="{{ initial_room_details.room.hostel_name }}"
+                            data-block-name="{{ initial_room_details.room.block_name }}"
+                            data-floor-label="{{ initial_room_details.room.floor_label }}"
+                            data-room-type="{{ initial_room_details.room.room_type_display }}"
+                            data-occupancy-category="{{ initial_room_details.room.occupancy_category }}">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-xs font-mono">{{ bed.bed_label }}</span>
+                            <span class="text-[9px] px-1.5 py-0.5 rounded {% if selected_bed_id == bed.id|stringformat:'s' %}bg-white/20 text-white{% elif bed.is_occupied %}bg-slate-100 text-slate-700{% else %}bg-emerald-100 text-emerald-800{% endif %}">
+                                {% if bed.is_occupied %}Target{% else %}Vacant{% endif %}
+                            </span>
+                        </div>
+                        <div class="text-[10px] {% if selected_bed_id == bed.id|stringformat:'s' %}text-emerald-100{% else %}text-slate-500{% endif %}">
+                            {{ bed.status_label }}
+                        </div>
+                    </button>
+                    {% elif bed.is_current %}
+                    <div class="rounded-xl border border-teal-300 bg-teal-50/70 p-3 text-left flex flex-col justify-between h-24 opacity-80 cursor-not-allowed">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-xs font-mono text-teal-900">{{ bed.bed_label }}</span>
+                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-teal-200 text-teal-800 font-semibold">Current</span>
+                        </div>
+                        <div class="text-[10px] text-teal-700 font-medium">Your current bed</div>
+                    </div>
+                    {% else %}
+                    <div class="rounded-xl border border-slate-200 bg-slate-100/70 p-3 text-left flex flex-col justify-between h-24 opacity-60 cursor-not-allowed">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-xs font-mono text-slate-600">{{ bed.bed_label }}</span>
+                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Unavailable</span>
+                        </div>
+                        <div class="text-[10px] text-slate-500">Not selectable</div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                </div>
             </div>
-            {% endfor %}
+
+            <!-- Read-only Destination & Current Allocation Comparison Card -->
+            <div id="destination-summary-card" class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3 {% if not selected_bed %}hidden{% endif %}">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200/60 pb-2.5">
+                    <div class="flex items-center gap-2">
+                        <span class="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold">✓</span>
+                        <h4 class="text-xs font-bold text-emerald-900 uppercase tracking-wider">Exchange Destination Selected</h4>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="btn-change-bed" class="text-xs text-[#702C3B] font-semibold underline hover:no-underline">Change Bed</button>
+                        <span class="text-slate-300">&bull;</span>
+                        <button type="button" id="btn-clear-bed" class="text-xs text-red-600 font-semibold hover:underline">Clear Selection</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <!-- Current Allocation Column -->
+                    <div class="p-3 bg-white rounded-lg border border-emerald-200/70">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Your Current Room</span>
+                        {% if current_occupancy %}
+                        <p class="font-bold text-slate-900 text-sm">{{ current_occupancy.bed.room.floor.block.hostel.name }}</p>
+                        <p class="text-slate-600 text-[11px] mt-0.5">
+                            Block {{ current_occupancy.bed.room.floor.block.name }} &bull;
+                            {{ current_occupancy.bed.room.floor.floor_label }} &bull;
+                            Room {{ current_occupancy.bed.room.room_number }}
+                        </p>
+                        <p class="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-teal-50 border border-teal-200 text-teal-800 text-[11px] font-mono font-bold">
+                            <span>Bed {{ current_occupancy.bed.bed_label }}</span>
+                        </p>
+                        {% else %}
+                        <p class="text-slate-500 italic">No active allocation recorded.</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Requested Destination Column -->
+                    <div class="p-3 bg-white rounded-lg border border-emerald-200/70">
+                        <span class="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">Requested Destination</span>
+                        <p id="summary-dest-hostel" class="font-bold text-slate-900 text-sm">{{ selected_bed.room.floor.block.hostel.name|default:"" }}</p>
+                        <p id="summary-dest-meta" class="text-slate-600 text-[11px] mt-0.5">
+                            {% if selected_bed %}
+                            Block {{ selected_bed.room.floor.block.name }} &bull;
+                            {{ selected_bed.room.floor.floor_label }} &bull;
+                            Room {{ selected_bed.room.room_number }} ({{ selected_bed.room.get_room_type_display }})
+                            {% endif %}
+                        </p>
+                        <p id="summary-dest-bed" class="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-100 border border-emerald-300 text-emerald-900 text-[11px] font-mono font-bold">
+                            <span>{% if selected_bed %}Bed {{ selected_bed.bed_label }}{% endif %}</span>
+                        </p>
+                    </div>
+                </div>
+
+                <p class="text-[11px] text-emerald-800/80 pt-1">
+                    <em>Notice:</em> Selecting a bed submits an exchange request for review. It does not automatically allocate or reserve the bed until approved by the hostel administration.
+                </p>
+            </div>
+        </section>
+
+        <!-- GENERAL PREFERENCES SECTION (Secondary Mode) -->
+        <section id="preferences-section" class="space-y-4 hidden">
+            <div class="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900">
+                <strong>General Preferences Mode:</strong> Specify your destination criteria. The system will look for matching students or vacant beds across campus.
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                    <label for="{{ form.preferred_hostel.id_for_label }}" class="block text-xs font-semibold text-slate-700 mb-1">Preferred Hostel</label>
+                    {{ form.preferred_hostel }}
+                    {% if form.preferred_hostel.errors %}<p class="text-xs text-red-600 mt-1">{{ form.preferred_hostel.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.preferred_block.id_for_label }}" class="block text-xs font-semibold text-slate-700 mb-1">Preferred Block (Optional)</label>
+                    {{ form.preferred_block }}
+                    {% if form.preferred_block.errors %}<p class="text-xs text-red-600 mt-1">{{ form.preferred_block.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.preferred_floor.id_for_label }}" class="block text-xs font-semibold text-slate-700 mb-1">Preferred Floor (Optional)</label>
+                    {{ form.preferred_floor }}
+                    {% if form.preferred_floor.errors %}<p class="text-xs text-red-600 mt-1">{{ form.preferred_floor.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.preferred_room_type.id_for_label }}" class="block text-xs font-semibold text-slate-700 mb-1">Preferred Room Type</label>
+                    {{ form.preferred_room_type }}
+                    {% if form.preferred_room_type.errors %}<p class="text-xs text-red-600 mt-1">{{ form.preferred_room_type.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.preferred_occupancy_category.id_for_label }}" class="block text-xs font-semibold text-slate-700 mb-1">Category (e.g. Standard, AC)</label>
+                    {{ form.preferred_occupancy_category }}
+                    {% if form.preferred_occupancy_category.errors %}<p class="text-xs text-red-600 mt-1">{{ form.preferred_occupancy_category.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.preferred_accessibility_attributes.id_for_label }}" class="block text-xs font-semibold text-slate-700 mb-1">Accessibility / Features</label>
+                    {{ form.preferred_accessibility_attributes }}
+                    {% if form.preferred_accessibility_attributes.errors %}<p class="text-xs text-red-600 mt-1">{{ form.preferred_accessibility_attributes.errors.0 }}</p>{% endif %}
+                </div>
+            </div>
+        </section>
+
+        <!-- SUBMISSION FORM: Reason, Confirmation & Actions -->
+        <form method="post" id="exchange-request-form" class="space-y-4 pt-4 border-t border-slate-100">
+            {% csrf_token %}
+            <!-- Hidden input for selected preferred bed -->
+            <input type="hidden" name="preferred_bed" id="id_preferred_bed" value="{{ selected_bed_id|default:'' }}">
+
+            <!-- Hidden inputs to forward preference values when in specific bed mode -->
+            <div id="hidden-preference-fields" class="hidden"></div>
+
+            <!-- Reason Field -->
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label for="{{ form.reason.id_for_label }}" class="block text-xs font-semibold text-slate-800">
+                        Reason for Exchange Request <span class="text-red-500">*</span>
+                    </label>
+                    <span id="char-counter" class="text-[11px] text-slate-400 font-mono">0 / 10 min</span>
+                </div>
+                {{ form.reason }}
+                <p class="mt-1 text-[11px] text-slate-400">Explain your reason clearly (academic timing, medical, personal, accessibility). Minimum 10 characters.</p>
+                {% if form.reason.errors %}
+                <p class="mt-1 text-xs text-red-600 font-medium">{{ form.reason.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Confirmation Checkbox -->
+            <div class="pt-2">
+                <label class="flex items-start gap-2.5 text-xs text-slate-600 cursor-pointer">
+                    <input type="checkbox" id="confirm-policy-check" required class="rounded border-slate-300 text-[#702C3B] focus:ring-[#702C3B]/30 mt-0.5">
+                    <span>I confirm that the details provided are accurate and understand that submitting this request initiates formal administrative review.</span>
+                </label>
+            </div>
+
+            <!-- Form Actions -->
             <div class="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
                 <a href="{% url 'exchange:request_list' %}" class="btn-secondary">Cancel</a>
-                <button type="submit" class="btn-primary">Save Exchange Request</button>
+                <button type="submit" id="btn-submit-request" class="btn-primary flex items-center gap-2">
+                    <span id="submit-spinner" class="hidden animate-spin">&#9696;</span>
+                    <span id="submit-text">{% if exchange_request %}Save Changes{% else %}Submit Exchange Request{% endif %}</span>
+                </button>
             </div>
         </form>
     </div>
 </div>
-<script>
-    (function () {
-        const hiddenBed = document.getElementById("id_preferred_bed");
-        const summary = document.getElementById("selected-bed-summary");
-        const summaryLabel = document.getElementById("selected-bed-label");
-        const summaryLocation = document.getElementById("selected-bed-location");
-        const clearButton = document.getElementById("clear-bed-selection");
-        const choices = Array.from(document.querySelectorAll(".bed-choice"));
 
-        function selectBed(choice) {
-            hiddenBed.value = choice.dataset.bedId;
-            choices.forEach((item) => {
-                item.classList.remove("bg-emerald-500", "border-emerald-600", "text-white");
-                if (item === choice) {
-                    item.classList.add("bg-emerald-500", "border-emerald-600", "text-white");
-                } else if (item.dataset.occupied === "true") {
-                    item.classList.add("bg-slate-300", "border-slate-400", "text-slate-800");
-                } else {
-                    item.classList.add("bg-white", "border-slate-300", "text-slate-800");
+<!-- Dynamic Browser Script -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const hiddenBed = document.getElementById("id_preferred_bed");
+    const hostelSelect = document.getElementById("select_hostel");
+    const blockSelect = document.getElementById("select_block");
+    const floorSelect = document.getElementById("select_floor");
+    const roomTilesGrid = document.getElementById("room-tiles-grid");
+    const roomCountBadge = document.getElementById("room-count-badge");
+    const bedInlinePanel = document.getElementById("bed-inline-panel");
+    const panelRoomNum = document.getElementById("panel-room-num");
+    const panelRoomTitle = document.getElementById("panel-room-title");
+    const panelRoomMeta = document.getElementById("panel-room-meta");
+    const panelBedsContainer = document.getElementById("panel-beds-container");
+    const panelCloseBtn = document.getElementById("panel-close-btn");
+
+    const destinationSummaryCard = document.getElementById("destination-summary-card");
+    const summaryDestHostel = document.getElementById("summary-dest-hostel");
+    const summaryDestMeta = document.getElementById("summary-dest-meta");
+    const summaryDestBed = document.getElementById("summary-dest-bed");
+    const btnChangeBed = document.getElementById("btn-change-bed");
+    const btnClearBed = document.getElementById("btn-clear-bed");
+
+    const stickyBar = document.getElementById("sticky-selection-bar");
+    const stickyLocationLabel = document.getElementById("sticky-location-label");
+    const stickyBedBadge = document.getElementById("sticky-bed-badge");
+
+    const tabSpecific = document.getElementById("tab-specific-bed");
+    const tabPreferences = document.getElementById("tab-preferences");
+    const specificSection = document.getElementById("specific-bed-section");
+    const preferencesSection = document.getElementById("preferences-section");
+
+    const reasonTextarea = document.getElementById("{{ form.reason.id_for_label }}");
+    const charCounter = document.getElementById("char-counter");
+    const requestForm = document.getElementById("exchange-request-form");
+    const submitBtn = document.getElementById("btn-submit-request");
+    const submitSpinner = document.getElementById("submit-spinner");
+    const submitText = document.getElementById("submit-text");
+
+    const stepPill1 = document.getElementById("step-pill-1");
+    const stepPill2 = document.getElementById("step-pill-2");
+    const stepPill3 = document.getElementById("step-pill-3");
+
+    let currentAbortController = null;
+    let selectedRoomTile = null;
+
+    // Reason character count
+    function updateCharCount() {
+        if (!reasonTextarea) return;
+        const len = reasonTextarea.value.trim().length;
+        charCounter.textContent = len + " / 10 min";
+        if (len >= 10) {
+            charCounter.className = "text-[11px] text-emerald-600 font-mono font-semibold";
+        } else {
+            charCounter.className = "text-[11px] text-slate-400 font-mono";
+        }
+        updateStepIndicators();
+    }
+    if (reasonTextarea) {
+        reasonTextarea.addEventListener("input", updateCharCount);
+        updateCharCount();
+    }
+
+    // Step indicators
+    function updateStepIndicators() {
+        const hasBed = hiddenBed && hiddenBed.value;
+        const hasReason = reasonTextarea && reasonTextarea.value.trim().length >= 10;
+
+        stepPill1.className = "student-step active";
+        if (hasBed) {
+            stepPill2.className = "student-step active";
+            if (hasReason) {
+                stepPill3.className = "student-step active";
+            } else {
+                stepPill3.className = "student-step";
+            }
+        } else {
+            stepPill2.className = "student-step";
+            stepPill3.className = "student-step";
+        }
+    }
+
+    // Mode Switching
+    function setMode(mode) {
+        if (mode === "specific") {
+            tabSpecific.classList.add("bg-white", "text-slate-900", "shadow-xs");
+            tabSpecific.classList.remove("text-slate-600");
+            tabPreferences.classList.remove("bg-white", "text-slate-900", "shadow-xs");
+            tabPreferences.classList.add("text-slate-600");
+            specificSection.classList.remove("hidden");
+            stickyBar.classList.remove("hidden");
+            preferencesSection.classList.add("hidden");
+        } else {
+            tabPreferences.classList.add("bg-white", "text-slate-900", "shadow-xs");
+            tabPreferences.classList.remove("text-slate-600");
+            tabSpecific.classList.remove("bg-white", "text-slate-900", "shadow-xs");
+            tabSpecific.classList.add("text-slate-600");
+            preferencesSection.classList.remove("hidden");
+            specificSection.classList.add("hidden");
+            stickyBar.classList.add("hidden");
+            // Clear specific bed selection
+            clearBedSelection();
+        }
+    }
+
+    tabSpecific.addEventListener("click", () => setMode("specific"));
+    tabPreferences.addEventListener("click", () => setMode("preferences"));
+
+    // In-Row placement helper
+    function findLastTileInRow(targetTile) {
+        const allTiles = Array.from(roomTilesGrid.querySelectorAll(".room-tile"));
+        const targetTop = targetTile.offsetTop;
+        // Tiles within 6px of the same offsetTop share the visual row
+        const rowTiles = allTiles.filter(t => Math.abs(t.offsetTop - targetTop) <= 6);
+        return rowTiles.length > 0 ? rowTiles[rowTiles.length - 1] : targetTile;
+    }
+
+    function positionPanelAfterRow(targetTile) {
+        const lastTile = findLastTileInRow(targetTile);
+        if (lastTile) {
+            lastTile.after(bedInlinePanel);
+        }
+    }
+
+    // Dynamic Bed Selection
+    function selectBed(card) {
+        const bedId = card.dataset.bedId;
+        const bedLabel = card.dataset.bedLabel;
+        const roomNumber = card.dataset.roomNumber;
+        const hostelName = card.dataset.hostelName;
+        const blockName = card.dataset.blockName;
+        const floorLabel = card.dataset.floorLabel;
+        const roomType = card.dataset.roomType;
+        const occCategory = card.dataset.occupancyCategory;
+
+        hiddenBed.value = bedId;
+
+        // Visual highlight on bed card
+        panelBedsContainer.querySelectorAll(".bed-card").forEach(c => {
+            c.classList.remove("bg-emerald-500", "border-emerald-600", "text-white", "ring-2", "ring-emerald-500", "shadow-xs");
+            c.classList.add("bg-white");
+        });
+        card.classList.remove("bg-white");
+        card.classList.add("bg-emerald-500", "border-emerald-600", "text-white", "ring-2", "ring-emerald-500", "shadow-xs");
+
+        // Update destination summary card
+        summaryDestHostel.textContent = hostelName;
+        summaryDestMeta.textContent = "Block " + blockName + " • " + floorLabel + " • Room " + roomNumber + " (" + roomType + ")";
+        summaryDestBed.textContent = "Bed " + bedLabel;
+        destinationSummaryCard.classList.remove("hidden");
+
+        // Update sticky bar
+        stickyBedBadge.textContent = "Room " + roomNumber + " · Bed " + bedLabel;
+        stickyBedBadge.className = "px-2 py-0.5 rounded font-mono font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300";
+
+        updateStepIndicators();
+
+        // Scroll to summary smoothly
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        destinationSummaryCard.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "nearest" });
+    }
+
+    function clearBedSelection() {
+        if (hiddenBed) hiddenBed.value = "";
+        if (destinationSummaryCard) destinationSummaryCard.classList.add("hidden");
+        if (stickyBedBadge) {
+            stickyBedBadge.textContent = "None selected";
+            stickyBedBadge.className = "px-2 py-0.5 rounded font-mono font-semibold bg-slate-100 text-slate-500 border border-slate-200";
+        }
+        if (panelBedsContainer) {
+            panelBedsContainer.querySelectorAll(".bed-card").forEach(c => {
+                c.classList.remove("bg-emerald-500", "border-emerald-600", "text-white", "ring-2", "ring-emerald-500", "shadow-xs");
+                c.classList.add("bg-white");
+            });
+        }
+        updateStepIndicators();
+    }
+
+    if (btnClearBed) btnClearBed.addEventListener("click", clearBedSelection);
+    if (btnChangeBed) {
+        btnChangeBed.addEventListener("click", () => {
+            const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            if (bedInlinePanel && !bedInlinePanel.classList.contains("hidden")) {
+                bedInlinePanel.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "nearest" });
+            } else if (roomTilesGrid) {
+                roomTilesGrid.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "nearest" });
+            }
+        });
+    }
+
+    // Room click -> fetch beds and insert in-row panel
+    function openRoomPanel(tile) {
+        const roomId = tile.dataset.roomId;
+        const roomNumber = tile.dataset.roomNumber;
+
+        // Deselect previous tile
+        if (selectedRoomTile && selectedRoomTile !== tile) {
+            selectedRoomTile.classList.remove("active");
+            selectedRoomTile.setAttribute("aria-expanded", "false");
+        }
+        selectedRoomTile = tile;
+        tile.classList.add("active");
+        tile.setAttribute("aria-expanded", "true");
+
+        // Place panel directly after this tile's visual row
+        positionPanelAfterRow(tile);
+        bedInlinePanel.classList.remove("hidden");
+
+        // Set skeleton loading state
+        panelRoomNum.textContent = roomNumber;
+        panelRoomTitle.textContent = "Room " + roomNumber + " · Loading...";
+        panelRoomMeta.textContent = "Fetching bed records...";
+        panelBedsContainer.innerHTML = '<div class="col-span-full py-4 text-center text-xs text-slate-500">Loading beds...</div>';
+
+        // Abort previous in-flight request
+        if (currentAbortController) {
+            currentAbortController.abort();
+        }
+        currentAbortController = new AbortController();
+
+        fetch("/exchange/api/rooms/" + encodeURIComponent(roomId) + "/beds/", {
+            signal: currentAbortController.signal,
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Could not load beds");
+            return res.json();
+        })
+        .then(data => {
+            panelRoomNum.textContent = data.room.room_number;
+            panelRoomTitle.textContent = "Room " + data.room.room_number + " · " + data.room.room_type_display;
+            panelRoomMeta.textContent = "Capacity: " + data.room.capacity + " • " + data.room.occupancy_category + " • " + data.room.hostel_name;
+
+            renderPanelBeds(data.room, data.beds);
+
+            // Scroll enough to reveal panel if out of view
+            const rect = bedInlinePanel.getBoundingClientRect();
+            if (rect.top < 60 || rect.bottom > window.innerHeight) {
+                const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                bedInlinePanel.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "nearest" });
+            }
+        })
+        .catch(err => {
+            if (err.name !== "AbortError") {
+                panelBedsContainer.innerHTML = '<div class="col-span-full py-4 text-center text-xs text-red-600">Failed to load bed details. <button type="button" class="underline ml-1" onclick="openRoomPanel(selectedRoomTile)">Retry</button></div>';
+            }
+        });
+    }
+
+    function renderPanelBeds(room, beds) {
+        panelBedsContainer.innerHTML = "";
+        const currentSelectedId = hiddenBed ? hiddenBed.value : "";
+
+        beds.forEach(bed => {
+            if (bed.selectable) {
+                const isSelected = (String(bed.id) === String(currentSelectedId));
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "bed-card rounded-xl border p-3 text-left transition-all flex flex-col justify-between h-24 " +
+                    (isSelected ? "bg-emerald-500 border-emerald-600 text-white shadow-xs ring-2 ring-emerald-500" :
+                    (bed.is_occupied ? "bg-white border-slate-300 hover:border-emerald-500 hover:bg-emerald-50/50" : "bg-white border-emerald-200 hover:border-emerald-500 hover:bg-emerald-50"));
+                btn.dataset.bedId = bed.id;
+                btn.dataset.bedLabel = bed.bed_label;
+                btn.dataset.roomNumber = room.room_number;
+                btn.dataset.hostelName = room.hostel_name;
+                btn.dataset.blockName = room.block_name;
+                btn.dataset.floorLabel = room.floor_label;
+                btn.dataset.roomType = room.room_type_display;
+                btn.dataset.occupancyCategory = room.occupancy_category;
+
+                btn.innerHTML =
+                    '<div class="flex items-center justify-between">' +
+                        '<span class="font-bold text-xs font-mono">' + bed.bed_label + '</span>' +
+                        '<span class="text-[9px] px-1.5 py-0.5 rounded ' + (isSelected ? 'bg-white/20 text-white' : (bed.is_occupied ? 'bg-slate-100 text-slate-700' : 'bg-emerald-100 text-emerald-800')) + '">' +
+                            (bed.is_occupied ? 'Target' : 'Vacant') +
+                        '</span>' +
+                    '</div>' +
+                    '<div class="text-[10px] ' + (isSelected ? 'text-emerald-100' : 'text-slate-500') + '">' + bed.status_label + '</div>';
+
+                btn.addEventListener("click", () => selectBed(btn));
+                panelBedsContainer.appendChild(btn);
+            } else if (bed.is_current) {
+                const div = document.createElement("div");
+                div.className = "rounded-xl border border-teal-300 bg-teal-50/70 p-3 text-left flex flex-col justify-between h-24 opacity-80 cursor-not-allowed";
+                div.innerHTML =
+                    '<div class="flex items-center justify-between">' +
+                        '<span class="font-bold text-xs font-mono text-teal-900">' + bed.bed_label + '</span>' +
+                        '<span class="text-[9px] px-1.5 py-0.5 rounded bg-teal-200 text-teal-800 font-semibold">Current</span>' +
+                    '</div>' +
+                    '<div class="text-[10px] text-teal-700 font-medium">Your current bed</div>';
+                panelBedsContainer.appendChild(div);
+            } else {
+                const div = document.createElement("div");
+                div.className = "rounded-xl border border-slate-200 bg-slate-100/70 p-3 text-left flex flex-col justify-between h-24 opacity-60 cursor-not-allowed";
+                div.innerHTML =
+                    '<div class="flex items-center justify-between">' +
+                        '<span class="font-bold text-xs font-mono text-slate-600">' + bed.bed_label + '</span>' +
+                        '<span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Unavailable</span>' +
+                    '</div>' +
+                    '<div class="text-[10px] text-slate-500">Not selectable</div>';
+                panelBedsContainer.appendChild(div);
+            }
+        });
+    }
+
+    function closePanel() {
+        bedInlinePanel.classList.add("hidden");
+        if (selectedRoomTile) {
+            selectedRoomTile.classList.remove("active");
+            selectedRoomTile.setAttribute("aria-expanded", "false");
+            selectedRoomTile.focus();
+        }
+    }
+
+    panelCloseBtn.addEventListener("click", closePanel);
+
+    // Attach click and keyboard handlers to initial room tiles
+    function attachRoomTileListeners() {
+        roomTilesGrid.querySelectorAll(".room-tile").forEach(tile => {
+            tile.addEventListener("click", () => openRoomPanel(tile));
+            tile.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openRoomPanel(tile);
                 }
             });
-            summaryLabel.textContent = choice.dataset.bedLabel;
-            summaryLocation.textContent = " · Room " + choice.dataset.roomNumber + " · " + choice.dataset.hostelName + " · " + choice.dataset.blockName;
-            summary.classList.remove("hidden");
+        });
+    }
+    attachRoomTileListeners();
+
+    // Attach listeners to initial bed buttons inside panel
+    panelBedsContainer.querySelectorAll(".bed-card").forEach(c => {
+        c.addEventListener("click", () => selectBed(c));
+    });
+
+    // Auto-update Location Selectors
+    function updateStickyLocation() {
+        const hText = hostelSelect.options[hostelSelect.selectedIndex]?.text || "Select Hostel";
+        const bText = blockSelect.options[blockSelect.selectedIndex]?.text || "";
+        const fText = floorSelect.options[floorSelect.selectedIndex]?.text || "";
+        stickyLocationLabel.textContent = hText + (bText ? " • " + bText : "") + (fText ? " • " + fText : "");
+    }
+
+    function loadFloorRooms(floorId) {
+        roomCountBadge.textContent = "Loading...";
+        roomTilesGrid.innerHTML = '<div class="col-span-full py-8 text-center text-xs text-slate-500">Loading rooms on this floor...</div>';
+        closePanel();
+
+        fetch("/exchange/api/floors/" + encodeURIComponent(floorId) + "/rooms/", {
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+        .then(res => res.json())
+        .then(data => {
+            roomCountBadge.textContent = data.rooms.length + " Room" + (data.rooms.length === 1 ? "" : "s");
+            renderRoomTiles(data.rooms);
+            updateStickyLocation();
+        })
+        .catch(() => {
+            roomTilesGrid.innerHTML = '<div class="col-span-full py-6 text-center text-xs text-red-600">Failed to load rooms. Please try again.</div>';
+        });
+    }
+
+    function renderRoomTiles(rooms) {
+        roomTilesGrid.innerHTML = "";
+        if (rooms.length === 0) {
+            roomTilesGrid.innerHTML = '<div class="col-span-full py-8 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-xl">No rooms configured on this floor level.</div>';
+            return;
         }
 
-        choices.forEach((choice) => {
-            choice.dataset.occupied = choice.textContent.indexOf("Occupied") >= 0 ? "true" : "false";
-            choice.addEventListener("click", () => selectBed(choice));
+        rooms.forEach(r => {
+            const tile = document.createElement("div");
+            tile.className = "room-tile";
+            tile.dataset.roomId = r.id;
+            tile.dataset.roomNumber = r.room_number;
+            tile.tabIndex = 0;
+            tile.role = "button";
+            tile.setAttribute("aria-expanded", "false");
+            tile.setAttribute("aria-controls", "bed-inline-panel");
+
+            let bedSubText = "";
+            if (r.vacant_beds > 0) {
+                bedSubText += '<span class="text-emerald-700 font-semibold">' + r.vacant_beds + ' vacant</span>';
+            }
+            if (r.occupied_target_beds > 0) {
+                if (bedSubText) bedSubText += ", ";
+                bedSubText += '<span class="text-slate-600">' + r.occupied_target_beds + ' target' + (r.occupied_target_beds === 1 ? '' : 's') + '</span>';
+            }
+
+            tile.innerHTML =
+                '<div class="flex items-center justify-between gap-1">' +
+                    '<span class="font-mono text-sm font-bold text-slate-900">Room ' + r.room_number + '</span>' +
+                    '<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">' + r.room_type_display + '</span>' +
+                '</div>' +
+                '<div class="mt-2 text-[11px] text-slate-500 space-y-0.5">' +
+                    '<div>' + r.total_beds + ' bed' + (r.total_beds === 1 ? '' : 's') + '</div>' +
+                    '<div class="text-[10px] text-slate-400">' + (bedSubText || 'All unavailable') + '</div>' +
+                '</div>' +
+                (r.has_current_bed ? '<div class="mt-2 pt-1 border-t border-teal-100"><span class="text-[9px] font-bold text-teal-700 uppercase tracking-wide">Your room</span></div>' : '');
+
+            roomTilesGrid.appendChild(tile);
         });
-        if (clearButton) {
-            clearButton.addEventListener("click", () => {
-                hiddenBed.value = "";
-                summary.classList.add("hidden");
-                choices.forEach((choice) => {
-                    choice.classList.remove("bg-emerald-500", "border-emerald-600", "text-white");
-                });
-            });
+
+        attachRoomTileListeners();
+
+        // If only 1 room, auto-open it
+        if (rooms.length === 1) {
+            const firstTile = roomTilesGrid.querySelector(".room-tile");
+            if (firstTile) openRoomPanel(firstTile);
         }
-    }());
+    }
+
+    // Floor Change
+    floorSelect.addEventListener("change", function () {
+        clearBedSelection();
+        loadFloorRooms(this.value);
+    });
+
+    // Block Change -> update floors, then load rooms
+    blockSelect.addEventListener("change", function () {
+        const blockId = this.value;
+        clearBedSelection();
+        floorSelect.innerHTML = '<option value="">Loading floors...</option>';
+        floorSelect.disabled = true;
+
+        fetch("/exchange/api/blocks/" + encodeURIComponent(blockId) + "/floors/", {
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+        .then(res => res.json())
+        .then(data => {
+            floorSelect.innerHTML = "";
+            if (data.floors.length === 0) {
+                floorSelect.innerHTML = '<option value="">No floors available</option>';
+                roomTilesGrid.innerHTML = '<div class="col-span-full py-8 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-xl">No floors available in this block.</div>';
+                return;
+            }
+            data.floors.forEach(f => {
+                const opt = document.createElement("option");
+                opt.value = f.id;
+                opt.textContent = f.floor_label;
+                floorSelect.appendChild(opt);
+            });
+            floorSelect.disabled = false;
+            // Auto-select first floor and load rooms
+            loadFloorRooms(data.floors[0].id);
+        });
+    });
+
+    // Hostel Change -> update blocks, floors, rooms
+    hostelSelect.addEventListener("change", function () {
+        const hostelId = this.value;
+        clearBedSelection();
+        blockSelect.innerHTML = '<option value="">Loading blocks...</option>';
+        blockSelect.disabled = true;
+        floorSelect.innerHTML = '<option value="">Select block first</option>';
+        floorSelect.disabled = true;
+
+        fetch("/exchange/api/hostels/" + encodeURIComponent(hostelId) + "/blocks/", {
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+        .then(res => res.json())
+        .then(data => {
+            blockSelect.innerHTML = "";
+            if (data.blocks.length === 0) {
+                blockSelect.innerHTML = '<option value="">No blocks available</option>';
+                return;
+            }
+            data.blocks.forEach(b => {
+                const opt = document.createElement("option");
+                opt.value = b.id;
+                opt.textContent = b.name;
+                blockSelect.appendChild(opt);
+            });
+            blockSelect.disabled = false;
+            // Trigger block change for first block
+            blockSelect.dispatchEvent(new Event("change"));
+        });
+    });
+
+    // Form submission validation & double-submission prevention
+    requestForm.addEventListener("submit", function (e) {
+        const reasonLen = reasonTextarea ? reasonTextarea.value.trim().length : 0;
+        if (reasonLen < 10) {
+            e.preventDefault();
+            alert("Please provide at least 10 characters for your exchange reason.");
+            if (reasonTextarea) reasonTextarea.focus();
+            return;
+        }
+
+        const isSpecific = !tabSpecific.classList.contains("text-slate-600");
+        if (isSpecific && (!hiddenBed || !hiddenBed.value)) {
+            e.preventDefault();
+            alert("Please select a specific destination bed from the room layout, or switch to 'Find by Preferences' mode.");
+            return;
+        }
+
+        // Disable button to prevent double-submit
+        submitBtn.disabled = true;
+        submitSpinner.classList.remove("hidden");
+        submitText.textContent = "Submitting request...";
+    });
+
+    // Restore saved mode if editing
+    {% if initial_mode == "preferences" %}
+    setMode("preferences");
+    {% else %}
+    setMode("specific");
+    {% endif %}
+
+    // Position initial bed panel under its row if pre-opened
+    {% if initial_room_details %}
+    const preselectedTile = roomTilesGrid.querySelector('.room-tile[data-room-id="{{ initial_room_details.room.id }}"]');
+    if (preselectedTile) {
+        positionPanelAfterRow(preselectedTile);
+        selectedRoomTile = preselectedTile;
+    }
+    {% endif %}
+});
 </script>
 {% endblock %}

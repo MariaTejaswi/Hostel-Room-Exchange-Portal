@@ -17,6 +17,25 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 
+def get_warden_assigned_hostel_ids(user: User) -> list[int]:
+    """Return list of hostel IDs assigned to the warden."""
+    if not user or not user.is_authenticated:
+        return []
+    return list(
+        WardenAssignment.objects.filter(warden=user).values_list("hostel_id", flat=True)
+    )
+
+
+def get_warden_assigned_hostels(user: User):
+    """Return QuerySet of hostels assigned to the warden."""
+    if not user or not user.is_authenticated:
+        return Hostel.objects.none()
+    return Hostel.objects.filter(
+        assigned_wardens__warden=user,
+        institution=user.institution,
+    ).distinct()
+
+
 def get_hostel_queryset_with_stats(institution=None, user=None):
     """
     Fetch hostels with real aggregate database statistics using correlated subqueries
@@ -33,9 +52,9 @@ def get_hostel_queryset_with_stats(institution=None, user=None):
     if institution:
         qs = qs.filter(institution=institution)
 
-    # Scoping for wardens without administrative authority
-    if user and user.is_warden_role and not (user.is_chief_warden_role or user.is_hostel_admin_role):
-        assigned_hostel_ids = WardenAssignment.objects.filter(warden=user).values_list("hostel_id", flat=True)
+    # Scoping for wardens: strictly assigned hostels
+    if user and user.is_warden_role:
+        assigned_hostel_ids = get_warden_assigned_hostel_ids(user)
         qs = qs.filter(id__in=assigned_hostel_ids)
 
     active_occupant_bed_ids = StudentOccupancy.objects.filter(
@@ -177,8 +196,8 @@ def get_room_inventory_queryset(
     if institution:
         qs = qs.filter(floor__block__hostel__institution=institution)
 
-    if user and user.is_warden_role and not (user.is_chief_warden_role or user.is_hostel_admin_role):
-        assigned_hostels = WardenAssignment.objects.filter(warden=user).values_list("hostel_id", flat=True)
+    if user and user.is_warden_role:
+        assigned_hostels = get_warden_assigned_hostel_ids(user)
         qs = qs.filter(floor__block__hostel_id__in=assigned_hostels)
 
     if hostel_id:
@@ -285,7 +304,7 @@ def get_eligible_unallocated_students(institution, required_category: str | None
     return qs
 
 
-def get_vacant_beds(institution, hostel_id=None):
+def get_vacant_beds(institution, hostel_id=None, user=None):
     """Return in-service beds that have no active occupant in active hierarchy."""
     occupied_bed_ids = StudentOccupancy.objects.filter(
         institution=institution,
@@ -307,6 +326,10 @@ def get_vacant_beds(institution, hostel_id=None):
         .select_related("room__floor__block__hostel")
         .order_by("room__floor__block__hostel__name", "room__room_number", "bed_label")
     )
+
+    if user and user.is_warden_role:
+        assigned_hostels = get_warden_assigned_hostel_ids(user)
+        qs = qs.filter(room__floor__block__hostel_id__in=assigned_hostels)
 
     if hostel_id:
         qs = qs.filter(room__floor__block__hostel_id=hostel_id)

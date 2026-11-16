@@ -111,38 +111,37 @@ class ExchangeRequestForm(forms.ModelForm):
         )
 
     def clean_reason(self):
-        reason = self.cleaned_data["reason"].strip()
+        reason = self.cleaned_data.get("reason", "").strip()
         if len(reason) < 10:
             raise forms.ValidationError("Please provide at least 10 characters for the exchange reason.")
         return reason
 
     def clean(self):
         cleaned_data = super().clean()
+        preferred_bed = cleaned_data.get("preferred_bed")
         hostel = cleaned_data.get("preferred_hostel")
         block = cleaned_data.get("preferred_block")
         floor = cleaned_data.get("preferred_floor")
-        preferred_bed = cleaned_data.get("preferred_bed")
+
         if preferred_bed:
+            # Bed is authoritative: resolve destination relationships from database
             bed_hostel = preferred_bed.room.floor.block.hostel
             bed_block = preferred_bed.room.floor.block
             bed_floor = preferred_bed.room.floor
-            if not hostel:
-                cleaned_data["preferred_hostel"] = bed_hostel
-                hostel = bed_hostel
-            if not block:
-                cleaned_data["preferred_block"] = bed_block
-                block = bed_block
-            if not floor:
-                cleaned_data["preferred_floor"] = bed_floor
-                floor = bed_floor
-            if hostel.id != bed_hostel.id:
-                self.add_error("preferred_hostel", "Selected hostel must contain the selected bed.")
-            if block.id != bed_block.id:
-                self.add_error("preferred_block", "Selected block must contain the selected bed.")
-            if floor.id != bed_floor.id:
-                self.add_error("preferred_floor", "Selected floor must contain the selected bed.")
-        if hostel and block and block.hostel_id != hostel.id:
-            self.add_error("preferred_block", "Select a block from the preferred hostel.")
-        if block and floor and floor.block_id != block.id:
-            self.add_error("preferred_floor", "Select a floor from the preferred block.")
+
+            cleaned_data["preferred_hostel"] = bed_hostel
+            cleaned_data["preferred_block"] = bed_block
+            cleaned_data["preferred_floor"] = bed_floor
+
+            if not cleaned_data.get("preferred_room_type"):
+                cleaned_data["preferred_room_type"] = preferred_bed.room.room_type
+            if not cleaned_data.get("preferred_occupancy_category"):
+                cleaned_data["preferred_occupancy_category"] = preferred_bed.room.occupancy_category or "Standard"
+        else:
+            # Preferences mode validation
+            if hostel and block and block.hostel_id != hostel.id:
+                self.add_error("preferred_block", "Select a block from the preferred hostel.")
+            if block and floor and floor.block_id != block.id:
+                self.add_error("preferred_floor", "Select a floor from the preferred block.")
+
         return cleaned_data

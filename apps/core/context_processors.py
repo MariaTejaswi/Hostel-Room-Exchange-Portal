@@ -45,11 +45,14 @@ def navigation_context(request):
         context["can_manage_inventory"] = False  # Oversight & escalation only; no infrastructure mutation
         context["can_assign_occupancy"] = False  # Routine allocations belong to destination wardens
     elif user.is_warden_role:
+        from apps.hostels.models import WardenAssignment
+        has_assignments = WardenAssignment.objects.filter(warden=user).exists()
         context["user_role"] = "Warden"
         context["user_role_label"] = "Warden"
         context["is_warden"] = True
         context["can_manage_inventory"] = False  # Routine operations in assigned hostels
-        context["can_assign_occupancy"] = True   # Authorized for routine allocation in assigned hostels
+        context["can_assign_occupancy"] = has_assignments  # Authorized only when assigned to at least one hostel
+        context["has_assigned_hostels"] = has_assignments
     elif user.is_sysadmin_role:
         context["user_role"] = "System Administrator"
         context["user_role_label"] = "System Admin"

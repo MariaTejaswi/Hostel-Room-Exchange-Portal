@@ -122,20 +122,22 @@ class OccupancyAssignForm(forms.Form):
 
     def __init__(self, *args, institution=None, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.user = user
         if institution:
             self.fields["student"].queryset = get_eligible_unallocated_students(institution)
-            vacant_beds = get_vacant_beds(institution)
-            # Restrict bed choices to assigned hostels for wardens
-            if user and user.is_warden_role and not (user.is_chief_warden_role or user.is_hostel_admin_role):
-                from .models import WardenAssignment
-                assigned_hostel_ids = WardenAssignment.objects.filter(warden=user).values_list("hostel_id", flat=True)
-                vacant_beds = vacant_beds.filter(room__floor__block__hostel_id__in=assigned_hostel_ids)
-            self.fields["bed"].queryset = vacant_beds
+            self.fields["bed"].queryset = get_vacant_beds(institution, user=user)
 
     def clean(self):
         cleaned_data = super().clean()
         student = cleaned_data.get("student")
         bed = cleaned_data.get("bed")
+
+        if bed and self.user and self.user.is_warden_role:
+            from .selectors import get_warden_assigned_hostel_ids
+            assigned_ids = get_warden_assigned_hostel_ids(self.user)
+            if bed.room.floor.block.hostel_id not in assigned_ids:
+                raise forms.ValidationError("You are not authorized to allocate beds in this hostel.")
+
         if student and bed:
             hostel = bed.room.floor.block.hostel
             eligibility = getattr(student, "residential_eligibility", None)

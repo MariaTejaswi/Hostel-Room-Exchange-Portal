@@ -19,13 +19,29 @@ def _assert_student(student):
 
 
 def _request_data(data):
+    preferred_bed = data.get("preferred_bed")
+    hostel = data.get("preferred_hostel")
+    block = data.get("preferred_block")
+    floor = data.get("preferred_floor")
+    room_type = data.get("preferred_room_type", "")
+    occupancy_category = data.get("preferred_occupancy_category", "").strip()
+
+    if preferred_bed:
+        hostel = preferred_bed.room.floor.block.hostel
+        block = preferred_bed.room.floor.block
+        floor = preferred_bed.room.floor
+        if not room_type:
+            room_type = preferred_bed.room.room_type
+        if not occupancy_category:
+            occupancy_category = preferred_bed.room.occupancy_category or "Standard"
+
     return {
-        "preferred_hostel": data.get("preferred_hostel"),
-        "preferred_block": data.get("preferred_block"),
-        "preferred_floor": data.get("preferred_floor"),
-        "preferred_bed": data.get("preferred_bed"),
-        "preferred_room_type": data.get("preferred_room_type", ""),
-        "preferred_occupancy_category": data.get("preferred_occupancy_category", "").strip(),
+        "preferred_hostel": hostel,
+        "preferred_block": block,
+        "preferred_floor": floor,
+        "preferred_bed": preferred_bed,
+        "preferred_room_type": room_type,
+        "preferred_occupancy_category": occupancy_category,
         "preferred_accessibility_attributes": data.get(
             "preferred_accessibility_attributes",
             "",

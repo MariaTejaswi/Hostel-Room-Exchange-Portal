@@ -105,7 +105,11 @@
                     {% empty %}
                     <tr>
                         <td colspan="8" class="text-center py-8 text-xs text-slate-500">
+                            {% if is_warden and not has_assigned_hostels %}
+                            No hostel has been assigned to your account. Contact the hostel administration.
+                            {% else %}
                             No occupancy records match the selected filters.
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

@@ -31,4 +31,25 @@ urlpatterns = [
         views.exchange_request_withdraw_view,
         name="request_withdraw",
     ),
+    # Lightweight AJAX endpoints for dynamic bed/room explorer
+    path(
+        "exchange/api/hostels/<str:hostel_id>/blocks/",
+        views.api_exchange_blocks,
+        name="api_blocks",
+    ),
+    path(
+        "exchange/api/blocks/<str:block_id>/floors/",
+        views.api_exchange_floors,
+        name="api_floors",
+    ),
+    path(
+        "exchange/api/floors/<str:floor_id>/rooms/",
+        views.api_exchange_floor_rooms,
+        name="api_floor_rooms",
+    ),
+    path(
+        "exchange/api/rooms/<str:room_id>/beds/",
+        views.api_exchange_room_beds,
+        name="api_room_beds",
+    ),
 ]

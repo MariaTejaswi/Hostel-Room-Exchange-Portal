@@ -107,4 +107,52 @@
     @apply text-sm sm:text-base font-bold text-slate-900 min-w-0;
     overflow-wrap: anywhere;
   }
+
+  .room-tile {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 0.875rem;
+    border-radius: 0.75rem;
+    border: 1px solid #E2E8F0;
+    background-color: #FFFFFF;
+    cursor: pointer;
+    transition: all 150ms ease;
+    user-select: none;
+    min-height: 84px;
+  }
+
+  .room-tile:hover {
+    border-color: #702C3B;
+    box-shadow: 0 4px 12px rgba(112, 44, 59, 0.08);
+    transform: translateY(-1px);
+  }
+
+  .room-tile.active,
+  .room-tile[aria-expanded="true"] {
+    border-color: #702C3B;
+    background-color: #FAF4F5;
+    box-shadow: 0 0 0 2px #702C3B;
+  }
+
+  .room-inline-panel {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-top: 0.75rem;
+    margin-bottom: 0.75rem;
+    border-radius: 0.875rem;
+    border: 1px solid #E8DED4;
+    background-color: #FFFDF9;
+    box-shadow: 0 6px 20px rgba(73, 55, 47, 0.06);
+    padding: 1.25rem;
+  }
+
+  .sidebar svg,
+  .sidebar-nav-item svg {
+    width: 1rem !important;
+    height: 1rem !important;
+    max-width: 1rem !important;
+    max-height: 1rem !important;
+    flex-shrink: 0 !important;
+  }
 }
