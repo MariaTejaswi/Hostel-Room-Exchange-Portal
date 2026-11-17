@@ -1,69 +1,187 @@
 {% extends 'layouts/dashboard_base.html' %}
 
-{% block title %}Exchange Request — RoomLoop{% endblock %}
-{% block breadcrumb_current %}Exchange Request{% endblock %}
+{% block title %}{% if exchange_request.request_type == 'vacant_transfer' %}Vacant-Bed Transfer Request{% else %}Exchange Request{% endif %} — RoomLoop{% endblock %}
+{% block breadcrumb_current %}{% if exchange_request.request_type == 'vacant_transfer' %}Vacant-Bed Transfer{% else %}Exchange Request{% endif %}{% endblock %}
 
 {% block content %}
 <div class="student-page w-full max-w-[980px] mx-auto space-y-6">
     <header class="student-welcome flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-            <p class="student-eyebrow">Exchange centre</p>
-            <h1 class="student-title">Your exchange request</h1>
-            <p class="student-subtitle">Request {{ exchange_request.pk }}</p>
+            <div class="flex items-center gap-2">
+                <p class="student-eyebrow">Accommodation Centre</p>
+                {% if exchange_request.request_type == 'vacant_transfer' %}
+                <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-purple-100 text-purple-900 border border-purple-200">
+                    Vacant-Bed Transfer
+                </span>
+                {% else %}
+                <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-teal-100 text-teal-900 border border-teal-200">
+                    Occupied-Bed Exchange
+                </span>
+                {% endif %}
+            </div>
+            <h1 class="student-title">
+                {% if exchange_request.request_type == 'vacant_transfer' %}
+                Vacant-Bed Transfer Request
+                {% else %}
+                Your Exchange Request
+                {% endif %}
+            </h1>
+            <p class="student-subtitle">Reference ID #{{ exchange_request.pk }}</p>
         </div>
-        {% if can_modify %}
-        <div class="flex gap-2">
+        <div class="flex items-center gap-2">
+            {% if exchange_request.status == 'completed' and transfer_record %}
+            <a href="{% url 'exchange:transfer_letter' pk=transfer_record.pk %}" target="_blank" class="btn-primary btn-sm flex items-center gap-1.5">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Transfer Letter</span>
+            </a>
+            {% endif %}
+            {% if can_edit %}
             <a href="{% url 'exchange:request_edit' pk=exchange_request.pk %}" class="btn-secondary btn-sm">Edit request</a>
+            {% endif %}
+            {% if can_withdraw %}
             <form method="post" action="{% url 'exchange:request_withdraw' pk=exchange_request.pk %}">
                 {% csrf_token %}
-                <button type="submit" class="btn-danger btn-sm" onclick="return confirm('Are you sure you want to withdraw this exchange request?');">Withdraw</button>
+                <button type="submit" class="btn-danger btn-sm" onclick="return confirm('Are you sure you want to withdraw this request?');">Withdraw</button>
             </form>
+            {% endif %}
         </div>
-        {% endif %}
     </header>
 
-    {% if is_expired %}
-    <div class="card p-4 border-l-4 border-amber-500 bg-amber-50/60 text-xs text-amber-900 space-y-1">
-        <p class="font-bold text-amber-950">This exchange request has expired</p>
-        <p>The validity period configured by your institution has lapsed. You may submit a new request if you still require an exchange.</p>
+    <!-- Notice of Status Outcomes -->
+    {% if exchange_request.status == 'completed' %}
+    <div class="card p-4 border-l-4 border-emerald-600 bg-emerald-50/70 text-xs text-emerald-950 space-y-1.5 rounded-xl">
+        <div class="flex items-center gap-2 font-bold text-emerald-900 text-sm">
+            <span>✓</span>
+            <span>Transfer Approved & Executed</span>
+        </div>
+        <p>
+            Your transfer request has been officially approved by the hostel authority and executed. Your active bed allocation has been updated to your destination.
+        </p>
+        {% if latest_approval and latest_approval.remarks %}
+        <p class="text-emerald-900/80 italic font-mono text-[11px]">
+            Authority Remarks: "{{ latest_approval.remarks }}"
+        </p>
+        {% endif %}
+    </div>
+    {% elif exchange_request.status == 'rejected' %}
+    <div class="card p-4 border-l-4 border-rose-600 bg-rose-50/70 text-xs text-rose-950 space-y-1.5 rounded-xl">
+        <div class="flex items-center gap-2 font-bold text-rose-900 text-sm">
+            <span>✕</span>
+            <span>Request Rejected by Hostel Authority</span>
+        </div>
+        <p>
+            This request was reviewed and rejected. Your original room allocation remains completely unchanged and active.
+        </p>
+        {% if latest_approval and latest_approval.remarks %}
+        <p class="text-rose-900 italic font-mono text-[11px]">
+            Reason: "{{ latest_approval.remarks }}"
+        </p>
+        {% endif %}
+    </div>
+    {% elif is_expired %}
+    <div class="card p-4 border-l-4 border-amber-500 bg-amber-50/60 text-xs text-amber-900 space-y-1 rounded-xl">
+        <p class="font-bold text-amber-950">This request has expired</p>
+        <p>The validity period configured by your institution has lapsed. Your current room allocation remains unaffected.</p>
     </div>
     {% elif has_active_proposal %}
-    <div class="card p-4 border-l-4 border-teal-600 bg-teal-50/60 text-xs text-teal-900 space-y-1">
+    <div class="card p-4 border-l-4 border-teal-600 bg-teal-50/60 text-xs text-teal-900 space-y-1 rounded-xl">
         <p class="font-bold text-teal-950">Active Proposal in Progress</p>
         <p>This request is actively reserved in a matching proposal. Modification and withdrawal are locked while the proposal is under review.</p>
     </div>
     {% endif %}
 
+    <!-- Section 9 Actionable Notice: Open Exchange Request Targeting Vacant Bed -->
+    {% if is_target_bed_vacant and exchange_request.status == 'open' and exchange_request.request_type == 'exchange' %}
+    <div class="card p-4 border-l-4 border-amber-600 bg-amber-50/80 text-xs text-amber-950 space-y-2 rounded-xl">
+        <div class="flex items-center gap-2 font-bold text-amber-900 text-sm">
+            <span>ℹ️</span>
+            <span>Notice: Target Bed is Currently Vacant</span>
+        </div>
+        <p class="leading-relaxed">
+            The target bed selected for this request (<strong>Room {{ exchange_request.preferred_bed.room.room_number }} · Bed {{ exchange_request.preferred_bed.bed_label }}</strong> in {{ exchange_request.preferred_bed.room.floor.block.hostel.name }}) is currently vacant.
+            Because this was submitted as an <em>Occupied-bed Exchange</em>, it is waiting in the matching cycle engine.
+        </p>
+        <p class="leading-relaxed">
+            To bypass matching cycles and route directly for authority approval and automatic transfer execution, you may withdraw this request and resubmit it as a direct <strong>Vacant-bed Transfer</strong>.
+        </p>
+        <div class="pt-1 flex items-center gap-3">
+            <form method="post" action="{% url 'exchange:request_withdraw' pk=exchange_request.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-sm bg-amber-800 hover:bg-amber-900 text-white rounded-lg px-3 py-1 font-semibold" onclick="return confirm('Withdraw this exchange request so you can submit a direct vacant-bed transfer?');">
+                    Withdraw & Resubmit as Vacant Transfer
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
         <section class="card">
-            <div class="card-header"><h2 class="student-section-title">Request status</h2><span class="student-status-pill student-status-{{ exchange_request.status }}">{{ exchange_request.get_status_display }}</span></div>
+            <div class="card-header flex items-center justify-between">
+                <h2 class="student-section-title">Request Status</h2>
+                <span class="student-status-pill student-status-{{ exchange_request.status }}">
+                    {{ exchange_request.get_status_display }}
+                </span>
+            </div>
             <div class="card-body">
                 <dl class="data-list">
-                    <div class="data-row"><dt class="data-label">Submitted</dt><dd class="data-value">{{ exchange_request.submitted_at|date:"M d, Y H:i" }}</dd></div>
-                    <div class="data-row"><dt class="data-label">Expires</dt><dd class="data-value">{{ exchange_request.expires_at|date:"M d, Y"|default:"No expiry" }}</dd></div>
+                    <div class="data-row">
+                        <dt class="data-label">Request Type</dt>
+                        <dd class="data-value font-semibold">{{ exchange_request.get_request_type_display }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt class="data-label">Approving Authority</dt>
+                        <dd class="data-value">{{ required_authority_label }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt class="data-label">Submitted</dt>
+                        <dd class="data-value">{{ exchange_request.submitted_at|date:"M d, Y H:i" }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt class="data-label">Expires</dt>
+                        <dd class="data-value">{{ exchange_request.expires_at|date:"M d, Y"|default:"No expiry" }}</dd>
+                    </div>
                 </dl>
             </div>
         </section>
+
         <section class="card">
-            <div class="card-header"><h2 class="student-section-title">Current accommodation</h2></div>
+            <div class="card-header"><h2 class="student-section-title">Current Accommodation</h2></div>
             <div class="card-body">
                 <dl class="data-list">
-                    <div class="data-row"><dt class="data-label">Hostel</dt><dd class="data-value">{{ exchange_request.current_occupancy.bed.room.floor.block.hostel.name }}</dd></div>
-                    <div class="data-row"><dt class="data-label">Room & bed</dt><dd class="data-value">Room {{ exchange_request.current_occupancy.bed.room.room_number }} · {{ exchange_request.current_occupancy.bed.bed_label }}</dd></div>
+                    <div class="data-row"><dt class="data-label">Hostel</dt><dd class="data-value font-bold text-slate-900">{{ exchange_request.current_occupancy.bed.room.floor.block.hostel.name }}</dd></div>
+                    <div class="data-row"><dt class="data-label">Block & Floor</dt><dd class="data-value">Block {{ exchange_request.current_occupancy.bed.room.floor.block.name }} · {{ exchange_request.current_occupancy.bed.room.floor.floor_label }}</dd></div>
+                    <div class="data-row"><dt class="data-label">Room & Bed</dt><dd class="data-value font-mono">Room {{ exchange_request.current_occupancy.bed.room.room_number }} · Bed {{ exchange_request.current_occupancy.bed.bed_label }}</dd></div>
                 </dl>
+                <div class="mt-3 p-2 bg-slate-50 border border-slate-200/80 rounded text-[11px] text-slate-600">
+                    <em>Notice:</em> Your current bed remains allocated until the transfer completes.
+                </div>
             </div>
         </section>
     </div>
 
     <section class="card">
-        <div class="card-header"><h2 class="student-section-title">Preferred accommodation</h2></div>
+        <div class="card-header"><h2 class="student-section-title">Target Accommodation</h2></div>
         <div class="card-body">
             <dl class="data-list">
-                <div class="data-row"><dt class="data-label">Hostel</dt><dd class="data-value">{{ exchange_request.preferred_hostel.name|default:"No preference" }}</dd></div>
+                <div class="data-row"><dt class="data-label">Hostel</dt><dd class="data-value font-semibold">{{ exchange_request.preferred_hostel.name|default:"No preference" }}</dd></div>
                 <div class="data-row"><dt class="data-label">Block</dt><dd class="data-value">{{ exchange_request.preferred_block.name|default:"No preference" }}</dd></div>
                 <div class="data-row"><dt class="data-label">Floor</dt><dd class="data-value">{{ exchange_request.preferred_floor.floor_label|default:"No preference" }}</dd></div>
-                <div class="data-row"><dt class="data-label">Selected bed</dt><dd class="data-value">{% if exchange_request.preferred_bed %}{{ exchange_request.preferred_bed.room.floor.block.hostel.name }} · Block {{ exchange_request.preferred_bed.room.floor.block.name }} · Room {{ exchange_request.preferred_bed.room.room_number }} · {{ exchange_request.preferred_bed.bed_label }}{% else %}No exact bed selected{% endif %}</dd></div>
-                <div class="data-row"><dt class="data-label">Room type</dt><dd class="data-value">{{ exchange_request.get_preferred_room_type_display|default:"No preference" }}</dd></div>
+                <div class="data-row">
+                    <dt class="data-label">Selected Bed</dt>
+                    <dd class="data-value">
+                        {% if exchange_request.preferred_bed %}
+                        <span class="font-bold text-[#702C3B]">
+                            {{ exchange_request.preferred_bed.room.floor.block.hostel.name }} · Block {{ exchange_request.preferred_bed.room.floor.block.name }} · Room {{ exchange_request.preferred_bed.room.room_number }} · Bed {{ exchange_request.preferred_bed.bed_label }}
+                        </span>
+                        {% else %}
+                        No exact bed selected
+                        {% endif %}
+                    </dd>
+                </div>
+                <div class="data-row"><dt class="data-label">Room Type</dt><dd class="data-value">{{ exchange_request.get_preferred_room_type_display|default:"No preference" }}</dd></div>
                 <div class="data-row"><dt class="data-label">Reason</dt><dd class="data-value whitespace-pre-line">{{ exchange_request.reason }}</dd></div>
             </dl>
         </div>

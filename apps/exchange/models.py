@@ -19,9 +19,15 @@ from apps.hostels.models import (
 class ExchangeRequest(TimeStampedModel):
     """A student's request to exchange their current accommodation."""
 
+    class RequestType(models.TextChoices):
+        EXCHANGE = "exchange", "Occupied-bed Exchange"
+        VACANT_TRANSFER = "vacant_transfer", "Vacant-bed Transfer"
+
     class Status(models.TextChoices):
         OPEN = "open", "Open"
         MATCHED = "matched", "Matched"
+        PENDING_APPROVAL = "pending_approval", "Pending Approval"
+        REJECTED = "rejected", "Rejected"
         WITHDRAWN = "withdrawn", "Withdrawn"
         EXPIRED = "expired", "Expired"
         COMPLETED = "completed", "Completed"
@@ -41,6 +47,12 @@ class ExchangeRequest(TimeStampedModel):
         StudentOccupancy,
         on_delete=models.PROTECT,
         related_name="exchange_requests",
+    )
+    request_type = models.CharField(
+        max_length=20,
+        choices=RequestType.choices,
+        default=RequestType.EXCHANGE,
+        db_index=True,
     )
     preferred_bed = models.ForeignKey(
         Bed,
@@ -93,13 +105,14 @@ class ExchangeRequest(TimeStampedModel):
         ordering = ["-submitted_at", "-created_at"]
         indexes = [
             models.Index(fields=["institution", "status"]),
+            models.Index(fields=["institution", "request_type", "status"]),
             models.Index(fields=["student", "status"]),
             models.Index(fields=["expires_at", "status"]),
         ]
         constraints = [
             models.UniqueConstraint(
                 fields=["student"],
-                condition=Q(status__in=["open", "matched"]),
+                condition=Q(status__in=["open", "matched", "pending_approval"]),
                 name="unique_active_exchange_request_per_student",
             ),
             models.CheckConstraint(
@@ -109,10 +122,12 @@ class ExchangeRequest(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f"{self.student.full_name} exchange request ({self.status})"
+        return f"{self.student.full_name} {self.get_request_type_display()} ({self.status})"
 
     def clean(self):
         super().clean()
+        if self.request_type == self.RequestType.VACANT_TRANSFER and not self.preferred_bed_id:
+            raise ValidationError("A specific preferred bed is required for a vacant-bed transfer.")
         if self.student_id and self.institution_id and self.student.institution_id != self.institution_id:
             raise ValidationError("Student and exchange request must belong to the same institution.")
         if self.current_occupancy_id:
@@ -254,6 +269,55 @@ class ExchangeProposal(TimeStampedModel):
         if self.expires_at and self.created_at and self.expires_at < self.created_at:
             raise ValidationError("Proposal expiry cannot precede creation.")
 
+    @property
+    def hostel_ids(self) -> set:
+        """Set of hostel IDs involved in this proposal."""
+        if hasattr(self, "_prefetched_objects_cache") and "participants" in self._prefetched_objects_cache:
+            return {
+                p.current_occupancy.bed.room.floor.block.hostel_id
+                for p in self.participants.all()
+                if p.current_occupancy_id and p.current_occupancy.bed_id
+            }
+        return set(
+            self.participants.values_list(
+                "current_occupancy__bed__room__floor__block__hostel_id",
+                flat=True,
+            )
+        )
+
+    @property
+    def is_cross_hostel(self) -> bool:
+        """Return whether proposal spans multiple hostels."""
+        return len(self.hostel_ids) > 1
+
+    @property
+    def classification(self) -> str:
+        """Classification: 'cross_hostel' or 'same_hostel'."""
+        return "cross_hostel" if self.is_cross_hostel else "same_hostel"
+
+    @property
+    def scope_hostel(self):
+        """For same-hostel proposals, returns the single Hostel object; otherwise None."""
+        if not self.is_cross_hostel:
+            if hasattr(self, "_prefetched_objects_cache") and "participants" in self._prefetched_objects_cache:
+                for p in self.participants.all():
+                    if p.current_occupancy_id and p.current_occupancy.bed_id:
+                        return p.current_occupancy.bed.room.floor.block.hostel
+            part = self.participants.select_related(
+                "current_occupancy__bed__room__floor__block__hostel"
+            ).first()
+            if part and part.current_occupancy and part.current_occupancy.bed:
+                return part.current_occupancy.bed.room.floor.block.hostel
+        return None
+
+    @property
+    def current_approval(self):
+        """Return the latest Approval record for this proposal if any."""
+        if hasattr(self, "_prefetched_objects_cache") and "approvals" in self._prefetched_objects_cache:
+            approvals = list(self.approvals.all())
+            return approvals[0] if approvals else None
+        return self.approvals.order_by("-decided_at", "-created_at").first()
+
 
 class ProposalParticipant(TimeStampedModel):
     """One student's position, occupancy reservation, and destination in a proposal."""
@@ -360,7 +424,7 @@ class ProposalParticipant(TimeStampedModel):
 
 
 class Approval(TimeStampedModel):
-    """An authority decision recorded against an exchange proposal."""
+    """An authority decision recorded against an exchange proposal or vacant-bed transfer request."""
 
     class AuthorityRole(models.TextChoices):
         WARDEN = "warden", "Warden"
@@ -375,6 +439,15 @@ class Approval(TimeStampedModel):
     proposal = models.ForeignKey(
         ExchangeProposal,
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="approvals",
+    )
+    exchange_request = models.ForeignKey(
+        ExchangeRequest,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name="approvals",
     )
     authority_user = models.ForeignKey(
@@ -403,12 +476,25 @@ class Approval(TimeStampedModel):
         ordering = ["created_at"]
         indexes = [
             models.Index(fields=["proposal", "decision"]),
+            models.Index(fields=["exchange_request", "decision"]),
             models.Index(fields=["authority_user", "decision"]),
         ]
         constraints = [
             models.UniqueConstraint(
                 fields=["proposal", "authority_user", "authority_role", "scope_hostel"],
+                condition=Q(proposal__isnull=False),
                 name="unique_exchange_approval_authority_scope",
+            ),
+            models.UniqueConstraint(
+                fields=["exchange_request", "authority_user", "authority_role"],
+                condition=Q(exchange_request__isnull=False),
+                name="unique_vacant_transfer_approval_authority_scope",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(proposal__isnull=False) | Q(exchange_request__isnull=False)
+                ),
+                name="exchange_approval_target_required",
             ),
             models.CheckConstraint(
                 condition=(
@@ -420,30 +506,73 @@ class Approval(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f"{self.authority_role} approval for proposal {self.proposal_id}"
+        if self.proposal_id:
+            return f"{self.authority_role} approval for proposal {self.proposal_id}"
+        return f"{self.authority_role} approval for request {self.exchange_request_id}"
 
     def clean(self):
         super().clean()
-        if self.authority_user_id and self.authority_user.institution_id not in (None, self.proposal.institution_id):
-            raise ValidationError("Approver must belong to the proposal institution.")
-        if self.scope_hostel_id and self.scope_hostel.institution_id != self.proposal.institution_id:
-            raise ValidationError("Approval scope hostel must belong to the proposal institution.")
+        target_institution_id = None
+        if self.proposal_id:
+            target_institution_id = self.proposal.institution_id
+        elif self.exchange_request_id:
+            target_institution_id = self.exchange_request.institution_id
+        else:
+            raise ValidationError("Approval must reference either a proposal or an exchange request.")
+
+        if self.authority_user_id and self.authority_user.institution_id not in (None, target_institution_id):
+            raise ValidationError("Approver must belong to the proposal/request institution.")
+        if self.scope_hostel_id and self.scope_hostel.institution_id != target_institution_id:
+            raise ValidationError("Approval scope hostel must belong to the proposal/request institution.")
 
 
 class TransferRecord(TimeStampedModel):
-    """Immutable historical record of one participant's completed exchange transfer."""
+    """Immutable historical record of one participant's completed exchange or vacant-bed transfer."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="transfer_records",
+    )
+    exchange_request = models.ForeignKey(
+        ExchangeRequest,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="transfer_records",
+    )
     proposal = models.ForeignKey(
         ExchangeProposal,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="transfer_records",
     )
     participant = models.OneToOneField(
         ProposalParticipant,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="transfer_record",
     )
+    approval = models.ForeignKey(
+        Approval,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="transfer_records",
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="executed_transfers",
+    )
+    remarks = models.TextField(blank=True)
     student = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -464,6 +593,13 @@ class TransferRecord(TimeStampedModel):
         on_delete=models.PROTECT,
         related_name="outgoing_exchange_transfers",
     )
+    new_occupancy = models.ForeignKey(
+        StudentOccupancy,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="incoming_transfer_records",
+    )
     new_room = models.ForeignKey(
         Room,
         on_delete=models.PROTECT,
@@ -474,6 +610,12 @@ class TransferRecord(TimeStampedModel):
         on_delete=models.PROTECT,
         related_name="incoming_exchange_transfers",
     )
+    source_hostel_name = models.CharField(max_length=150, blank=True)
+    source_room_number = models.CharField(max_length=50, blank=True)
+    source_bed_label = models.CharField(max_length=50, blank=True)
+    destination_hostel_name = models.CharField(max_length=150, blank=True)
+    destination_room_number = models.CharField(max_length=50, blank=True)
+    destination_bed_label = models.CharField(max_length=50, blank=True)
     transferred_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
@@ -481,22 +623,31 @@ class TransferRecord(TimeStampedModel):
         ordering = ["-transferred_at"]
         indexes = [
             models.Index(fields=["proposal", "student"]),
+            models.Index(fields=["exchange_request", "student"]),
             models.Index(fields=["student", "transferred_at"]),
         ]
         constraints = [
             models.UniqueConstraint(
                 fields=["proposal", "student"],
+                condition=Q(proposal__isnull=False),
                 name="unique_transfer_record_per_proposal_student",
+            ),
+            models.UniqueConstraint(
+                fields=["exchange_request"],
+                condition=Q(exchange_request__isnull=False),
+                name="unique_transfer_record_per_exchange_request",
             ),
         ]
 
     def __str__(self):
-        return f"{self.student.full_name} transfer for proposal {self.proposal_id}"
+        if self.proposal_id:
+            return f"{self.student.full_name} transfer for proposal {self.proposal_id}"
+        return f"{self.student.full_name} vacant-bed transfer for request {self.exchange_request_id}"
 
     def clean(self):
         super().clean()
         if self.participant_id:
-            if self.participant.proposal_id != self.proposal_id:
+            if self.proposal_id and self.participant.proposal_id != self.proposal_id:
                 raise ValidationError("Transfer record proposal must match participant proposal.")
             if self.participant.student_id != self.student_id:
                 raise ValidationError("Transfer record student must match participant student.")
@@ -506,6 +657,9 @@ class TransferRecord(TimeStampedModel):
                 raise ValidationError("Previous bed must match the previous occupancy.")
             if self.participant.proposed_bed_id != self.new_bed_id:
                 raise ValidationError("New bed must match the participant's proposed bed.")
+        if self.exchange_request_id:
+            if self.exchange_request.student_id != self.student_id:
+                raise ValidationError("Transfer record student must match exchange request student.")
         if self.previous_room_id and self.previous_bed.room_id != self.previous_room_id:
             raise ValidationError("Previous bed must belong to previous room.")
         if self.new_room_id and self.new_bed.room_id != self.new_room_id:
@@ -521,6 +675,7 @@ class PolicyRule(TimeStampedModel):
         MAX_CYCLE_LENGTH = "max_cycle_length", "Maximum cycle length"
         REQUIRE_FEE_CLEARANCE = "require_fee_clearance", "Require fee clearance"
         REQUIRE_NO_DISCIPLINARY_HOLD = "require_no_disciplinary_hold", "Require no disciplinary hold"
+        PROPOSAL_ACCEPTANCE_WINDOW_HOURS = "proposal_acceptance_window_hours", "Proposal acceptance window in hours"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     institution = models.ForeignKey(

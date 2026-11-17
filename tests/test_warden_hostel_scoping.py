@@ -1,7 +1,6 @@
 import pytest
 from django.urls import reverse
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.test.utils import setup_test_environment
 from apps.hostels.models import (
     Hostel,
     Block,
@@ -20,11 +19,6 @@ from apps.hostels.selectors import (
     get_vacant_beds,
 )
 from apps.hostels.services import assign_student_to_bed
-
-try:
-    setup_test_environment()
-except Exception:
-    pass
 
 
 @pytest.fixture

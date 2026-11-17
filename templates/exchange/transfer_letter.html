@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accommodation Transfer Letter — {{ student.registration_number|default:student.full_name }}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 20mm;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #1e293b;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 24px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .letter-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            padding: 40px;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid #702C3B;
+            padding-bottom: 20px;
+            margin-bottom: 24px;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .brand-logo {
+            width: 44px;
+            height: 44px;
+            background: #702C3B;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .brand-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #702C3B;
+            margin: 0;
+        }
+        .brand-subtitle {
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 2px 0 0;
+        }
+        .ref-box {
+            text-align: right;
+            font-size: 11px;
+            color: #475569;
+        }
+        .ref-box strong {
+            color: #0f172a;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .doc-title {
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #0f172a;
+            background: #F5EBDD;
+            border: 1px solid #E3D3C4;
+            padding: 8px;
+            border-radius: 6px;
+            margin: 20px 0 24px;
+        }
+        .section-title {
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #702C3B;
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 4px;
+            margin: 20px 0 10px;
+        }
+        .data-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .data-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px;
+        }
+        .data-label {
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #64748b;
+            margin-bottom: 2px;
+        }
+        .data-value {
+            font-size: 13px;
+            font-weight: 600;
+            color: #0f172a;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 14px 0;
+            font-size: 12px;
+        }
+        .comparison-table th, .comparison-table td {
+            border: 1px solid #cbd5e1;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .comparison-table th {
+            background: #f1f5f9;
+            color: #334155;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 10px;
+        }
+        .comparison-table td.highlight {
+            background: #ecfdf5;
+            font-weight: 600;
+            color: #065f46;
+        }
+        .terms-box {
+            background: #fdfbf7;
+            border: 1px solid #e2dcd4;
+            border-left: 4px solid #702C3B;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 11px;
+            color: #475569;
+            margin: 20px 0;
+            line-height: 1.6;
+        }
+        .signature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 36px;
+            padding-top: 16px;
+        }
+        .sig-block {
+            border-top: 1px dashed #94a3b8;
+            padding-top: 8px;
+            font-size: 11px;
+            color: #334155;
+        }
+        .sig-block strong {
+            display: block;
+            font-size: 12px;
+            color: #0f172a;
+        }
+        .actions-bar {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-bottom: 16px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: #702C3B;
+            color: #ffffff;
+            border: 1px solid #5C2330;
+        }
+        .btn-secondary {
+            background: #ffffff;
+            color: #334155;
+            border: 1px solid #cbd5e1;
+        }
+        @media print {
+            body {
+                background: #ffffff;
+                padding: 0;
+            }
+            .letter-container {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+            }
+            .actions-bar {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="actions-bar">
+        <a href="javascript:window.print()" class="btn btn-primary">
+            🖨️ Print Transfer Letter
+        </a>
+        <a href="?format=download" class="btn btn-secondary">
+            ⬇️ Download Document
+        </a>
+    </div>
+
+    <div class="letter-container">
+        <!-- Letterhead -->
+        <div class="header">
+            <div class="brand">
+                <div class="brand-logo">RL</div>
+                <div>
+                    <h1 class="brand-title">RoomLoop Platform</h1>
+                    <p class="brand-subtitle">{{ institution.name|default:"Apex University" }} &bull; Directorate of Student Housing</p>
+                </div>
+            </div>
+            <div class="ref-box">
+                <div>Document Ref: <strong>TRF-{{ transfer.id|stringformat:".8s"|upper }}</strong></div>
+                <div>Execution Date: <strong>{{ transfer.transferred_at|date:"d M Y · H:i" }}</strong></div>
+                <div>Status: <strong style="color: #059669;">OFFICIALLY EXECUTED</strong></div>
+            </div>
+        </div>
+
+        <div class="doc-title">
+            Official Accommodation Transfer Order & Confirmation
+        </div>
+
+        <p style="margin-bottom: 16px;">
+            This document certifies that the requested student room transfer has been authorized and recorded in the RoomLoop central accommodation registry. All historical residency records have been preserved and the student is officially reallocated as detailed below:
+        </p>
+
+        <!-- Student Profile -->
+        <div class="section-title">1. Resident Identification</div>
+        <div class="data-grid">
+            <div class="data-item">
+                <div class="data-label">Full Name</div>
+                <div class="data-value">{{ student.full_name }}</div>
+            </div>
+            <div class="data-item">
+                <div class="data-label">Registration Number</div>
+                <div class="data-value">{{ student.registration_number|default:"N/A" }}</div>
+            </div>
+            <div class="data-item">
+                <div class="data-label">Academic Category</div>
+                <div class="data-value">{{ student.residential_eligibility|default:"Regular Resident"|title }}</div>
+            </div>
+            <div class="data-item">
+                <div class="data-label">Email Address</div>
+                <div class="data-value">{{ student.email }}</div>
+            </div>
+        </div>
+
+        <!-- Allocation Comparison -->
+        <div class="section-title">2. Accommodation Reallocation Details</div>
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th style="width: 25%;">Parameter</th>
+                    <th style="width: 37.5%;">Previous Accommodation (Released)</th>
+                    <th style="width: 37.5%;">New Allocated Accommodation (Active)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Hostel</strong></td>
+                    <td>{{ transfer.source_hostel_name|default:transfer.previous_room.floor.block.hostel.name }}</td>
+                    <td class="highlight">{{ transfer.destination_hostel_name|default:transfer.new_room.floor.block.hostel.name }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Block & Floor</strong></td>
+                    <td>Block {{ transfer.previous_room.floor.block.name }} &bull; {{ transfer.previous_room.floor.floor_label }}</td>
+                    <td class="highlight">Block {{ transfer.new_room.floor.block.name }} &bull; {{ transfer.new_room.floor.floor_label }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Room Number</strong></td>
+                    <td>Room {{ transfer.source_room_number|default:transfer.previous_room.room_number }}</td>
+                    <td class="highlight">Room {{ transfer.destination_room_number|default:transfer.new_room.room_number }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Bed Label</strong></td>
+                    <td>Bed {{ transfer.source_bed_label|default:transfer.previous_bed.bed_label }}</td>
+                    <td class="highlight">Bed {{ transfer.destination_bed_label|default:transfer.new_bed.bed_label }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Effective Date</strong></td>
+                    <td>{{ transfer.transferred_at|date:"d M Y" }}</td>
+                    <td class="highlight">{{ transfer.transferred_at|date:"d M Y" }} (Immediate)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Approving Authority -->
+        <div class="section-title">3. Authorization & Audit Record</div>
+        <div class="data-grid">
+            <div class="data-item">
+                <div class="data-label">Approving Authority</div>
+                <div class="data-value">
+                    {% if transfer.approved_by %}
+                    {{ transfer.approved_by.full_name }}
+                    {% elif transfer.approval and transfer.approval.authority_user %}
+                    {{ transfer.approval.authority_user.full_name }}
+                    {% else %}
+                    Hostel Administration
+                    {% endif %}
+                </div>
+            </div>
+            <div class="data-item">
+                <div class="data-label">Authority Role</div>
+                <div class="data-value">
+                    {% if transfer.approval %}
+                    {{ transfer.approval.get_authority_role_display }}
+                    {% else %}
+                    Authorized Warden
+                    {% endif %}
+                </div>
+            </div>
+            <div class="data-item" style="grid-column: span 2;">
+                <div class="data-label">Administrative Remarks</div>
+                <div class="data-value" style="font-weight: normal; font-style: italic;">
+                    {{ transfer.remarks|default:transfer.approval.remarks|default:"Transfer approved following domain clearance and vacancy verification." }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="terms-box">
+            <strong>Move-In & Key Handover Protocol:</strong><br>
+            1. The resident must vacate the previous bed and present this transfer letter to the hostel caretaker within 48 hours of issue.<br>
+            2. Room inventory checklist clearance for Bed {{ transfer.source_bed_label|default:transfer.previous_bed.bed_label }} must be signed off by the warden.<br>
+            3. Any discrepancies in room fixtures at the destination bed (Room {{ transfer.destination_room_number|default:transfer.new_room.room_number }}) must be logged on RoomLoop within 24 hours of occupancy.
+        </div>
+
+        <!-- Signatures -->
+        <div class="signature-grid">
+            <div class="sig-block">
+                <strong>Resident Acceptance:</strong>
+                <span>{{ student.full_name }}</span><br>
+                <span style="font-size: 10px; color: #64748b;">Digitally verified via RoomLoop account login</span>
+            </div>
+            <div class="sig-block" style="text-align: right;">
+                <strong>Supervising Official:</strong>
+                <span>
+                    {% if transfer.approved_by %}
+                    {{ transfer.approved_by.full_name }}
+                    {% elif transfer.approval and transfer.approval.authority_user %}
+                    {{ transfer.approval.authority_user.full_name }}
+                    {% else %}
+                    Hostel Warden
+                    {% endif %}
+                </span><br>
+                <span style="font-size: 10px; color: #64748b;">Authorized Signature & Institutional Seal</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

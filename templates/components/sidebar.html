@@ -36,6 +36,10 @@
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4"/></svg>
             <span>My Exchange Requests</span>
         </a>
+        <a href="{% url 'exchange:proposal_list' %}" class="sidebar-nav-item {% if active_nav == 'proposals' %}active{% endif %}">
+            <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>My Exchange Proposals</span>
+        </a>
         <a href="{% url 'exchange:notifications' %}" class="sidebar-nav-item {% if active_nav == 'notifications' %}active{% endif %}">
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.5-2.5V10a6.5 6.5 0 10-13 0v4.5L4 17h5m6 0a3 3 0 01-6 0"/></svg>
             <span>Notifications</span>
@@ -90,6 +94,23 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
             </svg>
             <span>Occupancy Roster</span>
+        </a>
+        {% endif %}
+
+        {% if is_warden or is_chief_warden or is_dean %}
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">Exchange Governance</div>
+        <a href="{% url 'exchange:approval_list' %}" class="sidebar-nav-item flex items-center justify-between {% if active_nav == 'exchange_approvals' %}active{% endif %}">
+            <div class="flex items-center gap-3 min-w-0">
+                <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span class="truncate">Exchange Approvals</span>
+            </div>
+            {% if pending_approval_count > 0 %}
+            <span class="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                {{ pending_approval_count }}
+            </span>
+            {% endif %}
         </a>
         {% endif %}
 

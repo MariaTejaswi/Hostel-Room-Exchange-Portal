@@ -1,0 +1,196 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block title %}Exchange Proposal {{ proposal.id|stringformat:".8s" }} — RoomLoop{% endblock %}
+{% block breadcrumb_current %}Exchange Proposal{% endblock %}
+
+{% block content %}
+<div class="student-page w-full max-w-[980px] mx-auto space-y-6">
+    <header class="student-welcome flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <div class="flex items-center gap-2">
+                <p class="student-eyebrow">Exchange centre</p>
+                <span class="text-xs px-2.5 py-0.5 rounded-full font-medium bg-[#F5EBDD] text-[#702C3B] border border-[#E3D3C4]">
+                    {{ cycle_label }}
+                </span>
+            </div>
+            <h1 class="student-title">Exchange Proposal</h1>
+            <p class="student-subtitle text-xs text-slate-500 font-mono">{{ proposal.id }}</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="student-status-pill student-status-{{ proposal.status }} text-sm px-3 py-1">
+                {{ proposal.get_status_display }}
+            </span>
+            <a href="{% url 'exchange:proposal_list' %}" class="btn-secondary btn-sm">&larr; Back to proposals</a>
+        </div>
+    </header>
+
+    {% if is_expired %}
+    <div class="card p-4 border-l-4 border-amber-500 bg-amber-50/70 text-xs text-amber-900 space-y-1 rounded-r-lg">
+        <p class="font-bold text-amber-950 text-sm">Proposal Acceptance Deadline Expired</p>
+        <p>The acceptance window for this proposal lapsed before all participants submitted their acceptance. Reservations have been released and open requests restored.</p>
+    </div>
+    {% elif proposal.status == 'cancelled' %}
+    <div class="card p-4 border-l-4 border-rose-500 bg-rose-50/70 text-xs text-rose-900 space-y-1 rounded-r-lg">
+        <p class="font-bold text-rose-950 text-sm">Proposal Cancelled</p>
+        <p>A participant declined this exchange proposal. All temporary reservations have been released and non-expired requests returned to the open matching pool.</p>
+    </div>
+    {% elif proposal.status == 'pending_approval' %}
+    <div class="card p-4 border-l-4 border-emerald-500 bg-emerald-50/70 text-xs text-emerald-900 space-y-1 rounded-r-lg">
+        <p class="font-bold text-emerald-950 text-sm">Accepted by All Participants — Pending Authority Approval</p>
+        <p>Every participant in this exchange cycle has accepted. The proposal is currently under administrative review by the authorized hostel authorities. Physical occupancy remains unchanged until formal approval and transfer execution.</p>
+    </div>
+    {% elif can_respond %}
+    <div class="card p-5 border-l-4 border-[#702C3B] bg-[#FDF9F5] text-xs text-slate-700 space-y-3 rounded-r-lg shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <p class="font-bold text-[#3B1720] text-sm">Action Required: Your Response is Pending</p>
+                <p class="text-slate-600 mt-0.5">Please review the proposed destination accommodation and submit your response before the acceptance deadline.</p>
+                <p class="text-slate-500 text-[11px] mt-1 font-medium">Acceptance Deadline: <strong class="text-[#702C3B]">{{ proposal.expires_at|date:"M d, Y H:i" }}</strong></p>
+            </div>
+            <div class="flex items-center gap-2">
+                <form method="post" action="{% url 'exchange:proposal_respond' pk=proposal.pk %}" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="accept">
+                    <button type="submit" class="btn-primary btn-sm px-4 py-2 font-semibold" onclick="return confirm('Accept this room exchange proposal? Once accepted, you cannot reverse your decision.');">
+                        ✓ Accept Proposal
+                    </button>
+                </form>
+                <form method="post" action="{% url 'exchange:proposal_respond' pk=proposal.pk %}" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="decline">
+                    <button type="submit" class="btn-danger btn-sm px-4 py-2 font-semibold" onclick="return confirm('Are you sure you want to decline this proposal? Declining will cancel the proposal for all participants and return eligible requests to the open pool.');">
+                        ✕ Decline
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Your Allocation Comparison -->
+    <div class="card p-6 border border-[#D5C2B1] bg-white rounded-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-[#F0E6DD] pb-3">
+            <h2 class="text-base font-bold text-[#3B1720]">Your Allocation Comparison</h2>
+            <span class="text-xs text-slate-500">
+                Your response: 
+                {% if my_participation.response_status == 'accepted' %}
+                    <strong class="text-emerald-700 font-bold">Accepted ({{ my_participation.responded_at|date:"M d, Y H:i" }})</strong>
+                {% elif my_participation.response_status == 'declined' %}
+                    <strong class="text-rose-700 font-bold">Declined ({{ my_participation.responded_at|date:"M d, Y H:i" }})</strong>
+                {% else %}
+                    <strong class="text-amber-700 font-bold">Pending response</strong>
+                {% endif %}
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <div class="p-4 rounded-lg bg-[#FAF5F0] border border-[#EBE0D5] space-y-2">
+                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Current Room & Bed</span>
+                <p class="text-base font-bold text-slate-800">
+                    {{ my_participation.current_occupancy.bed.room.floor.block.hostel.name }}
+                </p>
+                <div class="text-xs text-slate-600 space-y-1">
+                    <p>Block {{ my_participation.current_occupancy.bed.room.floor.block.name }} · {{ my_participation.current_occupancy.bed.room.floor.floor_label }}</p>
+                    <p>Room {{ my_participation.current_occupancy.bed.room.room_number }} · Bed <strong>{{ my_participation.current_occupancy.bed.bed_label }}</strong></p>
+                    <p class="text-slate-500">Room Type: {{ my_participation.current_occupancy.bed.room.get_room_type_display }}</p>
+                </div>
+            </div>
+
+            <div class="p-4 rounded-lg bg-[#F5EBDD]/60 border border-[#E3D3C4] space-y-2">
+                <span class="text-[11px] font-bold text-[#702C3B] uppercase tracking-wider block">Proposed Destination</span>
+                <p class="text-base font-bold text-[#3B1720]">
+                    {{ my_participation.proposed_bed.room.floor.block.hostel.name }}
+                </p>
+                <div class="text-xs text-slate-700 space-y-1">
+                    <p>Block {{ my_participation.proposed_bed.room.floor.block.name }} · {{ my_participation.proposed_bed.room.floor.floor_label }}</p>
+                    <p>Room {{ my_participation.proposed_bed.room.room_number }} · Bed <strong class="text-[#702C3B]">{{ my_participation.proposed_bed.bed_label }}</strong></p>
+                    <p class="text-slate-500">Room Type: {{ my_participation.proposed_bed.room.get_room_type_display }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Acceptance Progress & Timeline -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <section class="card p-5 border border-[#D5C2B1] bg-white rounded-xl space-y-3">
+            <h3 class="text-sm font-bold text-[#3B1720]">Acceptance Progress</h3>
+            <div class="space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-600 font-medium">Participant Confirmations</span>
+                    <strong class="text-slate-800">{{ accepted_count }} of {{ total_count }} accepted</strong>
+                </div>
+                <div class="w-full bg-[#EFE4D8] rounded-full h-2.5 overflow-hidden">
+                    <div class="bg-[#702C3B] h-2.5 rounded-full transition-all duration-300" style="width: {{ progress_percent }}%;"></div>
+                </div>
+                <p class="text-[11px] text-slate-500">
+                    RoomLoop requires unanimous acceptance from all {{ total_count }} participants before the proposal can advance to authority approval.
+                </p>
+            </div>
+        </section>
+
+        <section class="card p-5 border border-[#D5C2B1] bg-white rounded-xl space-y-3">
+            <h3 class="text-sm font-bold text-[#3B1720]">Acceptance Window</h3>
+            <dl class="text-xs space-y-2">
+                <div class="flex justify-between">
+                    <dt class="text-slate-500">Deadline</dt>
+                    <dd class="font-semibold text-slate-800">{{ proposal.expires_at|date:"M d, Y H:i"|default:"Not specified" }}</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-slate-500">Matched At</dt>
+                    <dd class="text-slate-700">{{ proposal.matched_at|date:"M d, Y H:i"|default:proposal.created_at|date:"M d, Y H:i" }}</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-slate-500">Institution Scope</dt>
+                    <dd class="text-slate-700">{{ proposal.institution.name }}</dd>
+                </div>
+            </dl>
+        </section>
+    </div>
+
+    <!-- Cycle Rotation Walkthrough (Zero PII Leakage) -->
+    <section class="card p-6 border border-[#D5C2B1] bg-white rounded-xl space-y-4">
+        <div class="border-b border-[#F0E6DD] pb-3">
+            <h3 class="text-base font-bold text-[#3B1720]">Cycle Rotation Order</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Visualization of the proposed bed movements across all cycle participants.</p>
+        </div>
+
+        <div class="space-y-3">
+            {% for step in cycle_steps %}
+            <div class="p-4 rounded-lg border {% if step.is_me %}border-[#702C3B] bg-[#FDF9F5]{% else %}border-slate-200 bg-white{% endif %} flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+                <div class="flex items-start gap-3">
+                    <span class="w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs {% if step.is_me %}bg-[#702C3B] text-white{% else %}bg-slate-200 text-slate-700{% endif %}">
+                        {{ forloop.counter }}
+                    </span>
+                    <div>
+                        <strong class="text-sm {% if step.is_me %}text-[#702C3B]{% else %}text-slate-800{% endif %}">
+                            {{ step.label }}
+                        </strong>
+                        <div class="text-slate-600 mt-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                            <span>From: <strong>{{ step.current_hostel }} Rm {{ step.current_room }} ({{ step.current_bed }})</strong></span>
+                            <span class="hidden sm:inline text-slate-400">&rarr;</span>
+                            <span>To: <strong class="text-[#702C3B]">{{ step.proposed_hostel }} Rm {{ step.proposed_room }} ({{ step.proposed_bed }})</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 self-start sm:self-center">
+                    {% if step.response_status == 'accepted' %}
+                        <span class="px-2.5 py-1 rounded text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            ✓ Accepted
+                        </span>
+                    {% elif step.response_status == 'declined' %}
+                        <span class="px-2.5 py-1 rounded text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+                            ✕ Declined
+                        </span>
+                    {% else %}
+                        <span class="px-2.5 py-1 rounded text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                            ⏳ Pending
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}

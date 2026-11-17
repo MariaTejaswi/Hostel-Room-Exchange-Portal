@@ -7,9 +7,56 @@ app_name = "exchange"
 urlpatterns = [
     path("exchange/requests/", views.exchange_request_list_view, name="request_list"),
     path(
+        "exchange/proposals/",
+        views.proposal_list_view,
+        name="proposal_list",
+    ),
+    path(
+        "exchange/proposals/<uuid:pk>/",
+        views.proposal_detail_view,
+        name="proposal_detail",
+    ),
+    path(
+        "exchange/proposals/<uuid:pk>/respond/",
+        views.proposal_respond_view,
+        name="proposal_respond",
+    ),
+    path(
         "exchange/notifications/",
         views.exchange_notifications_view,
         name="notifications",
+    ),
+    # Module M5: Exchange Approval Workflow
+    path(
+        "exchange/approvals/",
+        views.exchange_approval_list_view,
+        name="approval_list",
+    ),
+    path(
+        "exchange/approvals/<uuid:pk>/",
+        views.exchange_approval_detail_view,
+        name="approval_detail",
+    ),
+    path(
+        "exchange/approvals/<uuid:pk>/decide/",
+        views.exchange_approval_decide_view,
+        name="approval_decide",
+    ),
+    # Vacant-bed Transfer Approvals
+    path(
+        "exchange/approvals/transfers/<uuid:pk>/",
+        views.exchange_vacant_transfer_approval_detail_view,
+        name="transfer_approval_detail",
+    ),
+    path(
+        "exchange/approvals/transfers/<uuid:pk>/decide/",
+        views.exchange_vacant_transfer_approval_decide_view,
+        name="transfer_approval_decide",
+    ),
+    path(
+        "exchange/transfers/<uuid:pk>/letter/",
+        views.transfer_letter_view,
+        name="transfer_letter",
     ),
     path(
         "exchange/requests/create/",

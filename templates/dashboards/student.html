@@ -64,7 +64,7 @@
 
     <div class="student-dashboard-grid">
     <!-- Current Accommodation -->
-    <section class="student-accommodation card">
+    <section class="student-accommodation card min-w-0 overflow-hidden">
         <div class="card-header">
             <div>
                 <p class="student-eyebrow">Your accommodation</p>
@@ -111,25 +111,27 @@
     </section>
 
     <!-- Exchange Centre -->
-    <section class="student-request-panel card">
-        <div class="student-panel-heading">
-            <div>
+    <section class="student-request-panel card min-w-0 overflow-hidden">
+        <div class="student-panel-heading flex items-end justify-between gap-2 min-w-0 mb-3">
+            <div class="min-w-0 flex-1">
                 <p class="student-eyebrow">Exchange centre</p>
-                <h2 class="student-section-title">Your exchange requests</h2>
+                <h2 class="student-section-title truncate">Your exchange requests</h2>
             </div>
             {% if current_occupancy %}
-            <a href="{% url 'exchange:request_list' %}" class="student-text-link">View all</a>
+            <a href="{% url 'exchange:request_list' %}" class="student-text-link flex-shrink-0 whitespace-nowrap">View all</a>
             {% endif %}
         </div>
         {% if exchange_requests %}
-        <div class="student-request-list">
+        <div class="student-request-list min-w-0 w-full">
             {% for exchange_request in exchange_requests %}
-            <a href="{% url 'exchange:request_detail' pk=exchange_request.pk %}" class="student-request-row">
-                <span class="min-w-0 flex-1">
-                    <strong class="truncate block">Request {{ exchange_request.pk|slice:":8" }}</strong>
-                    <small class="truncate block">Submitted {{ exchange_request.submitted_at|date:"M d, Y" }}</small>
+            <a href="{% url 'exchange:request_detail' pk=exchange_request.pk %}" class="student-request-row min-w-0 w-full">
+                <span class="min-w-0 flex-1 overflow-hidden">
+                    <strong class="truncate block font-semibold text-slate-900">
+                        {% if exchange_request.request_type == 'vacant_transfer' %}Transfer{% else %}Request{% endif %} #{{ exchange_request.pk|stringformat:".8s" }}
+                    </strong>
+                    <small class="truncate block text-slate-500 mt-0.5">Submitted {{ exchange_request.submitted_at|date:"M d, Y" }}</small>
                 </span>
-                <span class="student-status-pill student-status-{{ exchange_request.status }} flex-shrink-0">{{ exchange_request.get_status_display }}</span>
+                <span class="student-status-pill student-status-{{ exchange_request.status }} flex-shrink-0 ml-2 whitespace-nowrap">{{ exchange_request.get_status_display }}</span>
             </a>
             {% endfor %}
         </div>

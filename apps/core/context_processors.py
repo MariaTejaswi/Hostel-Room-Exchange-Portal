@@ -69,4 +69,8 @@ def navigation_context(request):
         context["can_manage_inventory"] = False
         context["can_assign_occupancy"] = False
 
+    if context.get("is_warden") or context.get("is_chief_warden") or context.get("is_dean"):
+        from apps.exchange.selectors import get_pending_approvals_count
+        context["pending_approval_count"] = get_pending_approvals_count(user)
+
     return context

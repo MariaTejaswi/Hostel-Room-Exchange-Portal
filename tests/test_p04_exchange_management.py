@@ -496,11 +496,17 @@ def test_cross_institution_preference_isolation(
 @pytest.mark.django_db
 def test_eligible_student_creates_exchange_request_with_derived_occupancy(
     student_user,
+    other_student_user,
     institution,
     hostel_setup,
     warden_user,
 ):
     occupancy = _occupy(student_user, hostel_setup, warden_user)
+    assign_student_to_bed(
+        student=other_student_user,
+        bed=hostel_setup["bed_b"],
+        created_by=warden_user,
+    )
     _configure_policies(institution)
     initial_bed_id = occupancy.bed_id
 

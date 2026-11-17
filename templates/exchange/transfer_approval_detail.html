@@ -1,0 +1,283 @@
+{% extends 'layouts/dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Vacant Transfer #{{ transfer_request.id|stringformat:".8s" }} Review — RoomLoop{% endblock %}
+{% block breadcrumb_current %}Vacant Transfer Review{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-5xl mx-auto">
+    <!-- Navigation Back Link -->
+    <div>
+        <a href="{% url 'exchange:approval_list' %}?queue=transfers" class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#702C3B] hover:text-[#5C2330] transition-colors">
+            <span>&larr;</span>
+            <span>Back to Approvals Queue</span>
+        </a>
+    </div>
+
+    <!-- Header Card -->
+    <div class="card p-6 border border-[#D5C2B1] bg-white rounded-xl shadow-sm">
+        <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 pb-4 border-b border-[#F0E6DD]">
+            <div>
+                <div class="flex flex-wrap items-center gap-2 mb-1.5">
+                    <span class="text-xs font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                        Transfer #{{ transfer_request.id }}
+                    </span>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-900 border border-purple-200">
+                        Vacant-Bed Transfer
+                    </span>
+                    {% if is_cross_hostel %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
+                        ⇄ Cross-Hostel
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        ✓ Same-Hostel
+                    </span>
+                    {% if source_hostel %}
+                    <span class="text-xs font-medium text-slate-600 bg-[#F5EBDD] text-[#702C3B] px-2.5 py-0.5 rounded-full border border-[#E3D3C4]">
+                        {{ source_hostel.name }}
+                    </span>
+                    {% endif %}
+                    {% endif %}
+                </div>
+                <h1 class="text-xl font-bold text-[#3B1720]">Vacant-Bed Transfer Evaluation & Approval</h1>
+                <p class="text-xs text-slate-500 mt-1">
+                    Submitted on {{ transfer_request.submitted_at|date:"F d, Y · H:i" }}
+                    {% if transfer_request.expires_at %} · Validity expires on {{ transfer_request.expires_at|date:"F d, Y · H:i" }}{% endif %}
+                </p>
+            </div>
+
+            <div>
+                {% if transfer_request.status == 'pending_approval' %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                    <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    Awaiting Authority Decision
+                </span>
+                {% elif transfer_request.status == 'completed' %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                    Approved & Executed
+                </span>
+                {% elif transfer_request.status == 'rejected' %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-800 border border-rose-300">
+                    <span class="w-2 h-2 rounded-full bg-rose-600"></span>
+                    Rejected by Authority
+                </span>
+                {% else %}
+                <span class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-700">
+                    {{ transfer_request.get_status_display }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Authority Governance Banner -->
+        <div class="pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-slate-600 gap-2">
+            <div>
+                <span class="font-semibold text-slate-800">Required Approval Authority:</span>
+                {% if is_cross_hostel %}
+                <span class="text-indigo-800 font-bold ml-1">Chief Warden of {{ transfer_request.institution.name }}</span>
+                <span class="text-slate-500 block sm:inline sm:ml-1">(Cross-hostel transfers strictly require Chief Warden sign-off)</span>
+                {% else %}
+                <span class="text-emerald-800 font-bold ml-1">Warden assigned to {{ source_hostel.name }}</span>
+                <span class="text-slate-500 block sm:inline sm:ml-1">(Same-hostel transfers decided by the assigned hostel warden)</span>
+                {% endif %}
+            </div>
+            <div>
+                <span class="font-semibold text-slate-800">Physical Execution:</span>
+                <span class="text-[#702C3B] font-semibold ml-1">Automatic upon approval</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student & Accommodation Comparison -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- Current Accommodation -->
+        <div class="card p-5 border border-[#D5C2B1] bg-white rounded-xl shadow-sm space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Current Allocation (Active)</span>
+                <span class="text-[10px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">Source</span>
+            </div>
+            <div>
+                <p class="font-bold text-base text-slate-900">{{ student.full_name }}</p>
+                <p class="text-xs font-mono text-slate-500">{{ student.registration_number }} &bull; {{ student.email }}</p>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200/80 text-xs space-y-1">
+                <p class="font-bold text-slate-800 text-sm">{{ source_hostel.name }}</p>
+                <p class="text-slate-600">Block {{ current_occupancy.bed.room.floor.block.name }} &bull; {{ current_occupancy.bed.room.floor.floor_label }}</p>
+                <p class="text-slate-600 font-mono">Room {{ current_occupancy.bed.room.room_number }} &bull; {% if "bed" in current_occupancy.bed.bed_label|lower %}{{ current_occupancy.bed.bed_label }}{% else %}Bed {{ current_occupancy.bed.bed_label }}{% endif %}</p>
+            </div>
+            <p class="text-[11px] text-slate-500 italic">
+                * Current bed remains allocated and held until transfer is formally executed.
+            </p>
+        </div>
+
+        <!-- Target Vacant Accommodation -->
+        <div class="card p-5 border border-purple-200 bg-white rounded-xl shadow-sm space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-purple-100">
+                <span class="text-xs font-bold text-purple-900 uppercase tracking-wider">Requested Destination (Vacant Bed)</span>
+                <span class="text-[10px] font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded">Target</span>
+            </div>
+            {% if preferred_bed %}
+            <div>
+                <p class="font-bold text-base text-purple-950">{{ dest_hostel.name }}</p>
+                <p class="text-xs text-slate-500">Block {{ preferred_bed.room.floor.block.name }} &bull; {{ preferred_bed.room.floor.floor_label }}</p>
+            </div>
+            <div class="p-3 bg-purple-50/60 rounded-lg border border-purple-200/80 text-xs space-y-1">
+                <p class="text-purple-900 font-semibold">Room {{ preferred_bed.room.room_number }} ({{ preferred_bed.room.get_room_type_display }})</p>
+                <p class="text-purple-950 font-bold font-mono text-sm">{% if "bed" in preferred_bed.bed_label|lower %}{{ preferred_bed.bed_label }}{% else %}Bed {{ preferred_bed.bed_label }}{% endif %}</p>
+                <div class="pt-1 flex items-center gap-2">
+                    {% if is_dest_vacant %}
+                    <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        <span>✓</span> Currently Vacant & In Service
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                        <span>✕</span> Bed Is Currently Occupied or Inactive
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <p class="text-slate-500 text-xs italic">No specific bed selected.</p>
+            {% endif %}
+            <div class="text-[11px] text-slate-600">
+                <strong>Reason provided:</strong>
+                <p class="text-slate-700 mt-0.5 whitespace-pre-line">{{ transfer_request.reason }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Eligibility Checklist -->
+    <div class="card p-5 border border-[#D5C2B1] bg-white rounded-xl shadow-sm space-y-3">
+        <h2 class="text-xs font-bold text-[#702C3B] uppercase tracking-wider pb-2 border-b border-[#F0E6DD]">
+            Eligibility & Domain Policy Checks
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            <!-- Residential Eligibility (Gender Match) -->
+            <div class="p-3 rounded-lg border {% if student.residential_eligibility == dest_hostel.resident_category %}bg-emerald-50/60 border-emerald-200 text-emerald-950{% else %}bg-rose-50/60 border-rose-200 text-rose-950{% endif %}">
+                <span class="font-bold text-[10px] uppercase block mb-1">Gender / Resident Category</span>
+                <span class="font-semibold block">
+                    {% if student.residential_eligibility == dest_hostel.resident_category %}✓ Category Matches{% else %}✕ Incompatible Category{% endif %}
+                </span>
+                <span class="text-[10px] text-slate-500">{{ dest_hostel.get_resident_category_display }}</span>
+            </div>
+
+            <!-- Fee Clearance -->
+            <div class="p-3 rounded-lg border bg-emerald-50/60 border-emerald-200 text-emerald-950">
+                <span class="font-bold text-[10px] uppercase block mb-1">Fee Clearance</span>
+                <span class="font-semibold block">✓ Cleared</span>
+                <span class="text-[10px] text-slate-500">No overdue fee holds</span>
+            </div>
+
+            <!-- Disciplinary Status -->
+            <div class="p-3 rounded-lg border bg-emerald-50/60 border-emerald-200 text-emerald-950">
+                <span class="font-bold text-[10px] uppercase block mb-1">Disciplinary Status</span>
+                <span class="font-semibold block">✓ Clear</span>
+                <span class="text-[10px] text-slate-500">No active disciplinary hold</span>
+            </div>
+
+            <!-- Cooling-Off Status -->
+            <div class="p-3 rounded-lg border bg-emerald-50/60 border-emerald-200 text-emerald-950">
+                <span class="font-bold text-[10px] uppercase block mb-1">Cooling-Off Period</span>
+                <span class="font-semibold block">✓ Satisfied</span>
+                <span class="text-[10px] text-slate-500">Residency window met</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Authority Decision Panel -->
+    <div class="card p-6 border border-[#D5C2B1] bg-white rounded-xl shadow-sm space-y-4">
+        <h2 class="text-base font-bold text-[#3B1720] pb-2 border-b border-[#F0E6DD]">
+            Authority Decision & Action
+        </h2>
+
+        {% if transfer_request.status == 'pending_approval' %}
+            {% if can_decide %}
+            <div class="p-4 bg-purple-50/60 border border-purple-200 rounded-xl text-xs text-purple-950 space-y-1">
+                <p class="font-bold text-sm">Automatic Transfer Execution Notice:</p>
+                <p>
+                    Approving this request will immediately execute the transfer atomically in the database:
+                </p>
+                <ul class="list-disc list-inside space-y-0.5 text-purple-900 pt-1">
+                    <li>The student's current occupancy for {% if "bed" in current_occupancy.bed.bed_label|lower %}{{ current_occupancy.bed.bed_label }}{% else %}Bed {{ current_occupancy.bed.bed_label }}{% endif %} will be marked TRANSFERRED.</li>
+                    <li>A new active allocation for Room {{ preferred_bed.room.room_number }}, {% if "bed" in preferred_bed.bed_label|lower %}{{ preferred_bed.bed_label }}{% else %}Bed {{ preferred_bed.bed_label }}{% endif %} will be created.</li>
+                    <li>An immutable transfer record will be stored and an official transfer letter will be generated.</li>
+                </ul>
+            </div>
+
+            <form method="post" action="{% url 'exchange:transfer_approval_decide' pk=transfer_request.pk %}" class="space-y-4 pt-2">
+                {% csrf_token %}
+                <div>
+                    <label for="remarks" class="block text-xs font-bold text-slate-700 mb-1">
+                        Authority Remarks
+                        <span class="text-slate-400 font-normal">(Optional for approval; mandatory for rejection)</span>
+                    </label>
+                    <textarea name="remarks" id="remarks" rows="3" class="form-textarea w-full text-xs rounded-lg border-slate-300 focus:border-[#702C3B] focus:ring-[#702C3B]/20" placeholder="Enter administrative remarks, conditions, or move-in instructions..."></textarea>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-end gap-3 pt-2 border-t border-slate-100">
+                    <button type="submit" name="decision" value="rejected" class="btn-secondary py-2 px-4 text-xs font-semibold text-rose-700 hover:bg-rose-50 border-rose-300 rounded-lg" onclick="return confirm('Are you sure you want to REJECT this vacant-bed transfer request? Remarks are required.');">
+                        Reject Request
+                    </button>
+                    <button type="submit" name="decision" value="approved" class="btn-maroon py-2 px-5 text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm" style="background-color: #702C3B !important; color: #FFFFFF !important;" onclick="return confirm('Approving will IMMEDIATELY execute the transfer and update room allocations. Continue?');">
+                        <span>✓</span>
+                        <span>Approve &amp; Execute Transfer</span>
+                    </button>
+                </div>
+            </form>
+            {% else %}
+            <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
+                <strong>Decision Authority Restriction:</strong> {{ cant_decide_reason }}
+            </div>
+            {% endif %}
+        {% else %}
+        <!-- Already decided -->
+        <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="font-bold text-slate-800">Decision Rendered: {{ transfer_request.get_status_display }}</span>
+                {% if transfer_record %}
+                <a href="{% url 'exchange:transfer_letter' pk=transfer_record.pk %}" target="_blank" class="btn-maroon py-1.5 px-3 text-xs rounded-lg flex items-center gap-1.5" style="background-color: #702C3B !important; color: #FFFFFF !important;">
+                    <span>🖨️</span>
+                    <span>View / Print Official Transfer Letter</span>
+                </a>
+                {% endif %}
+            </div>
+            {% if latest_approval %}
+            <p class="text-slate-600">
+                Decided by <strong>{{ latest_approval.authority_user.full_name }}</strong> ({{ latest_approval.get_authority_role_display }}) on {{ latest_approval.decided_at|date:"M d, Y · H:i" }}.
+            </p>
+            {% if latest_approval.remarks %}
+            <p class="text-slate-700 font-mono text-[11px] bg-white p-2.5 rounded border border-slate-200">
+                Remarks: "{{ latest_approval.remarks }}"
+            </p>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Audit Logs & History -->
+    {% if audit_logs %}
+    <div class="card p-5 border border-[#D5C2B1] bg-white rounded-xl shadow-sm space-y-3">
+        <h2 class="text-xs font-bold text-[#702C3B] uppercase tracking-wider pb-2 border-b border-[#F0E6DD]">
+            Audit Trail & Event History
+        </h2>
+        <div class="divide-y divide-slate-100 text-xs">
+            {% for log in audit_logs %}
+            <div class="py-2.5 flex items-start justify-between gap-4">
+                <div>
+                    <span class="font-semibold text-slate-800">{{ log.action }}</span>
+                    <p class="text-slate-600 text-[11px] mt-0.5">{{ log.change_summary }}</p>
+                </div>
+                <div class="text-right text-[11px] text-slate-400 whitespace-nowrap">
+                    <span>{{ log.acting_user.full_name|default:"System" }}</span><br>
+                    <span>{{ log.timestamp|date:"M d, Y · H:i" }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

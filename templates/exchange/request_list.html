@@ -15,12 +15,14 @@
     </header>
 
     {% if exchange_requests %}
-    <div class="student-request-list">
+    <div class="student-request-list min-w-0 w-full">
         {% for exchange_request in exchange_requests %}
-        <a href="{% url 'exchange:request_detail' pk=exchange_request.pk %}" class="student-request-row">
-            <span>
-                <strong>Request {{ exchange_request.pk }}</strong>
-                <small>
+        <a href="{% url 'exchange:request_detail' pk=exchange_request.pk %}" class="student-request-row min-w-0 w-full">
+            <span class="min-w-0 flex-1 overflow-hidden">
+                <strong class="truncate block">
+                    {% if exchange_request.request_type == 'vacant_transfer' %}Transfer{% else %}Request{% endif %} #{{ exchange_request.pk|stringformat:".8s" }}
+                </strong>
+                <small class="truncate block">
                     {% if exchange_request.preferred_bed %}
                     {{ exchange_request.preferred_bed.room.floor.block.hostel.name }} · Room {{ exchange_request.preferred_bed.room.room_number }} · {{ exchange_request.preferred_bed.bed_label }}
                     {% else %}
@@ -28,7 +30,7 @@
                     {% endif %}
                 </small>
             </span>
-            <span class="student-status-pill student-status-{{ exchange_request.status }}">{{ exchange_request.get_status_display }}</span>
+            <span class="student-status-pill student-status-{{ exchange_request.status }} flex-shrink-0 ml-2 whitespace-nowrap">{{ exchange_request.get_status_display }}</span>
         </a>
         {% endfor %}
     </div>

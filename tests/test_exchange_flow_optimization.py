@@ -2,13 +2,29 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.urls import reverse
 
-from apps.exchange.models import ExchangeRequest
+from apps.exchange.models import ExchangeRequest, PolicyRule
 from apps.exchange.selectors import (
     get_floor_room_summaries_for_exchange,
     get_room_bed_details_for_exchange,
 )
 from apps.hostels.models import Bed, OperationalStatus, Room
 from apps.hostels.services import assign_student_to_bed
+
+
+@pytest.fixture(autouse=True)
+def configure_exchange_policies(institution):
+    for key, val in [
+        (PolicyRule.Key.COOLING_OFF_DAYS, 0),
+        (PolicyRule.Key.REQUEST_VALIDITY_DAYS, 30),
+        (PolicyRule.Key.REQUIRE_FEE_CLEARANCE, False),
+        (PolicyRule.Key.REQUIRE_NO_DISCIPLINARY_HOLD, False),
+        (PolicyRule.Key.PROPOSAL_ACCEPTANCE_WINDOW_HOURS, 48),
+    ]:
+        PolicyRule.objects.update_or_create(
+            institution=institution,
+            key=key,
+            defaults={"value": {"value": val}, "is_active": True},
+        )
 
 
 @pytest.fixture

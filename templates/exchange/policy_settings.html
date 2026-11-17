@@ -93,6 +93,22 @@
                         {% endif %}
                     </div>
 
+                    <!-- Proposal Acceptance Window Hours -->
+                    <div class="space-y-1.5 pt-4 border-t border-slate-100">
+                        <label for="{{ form.proposal_acceptance_window_hours.id_for_label }}" class="block text-xs font-bold text-slate-800">
+                            {{ form.proposal_acceptance_window_hours.label }}
+                        </label>
+                        <div class="max-w-xs">
+                            {{ form.proposal_acceptance_window_hours }}
+                        </div>
+                        <p class="text-[11px] text-slate-500 leading-relaxed">
+                            {{ form.proposal_acceptance_window_hours.help_text }}
+                        </p>
+                        {% if form.proposal_acceptance_window_hours.errors %}
+                        <p class="text-xs text-red-600 font-medium">{{ form.proposal_acceptance_window_hours.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
                     <!-- Pre-requisite Clearances -->
                     <div class="pt-4 border-t border-slate-100 space-y-4">
                         <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Pre-requisite Clearances</h3>

@@ -185,6 +185,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.exchange.tasks.expire_exchange_requests_task",
         "schedule": 3600.0,  # Every hour
     },
+    "expire-exchange-proposals-every-hour": {
+        "task": "apps.exchange.tasks.expire_exchange_proposals_task",
+        "schedule": 3600.0,  # Every hour
+    },
 }
 
 # Email Backend

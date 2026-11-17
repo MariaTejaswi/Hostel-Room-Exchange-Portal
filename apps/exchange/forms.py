@@ -162,6 +162,13 @@ class ExchangePolicySettingsForm(forms.Form):
         help_text="Number of days before an open exchange request expires automatically.",
         widget=forms.NumberInput(attrs={"class": "form-input", "min": "1"}),
     )
+    proposal_acceptance_window_hours = forms.IntegerField(
+        min_value=1,
+        required=False,
+        label="Proposal Acceptance Window (Hours)",
+        help_text="Hours all participants have to accept an activated proposal before it automatically expires. Kept distinct from request validity.",
+        widget=forms.NumberInput(attrs={"class": "form-input", "min": "1"}),
+    )
     require_fee_clearance = forms.BooleanField(
         required=False,
         label="Require Fee Clearance",

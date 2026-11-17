@@ -36,6 +36,52 @@
   }
 
   /* Button styles */
+  .btn-maroon {
+    background-color: #702C3B !important;
+    color: #FFFFFF !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    font-weight: 600;
+    transition: background-color 0.15s ease-in-out, transform 0.1s ease-in-out;
+  }
+  .btn-maroon:hover {
+    background-color: #5C2330 !important;
+    color: #FFFFFF !important;
+  }
+  .btn-maroon-secondary {
+    background-color: #FFFFFF;
+    color: #49372F;
+    border: 1px solid #D5C2B1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    font-weight: 500;
+    transition: all 0.15s ease-in-out;
+  }
+  .btn-maroon-secondary:hover {
+    background-color: #F5EBDD;
+    color: #702C3B;
+    border-color: #702C3B;
+  }
+  .tab-maroon-active {
+    background-color: #702C3B !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  }
+  .tab-maroon-inactive {
+    background-color: #FFFFFF;
+    color: #49372F;
+    border: 1px solid #D5C2B1;
+  }
+  .tab-maroon-inactive:hover {
+    background-color: #F5EBDD;
+    color: #702C3B;
+    border-color: #D5C2B1;
+  }
+
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-600/40 disabled:opacity-50 disabled:cursor-not-allowed;
   }
@@ -352,12 +398,15 @@
   .student-shell .student-dashboard-grid {
     display: grid;
     gap: 1.25rem;
-    grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
   }
 
   .student-shell .student-request-panel {
     align-self: start;
     padding: 1.25rem;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .student-shell .student-request-panel .student-panel-heading {
@@ -552,6 +601,8 @@
   .student-request-list {
     display: grid;
     gap: .75rem;
+    min-width: 0;
+    width: 100%;
   }
 
   .student-request-row {
@@ -560,10 +611,14 @@
     border: 1px solid var(--rl-border);
     border-radius: .8rem;
     display: flex;
-    gap: 1rem;
+    gap: .75rem;
     justify-content: space-between;
-    padding: 1rem 1.1rem;
+    padding: .85rem 1rem;
     transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 
   .student-request-row:hover {
@@ -573,10 +628,29 @@
     transform: translateY(-1px);
   }
 
+  .student-request-row span:first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
   .student-request-row strong {
     color: var(--rl-ink);
     display: block;
     font-size: .85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .student-request-row small {
+    color: var(--rl-muted);
+    font-size: .8rem;
+    margin-top: .25rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
   }
 
   .student-empty {
@@ -693,3 +767,69 @@
     }
   }
 }
+
+/* ========================================================
+   RoomLoop Coffee-Brown Global Tokens & Controls
+   Guaranteed unpurged for all portals & approval queues
+   ======================================================== */
+.btn-maroon {
+  background-color: #702C3B !important;
+  color: #FFFFFF !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  border: 1px solid #5C2330;
+  transition: all 0.15s ease-in-out;
+  text-decoration: none;
+}
+.btn-maroon:hover {
+  background-color: #5C2330 !important;
+  color: #FFFFFF !important;
+}
+
+.btn-maroon-secondary {
+  background-color: #FFFFFF !important;
+  color: #49372F !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  border: 1px solid #D5C2B1;
+  transition: all 0.15s ease-in-out;
+  text-decoration: none;
+}
+.btn-maroon-secondary:hover {
+  background-color: #F5EBDD !important;
+  color: #702C3B !important;
+  border-color: #702C3B;
+}
+
+.tab-maroon-active {
+  background-color: #702C3B !important;
+  color: #FFFFFF !important;
+  border: 1px solid #5C2330 !important;
+  font-weight: 600;
+}
+
+.tab-maroon-inactive {
+  background-color: #FFFFFF !important;
+  color: #49372F !important;
+  border: 1px solid #D5C2B1 !important;
+  font-weight: 500;
+}
+.tab-maroon-inactive:hover {
+  background-color: #F5EBDD !important;
+  color: #702C3B !important;
+}
+

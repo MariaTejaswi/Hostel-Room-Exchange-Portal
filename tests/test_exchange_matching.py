@@ -28,6 +28,23 @@ def _request_data(hostel, block, floor, room):
     }
 
 
+def _configure_policies(institution):
+    from apps.exchange.models import PolicyRule
+
+    defaults = {
+        PolicyRule.Key.COOLING_OFF_DAYS: 0,
+        PolicyRule.Key.REQUEST_VALIDITY_DAYS: 30,
+        PolicyRule.Key.REQUIRE_FEE_CLEARANCE: False,
+        PolicyRule.Key.REQUIRE_NO_DISCIPLINARY_HOLD: False,
+    }
+    for key, val in defaults.items():
+        PolicyRule.objects.update_or_create(
+            institution=institution,
+            key=key,
+            defaults={"value": {"value": val}, "is_active": True},
+        )
+
+
 def _make_cycle(
     *,
     count,
@@ -37,6 +54,7 @@ def _make_cycle(
     hostel_setup,
     warden_user,
 ):
+    _configure_policies(institution)
     users = [student_user]
     for index in range(1, count):
         users.append(
@@ -225,11 +243,10 @@ def test_matching_revalidates_eligibility_before_creating_proposal(
     from apps.exchange.models import PolicyRule
 
     graph = build_exchange_graph(institution=institution)
-    PolicyRule.objects.create(
+    PolicyRule.objects.filter(
         institution=institution,
         key=PolicyRule.Key.REQUIRE_FEE_CLEARANCE,
-        value={"value": True},
-    )
+    ).update(value={"value": True})
 
     assert find_exchange_cycles(graph)
     assert create_exchange_proposals(institution=institution) == []

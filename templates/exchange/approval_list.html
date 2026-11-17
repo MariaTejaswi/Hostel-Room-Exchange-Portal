@@ -1,0 +1,361 @@
+{% extends 'layouts/dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Exchange & Transfer Approvals Queue — RoomLoop{% endblock %}
+{% block breadcrumb_current %}Approvals Queue{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-[#E3D3C4]">
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#F5EBDD] text-[#702C3B] border border-[#E3D3C4]">
+                    Authority Governance
+                </span>
+                {% if is_dean %}
+                <span class="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                    Dean Analytics (Read-Only)
+                </span>
+                {% elif is_chief_warden %}
+                <span class="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                    Chief Warden (Cross-Hostel Authority)
+                </span>
+                {% elif is_warden %}
+                <span class="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                    Warden (Same-Hostel Authority)
+                </span>
+                {% endif %}
+            </div>
+            <h1 class="text-2xl font-bold text-[#3B1720] mt-1.5 tracking-tight">Exchange Approvals Queue &amp; Transfers</h1>
+            <p class="text-xs sm:text-sm text-slate-600 mt-0.5">
+                {% if is_dean %}
+                Institution-wide oversight for student room exchanges and vacant-bed transfer requests.
+                {% elif is_chief_warden %}
+                Review, evaluate, and render authoritative decisions on cross-hostel exchanges and transfers.
+                {% else %}
+                Review, evaluate, and render authoritative decisions on same-hostel exchanges and transfers within your assigned hostels.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <!-- Queue Tabs -->
+    <div class="flex items-center gap-2 border-b border-[#E3D3C4] pb-2 text-xs font-semibold">
+        <a href="?queue=all{% if status_filter %}&status={{ status_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if hostel_filter %}&hostel={{ hostel_filter }}{% endif %}"
+           class="px-3.5 py-1.5 rounded-lg transition-colors {% if queue_filter == 'all' %}tab-maroon-active text-white shadow-xs{% else %}tab-maroon-inactive text-slate-700 hover:bg-[#F5EBDD]{% endif %}"
+           {% if queue_filter == 'all' %}style="background-color: #702C3B !important; color: #FFFFFF !important;"{% endif %}>
+            All Items
+        </a>
+        <a href="?queue=transfers{% if status_filter %}&status={{ status_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if hostel_filter %}&hostel={{ hostel_filter }}{% endif %}"
+           class="px-3.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 {% if queue_filter == 'transfers' %}tab-maroon-active text-white shadow-xs{% else %}tab-maroon-inactive text-slate-700 hover:bg-[#F5EBDD]{% endif %}"
+           {% if queue_filter == 'transfers' %}style="background-color: #702C3B !important; color: #FFFFFF !important;"{% endif %}>
+            <span>Vacant-bed Transfers</span>
+            {% if trans_pending > 0 %}
+            <span class="w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center"
+                  {% if queue_filter == 'transfers' %}style="background-color: #F5EBDD; color: #702C3B;"{% else %}style="background-color: #F4E7EA; color: #702C3B;"{% endif %}>
+                {{ trans_pending }}
+            </span>
+            {% endif %}
+        </a>
+        <a href="?queue=exchanges{% if status_filter %}&status={{ status_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if hostel_filter %}&hostel={{ hostel_filter }}{% endif %}"
+           class="px-3.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 {% if queue_filter == 'exchanges' %}tab-maroon-active text-white shadow-xs{% else %}tab-maroon-inactive text-slate-700 hover:bg-[#F5EBDD]{% endif %}"
+           {% if queue_filter == 'exchanges' %}style="background-color: #702C3B !important; color: #FFFFFF !important;"{% endif %}>
+            <span>Occupied-bed Exchanges</span>
+            {% if prop_pending > 0 %}
+            <span class="w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center"
+                  {% if queue_filter == 'exchanges' %}style="background-color: #F5EBDD; color: #702C3B;"{% else %}style="background-color: #FEF3C7; color: #92400E;"{% endif %}>
+                {{ prop_pending }}
+            </span>
+            {% endif %}
+        </a>
+    </div>
+
+    <!-- Summary Metrics -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Pending Approval -->
+        <a href="?status=pending_approval{% if queue_filter %}&queue={{ queue_filter }}{% endif %}" class="card p-4 border border-[#D5C2B1] bg-white rounded-xl hover:shadow-sm transition-all {% if status_filter == 'pending_approval' %}ring-2 ring-[#702C3B]/40 bg-[#FDFBF7]{% endif %}">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Awaiting Decision</span>
+                <span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-bold text-xs">⏳</span>
+            </div>
+            <p class="text-2xl font-bold text-[#702C3B] mt-2">{{ pending_count }}</p>
+            <p class="text-[11px] text-slate-500 mt-0.5">Requires authority action</p>
+        </a>
+
+        <!-- Approved -->
+        <a href="?status=approved{% if queue_filter %}&queue={{ queue_filter }}{% endif %}" class="card p-4 border border-[#D5C2B1] bg-white rounded-xl hover:shadow-sm transition-all {% if status_filter == 'approved' %}ring-2 ring-emerald-600/40 bg-[#FBFDFB]{% endif %}">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Approved / Executed</span>
+                <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center font-bold text-xs">✓</span>
+            </div>
+            <p class="text-2xl font-bold text-emerald-800 mt-2">{{ approved_count }}</p>
+            <p class="text-[11px] text-slate-500 mt-0.5">Approved or executed</p>
+        </a>
+
+        <!-- Rejected -->
+        <a href="?status=rejected{% if queue_filter %}&queue={{ queue_filter }}{% endif %}" class="card p-4 border border-[#D5C2B1] bg-white rounded-xl hover:shadow-sm transition-all {% if status_filter == 'rejected' %}ring-2 ring-rose-600/40 bg-[#FDFBFB]{% endif %}">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Rejected</span>
+                <span class="w-8 h-8 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center font-bold text-xs">✕</span>
+            </div>
+            <p class="text-2xl font-bold text-rose-800 mt-2">{{ rejected_count }}</p>
+            <p class="text-[11px] text-slate-500 mt-0.5">Declined by authority</p>
+        </a>
+
+        <!-- Total Scoped -->
+        <a href="?status=all{% if queue_filter %}&queue={{ queue_filter }}{% endif %}" class="card p-4 border border-[#D5C2B1] bg-white rounded-xl hover:shadow-sm transition-all {% if status_filter == 'all' %}ring-2 ring-slate-400 bg-slate-50{% endif %}">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total in Scope</span>
+                <span class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs">∑</span>
+            </div>
+            <p class="text-2xl font-bold text-slate-800 mt-2">{{ total_count }}</p>
+            <p class="text-[11px] text-slate-500 mt-0.5">All scoped items</p>
+        </a>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="card p-4 border border-[#D5C2B1] bg-white rounded-xl">
+        <form method="get" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <input type="hidden" name="queue" value="{{ queue_filter }}">
+
+            <!-- Search Query -->
+            <div class="relative flex-1 min-w-[240px]">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <svg width="15" height="15" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search by student name, reg number, email, or reference ID..." class="form-input pl-10 pr-4 py-2 w-full text-xs rounded-lg border border-slate-300 focus:border-[#702C3B] focus:ring-[#702C3B]/20">
+            </div>
+
+            <!-- Status Filter -->
+            <div class="w-full sm:w-48 shrink-0">
+                <select name="status" class="form-select py-2 px-3 text-xs w-full rounded-lg border border-slate-300 focus:border-[#702C3B] focus:ring-[#702C3B]/20">
+                    <option value="pending_approval" {% if status_filter == 'pending_approval' %}selected{% endif %}>Awaiting Decision</option>
+                    <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved / Executed</option>
+                    <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
+                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Scoped Items</option>
+                </select>
+            </div>
+
+            <!-- Hostel Filter (Chief Warden or Dean) -->
+            {% if filter_hostels %}
+            <div class="w-full sm:w-48 shrink-0">
+                <select name="hostel" class="form-select py-2 px-3 text-xs w-full rounded-lg border border-slate-300 focus:border-[#702C3B] focus:ring-[#702C3B]/20">
+                    <option value="">All Hostels</option>
+                    {% for h in filter_hostels %}
+                    <option value="{{ h.id }}" {% if hostel_filter == h.id|stringformat:"s" %}selected{% endif %}>{{ h.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="submit" class="btn-maroon py-2 px-4 text-xs font-semibold whitespace-nowrap rounded-lg shadow-xs" style="background-color: #702C3B !important; color: #FFFFFF !important;">
+                    Filter
+                </button>
+                {% if search_query or status_filter != 'pending_approval' or hostel_filter %}
+                <a href="{% url 'exchange:approval_list' %}?queue={{ queue_filter }}" class="btn-maroon-secondary py-2 px-3 text-xs whitespace-nowrap rounded-lg">
+                    Reset
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Results Table / List -->
+    {% if page_obj %}
+    <div class="card overflow-hidden border border-[#D5C2B1] bg-white rounded-xl">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-700">
+                <thead class="bg-[#F5EBDD]/60 border-b border-[#E3D3C4] text-[11px] font-bold text-[#702C3B] uppercase tracking-wider">
+                    <tr>
+                        <th class="px-4 py-3.5 min-w-[140px]">Reference & Date</th>
+                        <th class="px-4 py-3.5 min-w-[130px]">Classification</th>
+                        <th class="px-4 py-3.5 min-w-[160px]">Workflow Type</th>
+                        <th class="px-4 py-3.5 min-w-[220px]">Student(s) & Movements</th>
+                        <th class="px-4 py-3.5 min-w-[140px]">Status</th>
+                        <th class="px-4 py-3.5 text-right min-w-[150px]">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-[#F0E6DD]">
+                    {% for item in page_obj %}
+                    <tr class="hover:bg-[#FDFBF7] transition-colors">
+                        <!-- 1. ID & Date -->
+                        <td class="px-4 py-3.5">
+                            <span class="font-mono font-bold text-slate-900 block">
+                                {% if item.is_vacant_transfer %}
+                                TRF-{{ item.id|stringformat:".8s" }}
+                                {% else %}
+                                #{{ item.id|stringformat:".8s" }}
+                                {% endif %}
+                            </span>
+                            <span class="text-[11px] text-slate-500 block mt-0.5">
+                                {{ item.created_at|date:"M d, Y · H:i" }}
+                            </span>
+                        </td>
+
+                        <!-- 2. Classification -->
+                        <td class="px-4 py-3.5">
+                            {% if item.is_cross_hostel %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200">
+                                <span>⇄</span>
+                                Cross-Hostel
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                <span>✓</span>
+                                Same-Hostel
+                            </span>
+                            {% if item.scope_hostel %}
+                            <span class="block text-[10px] text-slate-500 mt-1 font-medium truncate max-w-[150px]" title="{{ item.scope_hostel.name }}">
+                                {{ item.scope_hostel.name }}
+                            </span>
+                            {% endif %}
+                            {% endif %}
+                        </td>
+
+                        <!-- 3. Workflow Type -->
+                        <td class="px-4 py-3.5">
+                            {% if item.is_vacant_transfer %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-900 border border-purple-200">
+                                Vacant-bed Transfer
+                            </span>
+                            <span class="text-[10px] text-slate-500 block mt-1">Direct authority transfer</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-800">
+                                {% if item.cycle_length == 2 %}Direct Swap (2-Way){% else %}{{ item.cycle_length }}-Party Rotation{% endif %}
+                            </span>
+                            <span class="text-[10px] text-slate-500 block mt-1">{{ item.cycle_length }} students involved</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- 4. Movements -->
+                        <td class="px-4 py-3.5">
+                            {% if item.is_vacant_transfer %}
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-1.5 text-[11px]">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-purple-700"></span>
+                                    <span class="font-semibold text-slate-800">{{ item.student.full_name }}</span>
+                                    <span class="text-slate-400">&rarr;</span>
+                                    <span class="text-slate-600 font-mono text-[10px]">
+                                        {{ item.dest_hostel.name }} Rm {{ item.dest_bed.room.room_number }} ({% if "bed" in item.dest_bed.bed_label|lower %}{{ item.dest_bed.bed_label }}{% else %}Bed {{ item.dest_bed.bed_label }}{% endif %})
+                                    </span>
+                                </div>
+                                <span class="text-[10px] text-emerald-700 font-semibold block pl-3">
+                                    ★ Destination bed is vacant
+                                </span>
+                            </div>
+                            {% else %}
+                            <div class="space-y-1">
+                                {% for p in item.participants %}
+                                <div class="flex items-center gap-1.5 text-[11px]">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-[#702C3B]"></span>
+                                    <span class="font-semibold text-slate-800">{{ p.student.full_name }}</span>
+                                    <span class="text-slate-400">&rarr;</span>
+                                    <span class="text-slate-600 font-mono text-[10px]">
+                                        {{ p.proposed_bed.room.floor.block.hostel.name }} Rm {{ p.proposed_bed.room.room_number }} ({% if "bed" in p.proposed_bed.bed_label|lower %}{{ p.proposed_bed.bed_label }}{% else %}Bed {{ p.proposed_bed.bed_label }}{% endif %})
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- 5. Status Badge -->
+                        <td class="px-4 py-3.5">
+                            {% if item.status == 'pending_approval' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                ⏳ Pending Approval
+                            </span>
+                            {% elif item.status == 'approved' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                                ✓ Approved (Transfer Pending)
+                            </span>
+                            {% elif item.status == 'completed' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                ✓ Approved & Executed
+                            </span>
+                            {% elif item.status == 'rejected' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-300">
+                                ✕ Rejected
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">
+                                {{ item.status_display }}
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- 6. Action Button -->
+                        <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                            {% if item.is_vacant_transfer %}
+                            <a href="{% url 'exchange:transfer_approval_detail' pk=item.id %}"
+                               class="btn-maroon inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg shadow-xs hover:opacity-95 transition-all"
+                               style="background-color: #702C3B !important; color: #FFFFFF !important;"
+                               title="Review Vacant-Bed Transfer #{{ item.id|stringformat:'.8s' }}">
+                                <span>Review Transfer</span>
+                                <span aria-hidden="true">&rarr;</span>
+                            </a>
+                            {% else %}
+                            <a href="{% url 'exchange:approval_detail' pk=item.id %}"
+                               class="btn-maroon inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg shadow-xs hover:opacity-95 transition-all"
+                               style="background-color: #702C3B !important; color: #FFFFFF !important;"
+                               title="Review Occupied-Bed Proposal #{{ item.id|stringformat:'.8s' }}">
+                                <span>Review Proposal</span>
+                                <span aria-hidden="true">&rarr;</span>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="px-4 py-3 border-t border-[#F0E6DD] bg-slate-50/60 flex items-center justify-between text-xs text-slate-600">
+            <div>
+                Showing page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} total items)
+            </div>
+            <div class="flex items-center gap-1">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if queue_filter %}&queue={{ queue_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if hostel_filter %}&hostel={{ hostel_filter }}{% endif %}" class="btn-secondary py-1 px-2.5 text-xs rounded border-slate-300">
+                    Previous
+                </a>
+                {% endif %}
+                <span class="px-2 font-bold text-slate-800">{{ page_obj.number }}</span>
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if queue_filter %}&queue={{ queue_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if hostel_filter %}&hostel={{ hostel_filter }}{% endif %}" class="btn-secondary py-1 px-2.5 text-xs rounded border-slate-300">
+                    Next
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <!-- Empty State -->
+    <div class="card p-12 text-center border border-[#D5C2B1] bg-white rounded-xl">
+        <div class="w-12 h-12 rounded-full bg-[#F5EBDD] text-[#702C3B] mx-auto flex items-center justify-center text-xl mb-3">
+            📋
+        </div>
+        <h3 class="text-base font-bold text-[#3B1720]">No items in this queue</h3>
+        <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+            {% if status_filter == 'pending_approval' %}
+            There are currently no room exchange or vacant-bed transfer requests awaiting your authority review or decision.
+            {% else %}
+            No requests matched the selected filter criteria. Try resetting your search or filter settings.
+            {% endif %}
+        </p>
+        <div class="mt-4">
+            <a href="{% url 'exchange:approval_list' %}?status=all&queue={{ queue_filter }}" class="btn-secondary py-1.5 px-3 text-xs inline-flex items-center gap-1.5 font-medium rounded-lg border-slate-300">
+                View all scoped items
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

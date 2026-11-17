@@ -364,6 +364,7 @@ class StudentOccupancy(TimeStampedModel):
         ADMINISTRATIVE = "administrative", "Administrative Allocation"
         DIRECT_SWAP = "direct_swap", "Direct 1-to-1 Exchange"
         MULTI_SWAP = "multi_swap", "Multi-Party Swap Ring"
+        VACANT_TRANSFER = "vacant_transfer", "Vacant-bed Transfer"
         SEED = "seed", "Initial System Seed"
 
     institution = models.ForeignKey(
