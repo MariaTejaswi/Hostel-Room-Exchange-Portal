@@ -180,6 +180,12 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_BEAT_SCHEDULE = {
+    "expire-exchange-requests-every-hour": {
+        "task": "apps.exchange.tasks.expire_exchange_requests_task",
+        "schedule": 3600.0,  # Every hour
+    },
+}
 
 # Email Backend
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")

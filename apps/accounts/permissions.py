@@ -194,3 +194,51 @@ def can_view_occupancy_roster(user: User) -> bool:
     if not user.is_authenticated:
         return False
     return not user.is_student_role
+
+
+def can_manage_student_accounts(user: User) -> bool:
+    """
+    Check if user is authorized to create, import, edit administrative details,
+    activate/deactivate student accounts, or initiate password reset for students.
+    Authorized: System Administrator with institution context ONLY.
+    Forbidden: Student, Warden, Chief Warden, Hostel Administrator, Dean of Student Welfare.
+    Note: Generic is_staff or is_superuser flags do NOT bypass this business role requirement.
+    """
+    if not user.is_authenticated or not getattr(user, "institution", None):
+        return False
+
+    # Block non-sysadmin roles explicitly
+    if (
+        user.is_student_role
+        or user.is_warden_role
+        or user.is_chief_warden_role
+        or user.is_hostel_admin_role
+        or user.is_dean_role
+    ):
+        return False
+
+    return user.is_sysadmin_role
+
+
+def can_verify_residential_eligibility(user: User) -> bool:
+    """
+    Check if user is authorized to review pending residential claims and establish
+    authoritative residential eligibility (Boys' / Girls' hostel eligibility).
+    Authorized: Hostel Administrator with institution context ONLY.
+    Forbidden: System Administrator, Student, Warden, Chief Warden, Dean of Student Welfare.
+    Note: Generic is_staff or is_superuser flags do NOT bypass this business role requirement.
+    """
+    if not user.is_authenticated or not getattr(user, "institution", None):
+        return False
+
+    # Block non-hostel-admin roles explicitly
+    if (
+        user.is_student_role
+        or user.is_warden_role
+        or user.is_chief_warden_role
+        or user.is_dean_role
+        or user.is_sysadmin_role
+    ):
+        return False
+
+    return user.is_hostel_admin_role

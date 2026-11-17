@@ -56,6 +56,21 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         FEMALE = "female", "Girls' Hostel Eligible"
         UNVERIFIED = "unverified", "Pending Institutional Verification"
 
+    class ClaimedResidentialCategory(models.TextChoices):
+        MALE = "male", "Boys' Hostel"
+        FEMALE = "female", "Girls' Hostel"
+        UNSPECIFIED = "unspecified", "Unspecified / Not Disclosed"
+
+    class AcademicYear(models.TextChoices):
+        YEAR_1 = "1st Year", "1st Year"
+        YEAR_2 = "2nd Year", "2nd Year"
+        YEAR_3 = "3rd Year", "3rd Year"
+        YEAR_4 = "4th Year", "4th Year"
+        YEAR_5 = "5th Year", "5th Year"
+        POSTGRAD = "Post-Graduate", "Post-Graduate"
+        RESEARCH = "Research Scholar", "Research Scholar"
+        OTHER = "Other", "Other"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(
         unique=True,
@@ -79,8 +94,34 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         db_index=True,
         help_text="Student ID / Roll / Registration number (for students)",
     )
+    department = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Academic department or faculty",
+    )
+    program = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Academic degree or study program",
+    )
+    academic_year = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        choices=AcademicYear.choices,
+        help_text="Current academic year level",
+    )
     phone_number = models.CharField(max_length=20, blank=True, help_text="Primary phone number")
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)
+    claimed_residential_category = models.CharField(
+        max_length=20,
+        choices=ClaimedResidentialCategory.choices,
+        default=ClaimedResidentialCategory.UNSPECIFIED,
+        blank=True,
+        help_text="Self-reported residential preference (unverified)",
+    )
     residential_eligibility = models.CharField(
         max_length=20,
         choices=ResidentialEligibility.choices,
@@ -174,3 +215,64 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     @property
     def is_sysadmin_role(self) -> bool:
         return self.primary_role == "System Administrator"
+
+    @property
+    def current_occupancy(self):
+        """Return active StudentOccupancy if any, or None."""
+        if hasattr(self, "occupancy_records"):
+            return self.occupancy_records.filter(status="active").select_related(
+                "bed__room__floor__block__hostel"
+            ).first()
+        from apps.hostels.models import StudentOccupancy
+        return StudentOccupancy.objects.filter(
+            student=self,
+            status=StudentOccupancy.OccupancyStatus.ACTIVE,
+        ).select_related("bed__room__floor__block__hostel").first()
+
+
+class EligibilityVerificationRecord(TimeStampedModel):
+    """
+    Audit trail of authoritative residential eligibility determinations made by Hostel Administrators.
+    Preserves history of each verification event, previous state, new state, verifier, and justification.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="eligibility_verifications",
+        help_text="Student whose eligibility was reviewed",
+    )
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.CASCADE,
+        related_name="eligibility_verifications",
+        help_text="Institution context",
+    )
+    previous_eligibility = models.CharField(
+        max_length=20,
+        choices=User.ResidentialEligibility.choices,
+        help_text="Eligibility status prior to this action",
+    )
+    new_eligibility = models.CharField(
+        max_length=20,
+        choices=User.ResidentialEligibility.choices,
+        help_text="Authoritative eligibility set by verifier",
+    )
+    verifier = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="verified_eligibilities",
+        help_text="Hostel Administrator who performed the verification",
+    )
+    reason = models.TextField(
+        help_text="Official verification reference, record citation, or justification note",
+    )
+
+    class Meta:
+        db_table = "accounts_eligibility_verifications"
+        verbose_name = "Eligibility Verification Record"
+        verbose_name_plural = "Eligibility Verification Records"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.student.full_name}: {self.previous_eligibility} -> {self.new_eligibility} by {self.verifier.full_name}"

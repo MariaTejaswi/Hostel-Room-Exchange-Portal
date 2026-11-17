@@ -145,3 +145,33 @@ class ExchangeRequestForm(forms.ModelForm):
                 self.add_error("preferred_floor", "Select a floor from the preferred block.")
 
         return cleaned_data
+
+
+class ExchangePolicySettingsForm(forms.Form):
+    """Configuration form for Hostel Administrators to update institution exchange policies."""
+
+    cooling_off_days = forms.IntegerField(
+        min_value=0,
+        label="Cooling-off Period (Days)",
+        help_text="Days a student must reside in their assigned room before becoming eligible for an exchange. Set to 0 to disable.",
+        widget=forms.NumberInput(attrs={"class": "form-input", "min": "0"}),
+    )
+    request_validity_days = forms.IntegerField(
+        min_value=1,
+        label="Request Validity Window (Days)",
+        help_text="Number of days before an open exchange request expires automatically.",
+        widget=forms.NumberInput(attrs={"class": "form-input", "min": "1"}),
+    )
+    require_fee_clearance = forms.BooleanField(
+        required=False,
+        label="Require Fee Clearance",
+        help_text="Mandates verified fee clearance from institutional accounts before submitting an exchange request.",
+        widget=forms.CheckboxInput(attrs={"class": "form-checkbox"}),
+    )
+    require_no_disciplinary_hold = forms.BooleanField(
+        required=False,
+        label="Require No Disciplinary Hold",
+        help_text="Blocks exchange requests for students with active disciplinary holds.",
+        widget=forms.CheckboxInput(attrs={"class": "form-checkbox"}),
+    )
+

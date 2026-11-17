@@ -14,11 +14,6 @@ from apps.exchange.models import (
 from apps.hostels.services import assign_student_to_bed
 
 
-@pytest.fixture(autouse=True)
-def clean_db():
-    """Let pytest-django isolate this module without the legacy teardown hook."""
-    yield
-
 
 def _create_request(student, institution, occupancy, **overrides):
     values = {

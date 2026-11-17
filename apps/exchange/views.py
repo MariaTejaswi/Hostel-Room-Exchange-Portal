@@ -3,8 +3,10 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
+from apps.core.models import AuditLog
 from apps.hostels.models import (
     Bed,
     Block,
@@ -15,8 +17,9 @@ from apps.hostels.models import (
     StudentOccupancy,
 )
 
-from .forms import ExchangeRequestForm
-from .models import Notification
+from .eligibility import check_student_exchange_eligibility
+from .forms import ExchangePolicySettingsForm, ExchangeRequestForm
+from .models import ExchangeRequest, Notification, PolicyRule
 from .selectors import (
     get_eligible_blocks_for_hostel,
     get_eligible_floors_for_block,
@@ -29,7 +32,9 @@ from .selectors import (
 )
 from .services import (
     create_exchange_request,
+    get_institution_exchange_policies,
     update_exchange_request,
+    update_institution_exchange_policy,
     withdraw_exchange_request,
 )
 
@@ -278,6 +283,10 @@ def exchange_request_create_view(request):
     else:
         form = ExchangeRequestForm(student=request.user)
     browser_context = _bed_browser_context(request, request.user, form)
+    eligibility_report = check_student_exchange_eligibility(
+        student=request.user,
+        occupancy=browser_context.get("current_occupancy"),
+    )
     return render(
         request,
         "exchange/request_form.html",
@@ -285,6 +294,7 @@ def exchange_request_create_view(request):
             "form": form,
             "page_title": "Create Exchange Request",
             "active_nav": "exchange",
+            "eligibility_report": eligibility_report,
             **browser_context,
         },
     )
@@ -297,11 +307,19 @@ def exchange_request_detail_view(request, pk):
         get_student_exchange_requests(request.user),
         pk=pk,
     )
+    now = timezone.now()
+    is_expired = bool(exchange_request.expires_at and exchange_request.expires_at <= now)
+    has_active_proposal = exchange_request.proposal_participations.filter(is_active_reservation=True).exists()
+    can_modify = exchange_request.status == ExchangeRequest.Status.OPEN and not is_expired and not has_active_proposal
+
     return render(
         request,
         "exchange/request_detail.html",
         {
             "exchange_request": exchange_request,
+            "can_modify": can_modify,
+            "is_expired": is_expired,
+            "has_active_proposal": has_active_proposal,
             "active_nav": "exchange",
         },
     )
@@ -341,6 +359,10 @@ def exchange_request_edit_view(request, pk):
     browser_context = _bed_browser_context(
         request, request.user, form, instance=exchange_request
     )
+    eligibility_report = check_student_exchange_eligibility(
+        student=request.user,
+        occupancy=browser_context.get("current_occupancy"),
+    )
     return render(
         request,
         "exchange/request_form.html",
@@ -349,6 +371,7 @@ def exchange_request_edit_view(request, pk):
             "exchange_request": exchange_request,
             "page_title": "Edit Exchange Request",
             "active_nav": "exchange",
+            "eligibility_report": eligibility_report,
             **browser_context,
         },
     )
@@ -375,144 +398,89 @@ def exchange_request_withdraw_view(request, pk):
 
 
 @login_required
-def exchange_request_list_view(request):
-    _require_student(request)
-    return render(
-        request,
-        "exchange/request_list.html",
-        {
-            "exchange_requests": get_student_exchange_requests(request.user),
-            "active_nav": "exchange",
-        },
-    )
+def exchange_policy_settings_view(request):
+    """Hostel Administrator policy configuration view."""
+    if not getattr(request.user, "is_hostel_admin_role", False):
+        raise PermissionDenied("Only Hostel Administrators can manage exchange policy rules.")
 
+    institution = getattr(request.user, "institution", None)
+    if not institution:
+        raise PermissionDenied("Your account is not associated with an institution.")
 
-@login_required
-def exchange_notifications_view(request):
-    _require_student(request)
-    return render(
-        request,
-        "exchange/notifications.html",
-        {
-            "notifications": Notification.objects.filter(
-                recipient=request.user,
-            )
-            .select_related("exchange_request", "proposal")
-            .order_by("-created_at"),
-            "active_nav": "notifications",
-        },
-    )
-
-
-@login_required
-def exchange_request_create_view(request):
-    _require_student(request)
     if request.method == "POST":
-        form = ExchangeRequestForm(request.POST, student=request.user)
+        form = ExchangePolicySettingsForm(request.POST)
         if form.is_valid():
+            ip = request.META.get("REMOTE_ADDR")
+            cd = form.cleaned_data
             try:
-                create_exchange_request(
-                    student=request.user,
-                    data=form.cleaned_data,
-                    ip_address=request.META.get("REMOTE_ADDR"),
+                update_institution_exchange_policy(
+                    acting_user=request.user,
+                    institution=institution,
+                    key=PolicyRule.Key.COOLING_OFF_DAYS,
+                    value=cd["cooling_off_days"],
+                    ip_address=ip,
                 )
-                messages.success(request, "Your exchange request was created.")
-                return redirect("exchange:request_list")
+                update_institution_exchange_policy(
+                    acting_user=request.user,
+                    institution=institution,
+                    key=PolicyRule.Key.REQUEST_VALIDITY_DAYS,
+                    value=cd["request_validity_days"],
+                    ip_address=ip,
+                )
+                update_institution_exchange_policy(
+                    acting_user=request.user,
+                    institution=institution,
+                    key=PolicyRule.Key.REQUIRE_FEE_CLEARANCE,
+                    value=cd["require_fee_clearance"],
+                    ip_address=ip,
+                )
+                update_institution_exchange_policy(
+                    acting_user=request.user,
+                    institution=institution,
+                    key=PolicyRule.Key.REQUIRE_NO_DISCIPLINARY_HOLD,
+                    value=cd["require_no_disciplinary_hold"],
+                    ip_address=ip,
+                )
+                messages.success(request, "Exchange policies have been successfully updated.")
+                return redirect("exchange:policy_settings")
             except ValidationError as error:
-                for message in _validation_messages(error):
-                    form.add_error(None, message)
+                for msg in _validation_messages(error):
+                    form.add_error(None, msg)
     else:
-        form = ExchangeRequestForm(student=request.user)
-    browser_context = _bed_browser_context(request, request.user, form)
+        policies = get_institution_exchange_policies(institution)
+        initial_data = {}
+        if policies.get(PolicyRule.Key.COOLING_OFF_DAYS) is not None:
+            initial_data["cooling_off_days"] = policies[PolicyRule.Key.COOLING_OFF_DAYS]
+        if policies.get(PolicyRule.Key.REQUEST_VALIDITY_DAYS) is not None:
+            initial_data["request_validity_days"] = policies[PolicyRule.Key.REQUEST_VALIDITY_DAYS]
+        if policies.get(PolicyRule.Key.REQUIRE_FEE_CLEARANCE) is not None:
+            initial_data["require_fee_clearance"] = policies[PolicyRule.Key.REQUIRE_FEE_CLEARANCE]
+        if policies.get(PolicyRule.Key.REQUIRE_NO_DISCIPLINARY_HOLD) is not None:
+            initial_data["require_no_disciplinary_hold"] = policies[PolicyRule.Key.REQUIRE_NO_DISCIPLINARY_HOLD]
+
+        form = ExchangePolicySettingsForm(initial=initial_data)
+
+    recent_audits = (
+        AuditLog.objects.filter(
+            institution=institution,
+            target_type="PolicyRule",
+        )
+        .select_related("acting_user")
+        .order_by("-timestamp")[:10]
+    )
+
+    policies = get_institution_exchange_policies(institution)
+    all_configured = all(v is not None for v in policies.values())
+
     return render(
         request,
-        "exchange/request_form.html",
+        "exchange/policy_settings.html",
         {
             "form": form,
-            "page_title": "Create Exchange Request",
-            "active_nav": "exchange",
-            **browser_context,
+            "recent_audits": recent_audits,
+            "all_configured": all_configured,
+            "active_nav": "exchange_policies",
+            "page_title": "Exchange Policy Settings",
         },
     )
 
-
-@login_required
-def exchange_request_detail_view(request, pk):
-    _require_student(request)
-    exchange_request = get_object_or_404(
-        get_student_exchange_requests(request.user),
-        pk=pk,
-    )
-    return render(
-        request,
-        "exchange/request_detail.html",
-        {
-            "exchange_request": exchange_request,
-            "active_nav": "exchange",
-        },
-    )
-
-
-@login_required
-def exchange_request_edit_view(request, pk):
-    _require_student(request)
-    exchange_request = get_object_or_404(
-        get_student_exchange_requests(request.user),
-        pk=pk,
-    )
-    if request.method == "POST":
-        form = ExchangeRequestForm(
-            request.POST,
-            instance=exchange_request,
-            student=request.user,
-        )
-        if form.is_valid():
-            try:
-                update_exchange_request(
-                    exchange_request=exchange_request,
-                    student=request.user,
-                    data=form.cleaned_data,
-                    ip_address=request.META.get("REMOTE_ADDR"),
-                )
-                messages.success(request, "Your exchange request was updated.")
-                return redirect("exchange:request_detail", pk=exchange_request.pk)
-            except ValidationError as error:
-                for message in _validation_messages(error):
-                    form.add_error(None, message)
-    else:
-        form = ExchangeRequestForm(
-            instance=exchange_request,
-            student=request.user,
-        )
-    browser_context = _bed_browser_context(request, request.user, form)
-    return render(
-        request,
-        "exchange/request_form.html",
-        {
-            "form": form,
-            "exchange_request": exchange_request,
-            "page_title": "Edit Exchange Request",
-            "active_nav": "exchange",
-            **browser_context,
-        },
-    )
-
-
-@login_required
-@require_POST
-def exchange_request_withdraw_view(request, pk):
-    _require_student(request)
-    exchange_request = get_object_or_404(
-        get_student_exchange_requests(request.user),
-        pk=pk,
-    )
-    try:
-        withdraw_exchange_request(
-            exchange_request=exchange_request,
-            student=request.user,
-            ip_address=request.META.get("REMOTE_ADDR"),
-        )
-        messages.success(request, "Your exchange request was withdrawn.")
-    except ValidationError as error:
-        messages.error(request, "; ".join(_validation_messages(error)))
-    return redirect("exchange:request_detail", pk=pk)

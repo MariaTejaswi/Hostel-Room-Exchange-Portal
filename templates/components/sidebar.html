@@ -93,7 +93,50 @@
         </a>
         {% endif %}
 
+        {% if is_hostel_admin %}
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">Residential Review</div>
+        <a href="{% url 'accounts:eligibility_verification_list' %}" class="sidebar-nav-item flex items-center justify-between {% if active_nav == 'eligibility_verification' %}active{% endif %}">
+            <div class="flex items-center gap-3 min-w-0">
+                <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+                <span class="truncate">Eligibility Verification</span>
+            </div>
+            {% if pending_eligibility_count > 0 %}
+            <span class="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                {{ pending_eligibility_count }}
+            </span>
+            {% endif %}
+        </a>
+        <a href="{% url 'exchange:policy_settings' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'exchange_policies' %}active{% endif %}">
+            <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+            </svg>
+            <span class="truncate">Exchange Policies</span>
+        </a>
+        {% endif %}
+
         {% if is_sysadmin %}
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">Students</div>
+        <a href="{% url 'accounts:student_list' %}" class="sidebar-nav-item {% if active_nav == 'students_directory' %}active{% endif %}">
+            <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+            </svg>
+            <span>Student Directory</span>
+        </a>
+        <a href="{% url 'accounts:student_create' %}" class="sidebar-nav-item {% if active_nav == 'students_add' %}active{% endif %}">
+            <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+            </svg>
+            <span>Add Student</span>
+        </a>
+        <a href="{% url 'accounts:student_import' %}" class="sidebar-nav-item {% if active_nav == 'students_import' %}active{% endif %}">
+            <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+            </svg>
+            <span>Import Students</span>
+        </a>
+
         <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">Technical Admin</div>
         <a href="{% url 'accounts:dashboard_sysadmin' %}" class="sidebar-nav-item {% if active_nav == 'sysadmin' %}active{% endif %}">
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

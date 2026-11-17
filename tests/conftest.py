@@ -1,14 +1,8 @@
-import os
-import django
 import pytest
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.development")
-django.setup()
-
 from django.test import Client
 from django.contrib.auth.models import Group
 from apps.core.models import Institution, AuditLog
-from apps.accounts.models import User
+from apps.accounts.models import User, EligibilityVerificationRecord
 from apps.accounts.services import (
     ensure_roles_exist,
     create_user_with_role,
@@ -40,54 +34,9 @@ from apps.exchange.models import (
 )
 
 
-def _do_cleanup():
-    Notification.objects.all().delete()
-    TransferRecord.objects.all().delete()
-    Approval.objects.all().delete()
-    ProposalParticipant.objects.all().delete()
-    ExchangeProposal.objects.all().delete()
-    ExchangeRequest.objects.all().delete()
-    PolicyRule.objects.all().delete()
-    StudentOccupancy.objects.all().delete()
-    WardenAssignment.objects.all().delete()
-    Bed.objects.all().delete()
-    Room.objects.all().delete()
-    Floor.objects.all().delete()
-    Block.objects.all().delete()
-    Hostel.objects.all().delete()
-    User.objects.all().delete()
-    AuditLog.objects.all().delete()
-    Institution.objects.all().delete()
-
-
-def pytest_sessionfinish(session, exitstatus):
-    """Restore demo seed data if tests ran against the primary development database."""
-    if os.getenv("SKIP_DEMO_SEED") == "1":
-        return
-    from django.conf import settings
-    from django.core.management import call_command
-    db_name = settings.DATABASES["default"]["NAME"]
-    if not str(db_name).startswith("test_"):
-        call_command("seed_demo")
-        call_command("seed_hostel_inventory", institution_code="DEMO-UNIV")
-
-
-@pytest.fixture(autouse=True)
-def clean_db():
-    """Ensure a clean database state before and after each test."""
-    _do_cleanup()
-    yield
-    _do_cleanup()
-
-
 @pytest.fixture
 def client():
     return Client()
-
-
-@pytest.fixture
-def db():
-    pass
 
 
 @pytest.fixture
@@ -123,6 +72,9 @@ def roles():
 
 @pytest.fixture
 def student_user(institution, roles):
+    user = User.objects.filter(email="student.test@apex.test").first()
+    if user:
+        return user
     return create_user_with_role(
         email="student.test@apex.test",
         full_name="Test Student",
@@ -136,6 +88,9 @@ def student_user(institution, roles):
 
 @pytest.fixture
 def other_student_user(institution, roles):
+    user = User.objects.filter(email="other.student@apex.test").first()
+    if user:
+        return user
     return create_user_with_role(
         email="other.student@apex.test",
         full_name="Other Student",
@@ -149,6 +104,9 @@ def other_student_user(institution, roles):
 
 @pytest.fixture
 def warden_user(institution, roles):
+    user = User.objects.filter(email="warden.test@apex.test").first()
+    if user:
+        return user
     return create_user_with_role(
         email="warden.test@apex.test",
         full_name="Test Warden",
@@ -160,6 +118,9 @@ def warden_user(institution, roles):
 
 @pytest.fixture
 def chief_warden_user(institution, roles):
+    user = User.objects.filter(email="chief.warden@apex.test").first()
+    if user:
+        return user
     return create_user_with_role(
         email="chief.warden@apex.test",
         full_name="Chief Warden",
@@ -171,6 +132,9 @@ def chief_warden_user(institution, roles):
 
 @pytest.fixture
 def admin_user(institution, roles):
+    user = User.objects.filter(email="admin.test@apex.test").first()
+    if user:
+        return user
     return create_user_with_role(
         email="admin.test@apex.test",
         full_name="Hostel Admin",
@@ -183,6 +147,9 @@ def admin_user(institution, roles):
 
 @pytest.fixture
 def sysadmin_user(institution, roles):
+    user = User.objects.filter(email="sysadmin.test@apex.test").first()
+    if user:
+        return user
     user = create_user_with_role(
         email="sysadmin.test@apex.test",
         full_name="System Administrator",
@@ -198,6 +165,9 @@ def sysadmin_user(institution, roles):
 
 @pytest.fixture
 def dean_user(institution, roles):
+    user = User.objects.filter(email="dean.test@apex.test").first()
+    if user:
+        return user
     return create_user_with_role(
         email="dean.test@apex.test",
         full_name="Dean Test",

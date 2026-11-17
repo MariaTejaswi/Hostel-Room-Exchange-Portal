@@ -38,6 +38,9 @@ def navigation_context(request):
         context["is_hostel_admin"] = True
         context["can_manage_inventory"] = True   # Infrastructure management authority
         context["can_assign_occupancy"] = False  # Denied routine allocations; emergency workflow deferred
+        if getattr(user, "institution", None):
+            from apps.accounts.selectors import get_pending_eligibility_count
+            context["pending_eligibility_count"] = get_pending_eligibility_count(user.institution)
     elif user.is_chief_warden_role:
         context["user_role"] = "Chief Warden"
         context["user_role_label"] = "Chief Warden"

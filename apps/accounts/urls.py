@@ -19,6 +19,9 @@ urlpatterns = [
     # Profile & Password Management
     path("profile/", views.profile_view, name="profile"),
     path("password-change/", views.password_change_view, name="password_change"),
+    # First-time Student Password Setup
+    path("password-setup/<str:uidb64>/<str:token>/", views.password_setup_view, name="password_setup"),
+    # Standard Password Reset
     path(
         "password-reset/",
         auth_views.PasswordResetView.as_view(
@@ -51,4 +54,16 @@ urlpatterns = [
         ),
         name="password_reset_complete",
     ),
+    # System Administrator: Student Account Management
+    path("students/", views.student_list_view, name="student_list"),
+    path("students/add/", views.student_create_view, name="student_create"),
+    path("students/import/", views.student_csv_import_view, name="student_import"),
+    path("students/import/template/", views.student_csv_template_download_view, name="student_csv_template"),
+    path("students/<uuid:pk>/", views.student_detail_view, name="student_detail"),
+    path("students/<uuid:pk>/edit/", views.student_edit_view, name="student_edit"),
+    path("students/<uuid:pk>/toggle-status/", views.student_toggle_status_view, name="student_toggle_status"),
+    path("students/<uuid:pk>/password-reset/", views.student_password_reset_initiate_view, name="student_password_reset"),
+    # Hostel Administrator: Residential Eligibility Verification
+    path("eligibility-verification/", views.eligibility_verification_list_view, name="eligibility_verification_list"),
+    path("eligibility-verification/<uuid:pk>/", views.eligibility_verify_student_view, name="eligibility_verify_student"),
 ]

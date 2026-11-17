@@ -1,0 +1,191 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block title %}{{ page_title }} — RoomLoop{% endblock %}
+{% block breadcrumb_current %}Exchange Policies{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-teal-700">Governance & Institutional Policy</p>
+            <h1 class="text-2xl font-bold text-slate-900 mt-1">Exchange Policy Settings</h1>
+            <p class="text-xs text-slate-500 mt-0.5">
+                Configure eligibility thresholds, request lifetimes, and clearance requirements for {{ request.user.institution.name|default:"the institution" }}.
+            </p>
+        </div>
+    </div>
+
+    <!-- Alert / Validation Messages -->
+    {% if messages %}
+    <div class="space-y-2">
+        {% for message in messages %}
+        <div class="p-3.5 rounded-lg text-xs font-medium {% if message.tags == 'success' %}bg-emerald-50 border border-emerald-200 text-emerald-800{% else %}bg-amber-50 border border-amber-200 text-amber-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if form.non_field_errors %}
+    <div class="p-3.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 space-y-1">
+        {% for error in form.non_field_errors %}
+        <p class="font-medium">{{ error }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Form Column (2 spans) -->
+        <div class="lg:col-span-2 space-y-6">
+            <div class="card p-6 bg-white border border-slate-200 rounded-xl shadow-xs space-y-6">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">Configurable Exchange Rules</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        These settings are evaluated in real time during exchange request creation and updates without redeploying code.
+                    </p>
+                </div>
+
+                {% if all_configured %}
+                <div class="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between">
+                    <span class="font-semibold">&#10003; All institutional exchange policies are configured and active.</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold uppercase">Active</span>
+                </div>
+                {% else %}
+                <div class="p-3.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+                    <p class="font-bold text-amber-950">Configuration Required</p>
+                    <p>Required institutional exchange policies have not been fully configured yet. Set policy rules below to enable student exchange requests for this institution.</p>
+                </div>
+                {% endif %}
+
+                <form method="post" action="{% url 'exchange:policy_settings' %}" class="space-y-5">
+                    {% csrf_token %}
+
+                    <!-- Cooling-Off Days -->
+                    <div class="space-y-1.5">
+                        <label for="{{ form.cooling_off_days.id_for_label }}" class="block text-xs font-bold text-slate-800">
+                            {{ form.cooling_off_days.label }}
+                        </label>
+                        <div class="max-w-xs">
+                            {{ form.cooling_off_days }}
+                        </div>
+                        <p class="text-[11px] text-slate-500 leading-relaxed">
+                            {{ form.cooling_off_days.help_text }}
+                        </p>
+                        {% if form.cooling_off_days.errors %}
+                        <p class="text-xs text-red-600 font-medium">{{ form.cooling_off_days.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Request Validity Days -->
+                    <div class="space-y-1.5 pt-4 border-t border-slate-100">
+                        <label for="{{ form.request_validity_days.id_for_label }}" class="block text-xs font-bold text-slate-800">
+                            {{ form.request_validity_days.label }}
+                        </label>
+                        <div class="max-w-xs">
+                            {{ form.request_validity_days }}
+                        </div>
+                        <p class="text-[11px] text-slate-500 leading-relaxed">
+                            {{ form.request_validity_days.help_text }}
+                        </p>
+                        {% if form.request_validity_days.errors %}
+                        <p class="text-xs text-red-600 font-medium">{{ form.request_validity_days.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Pre-requisite Clearances -->
+                    <div class="pt-4 border-t border-slate-100 space-y-4">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Pre-requisite Clearances</h3>
+
+                        <!-- Fee Clearance -->
+                        <div class="flex items-start gap-3 p-3.5 bg-slate-50 border border-slate-200/80 rounded-lg">
+                            <div class="pt-0.5">
+                                {{ form.require_fee_clearance }}
+                            </div>
+                            <div class="space-y-0.5 min-w-0">
+                                <label for="{{ form.require_fee_clearance.id_for_label }}" class="text-xs font-bold text-slate-900 cursor-pointer block">
+                                    {{ form.require_fee_clearance.label }}
+                                </label>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    {{ form.require_fee_clearance.help_text }}
+                                </p>
+                                <p class="text-[10px] text-amber-700 font-medium pt-1">
+                                    <em>Note:</em> When enabled, requests require an active institutional fee integration. If no adapter is configured, requests fail closed for student protection.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Disciplinary Clearance -->
+                        <div class="flex items-start gap-3 p-3.5 bg-slate-50 border border-slate-200/80 rounded-lg">
+                            <div class="pt-0.5">
+                                {{ form.require_no_disciplinary_hold }}
+                            </div>
+                            <div class="space-y-0.5 min-w-0">
+                                <label for="{{ form.require_no_disciplinary_hold.id_for_label }}" class="text-xs font-bold text-slate-900 cursor-pointer block">
+                                    {{ form.require_no_disciplinary_hold.label }}
+                                </label>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    {{ form.require_no_disciplinary_hold.help_text }}
+                                </p>
+                                <p class="text-[10px] text-amber-700 font-medium pt-1">
+                                    <em>Note:</em> When enabled, students under active disciplinary holds cannot initiate exchanges.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                        <a href="{% url 'accounts:dashboard' %}" class="btn-secondary btn-sm">Cancel</a>
+                        <button type="submit" class="btn-primary btn-sm inline-flex items-center gap-2">
+                            <span>Save Policy Settings</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Sidebar / Audit Column (1 span) -->
+        <div class="space-y-6">
+            <!-- Governance Guidance Card -->
+            <div class="card p-5 bg-white border border-slate-200 rounded-xl space-y-3">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-800">
+                    <span class="w-2 h-2 rounded-full bg-teal-600"></span>
+                    <span>Governance Rules</span>
+                </div>
+                <ul class="text-[11px] text-slate-600 space-y-2 list-disc list-inside leading-relaxed">
+                    <li>Only <strong>Hostel Administrators</strong> have operational authority to modify exchange policies.</li>
+                    <li>Changes take effect immediately on all subsequent submissions and edits.</li>
+                    <li>System Administrators do not hold operational policy or approval authority.</li>
+                    <li>Open requests reaching validity expiry are transitioned to <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-800">expired</code> via hourly scheduled job and proactive enforcement.</li>
+                </ul>
+            </div>
+
+            <!-- Recent Policy Audits -->
+            <div class="card p-5 bg-white border border-slate-200 rounded-xl space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Audit History</h3>
+                    <span class="text-[10px] text-slate-400">Last 10 updates</span>
+                </div>
+                {% if recent_audits %}
+                <div class="divide-y divide-slate-100 text-xs">
+                    {% for audit in recent_audits %}
+                    <div class="py-2.5 space-y-1">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="font-semibold text-slate-800">{{ audit.acting_user.full_name|default:"System" }}</span>
+                            <span class="text-slate-400">{{ audit.timestamp|date:"M d, H:i" }}</span>
+                        </div>
+                        <p class="text-[11px] text-slate-600">{{ audit.change_summary }}</p>
+                        {% if audit.ip_address %}
+                        <p class="text-[10px] text-slate-400 font-mono">IP: {{ audit.ip_address }}</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-xs text-slate-400 italic py-2">No policy modifications logged yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

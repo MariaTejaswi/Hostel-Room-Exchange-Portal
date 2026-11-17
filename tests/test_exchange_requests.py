@@ -36,6 +36,31 @@ def _occupy(student_user, hostel_setup, warden_user, **kwargs):
     )
 
 
+@pytest.fixture(autouse=True)
+def configured_policies(institution):
+    PolicyRule.objects.update_or_create(
+        institution=institution,
+        key=PolicyRule.Key.COOLING_OFF_DAYS,
+        defaults={"value": {"value": 0}, "is_active": True},
+    )
+    PolicyRule.objects.update_or_create(
+        institution=institution,
+        key=PolicyRule.Key.REQUEST_VALIDITY_DAYS,
+        defaults={"value": {"value": 30}, "is_active": True},
+    )
+    PolicyRule.objects.update_or_create(
+        institution=institution,
+        key=PolicyRule.Key.REQUIRE_FEE_CLEARANCE,
+        defaults={"value": {"value": False}, "is_active": True},
+    )
+    PolicyRule.objects.update_or_create(
+        institution=institution,
+        key=PolicyRule.Key.REQUIRE_NO_DISCIPLINARY_HOLD,
+        defaults={"value": {"value": False}, "is_active": True},
+    )
+
+
+
 @pytest.mark.django_db
 def test_student_can_create_exchange_request(client, student_user, hostel_setup, warden_user):
     _occupy(student_user, hostel_setup, warden_user)
@@ -182,11 +207,10 @@ def test_cooling_off_and_external_status_policies_are_enforced(
         warden_user,
         start_date=timezone.localdate(),
     )
-    PolicyRule.objects.create(
+    PolicyRule.objects.filter(
         institution=institution,
         key=PolicyRule.Key.COOLING_OFF_DAYS,
-        value={"value": 2},
-    )
+    ).update(value={"value": 2})
     with pytest.raises(ValidationError, match="cooling-off"):
         create_exchange_request(student=student_user, data=_request_data())
 
@@ -194,11 +218,10 @@ def test_cooling_off_and_external_status_policies_are_enforced(
         institution=institution,
         key=PolicyRule.Key.COOLING_OFF_DAYS,
     ).update(value={"value": 0})
-    PolicyRule.objects.create(
+    PolicyRule.objects.filter(
         institution=institution,
         key=PolicyRule.Key.REQUIRE_FEE_CLEARANCE,
-        value={"value": True},
-    )
+    ).update(value={"value": True})
     with pytest.raises(ValidationError, match="Fee status could not be verified"):
         create_exchange_request(
             student=student_user,

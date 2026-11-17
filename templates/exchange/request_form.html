@@ -26,6 +26,91 @@
         <span id="step-pill-3" class="student-step"><b>3</b> Reason & review</span>
     </div>
 
+    <!-- Current Allocation & Eligibility Status Card -->
+    <div class="card p-4 sm:p-5 bg-white border border-slate-200 rounded-xl space-y-4 shadow-xs">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
+            <div>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Current Assignment & Eligibility</span>
+                <h2 class="text-sm sm:text-base font-bold text-slate-900 mt-0.5">Your Accommodation Status</h2>
+            </div>
+            {% if eligibility_report.is_eligible %}
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 border border-emerald-200 text-emerald-800">
+                <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                <span>Eligible for Exchange</span>
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 border border-amber-200 text-amber-800">
+                <span class="w-2 h-2 rounded-full bg-amber-600"></span>
+                <span>Eligibility Action Required</span>
+            </span>
+            {% endif %}
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Current Allocation Details -->
+            <div class="p-3.5 rounded-lg bg-slate-50/80 border border-slate-200/80 space-y-2">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active Allocation</span>
+                {% if current_occupancy %}
+                <div class="space-y-1">
+                    <p class="font-bold text-slate-900 text-sm">{{ current_occupancy.bed.room.floor.block.hostel.name }}</p>
+                    <p class="text-slate-600 text-xs">
+                        Block {{ current_occupancy.bed.room.floor.block.name }} &bull;
+                        {{ current_occupancy.bed.room.floor.floor_label }} &bull;
+                        Room {{ current_occupancy.bed.room.room_number }}
+                    </p>
+                    <div class="pt-1 flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded bg-teal-50 border border-teal-200 text-teal-800 text-[11px] font-mono font-bold">
+                            Bed {{ current_occupancy.bed.bed_label }}
+                        </span>
+                        <span class="text-[11px] text-slate-400">
+                            Occupied since {{ current_occupancy.start_date|date:"M d, Y" }}
+                        </span>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-xs text-slate-500 italic">No active room allocation recorded. An allocated bed is required to request an exchange.</p>
+                {% endif %}
+            </div>
+
+            <!-- Eligibility Evaluation Checklist -->
+            <div class="p-3.5 rounded-lg bg-slate-50/80 border border-slate-200/80 space-y-2">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Policy Verification Checklist</span>
+                <ul class="text-xs space-y-1.5">
+                    {% for check in eligibility_report.checks %}
+                    {% if check.key != "preferred_hostel" and check.key != "preferred_block" and check.key != "preferred_floor" and check.key != "preferred_bed" %}
+                    <li class="flex items-start gap-2">
+                        {% if check.passed %}
+                        <span class="text-emerald-600 font-bold text-xs mt-0.5">&#10003;</span>
+                        <div class="min-w-0 flex-1">
+                            <span class="font-semibold text-slate-800">{{ check.label }}:</span>
+                            <span class="text-slate-600 ml-1">{{ check.reason }}</span>
+                        </div>
+                        {% else %}
+                        <span class="text-red-600 font-bold text-xs mt-0.5">&#10007;</span>
+                        <div class="min-w-0 flex-1">
+                            <span class="font-semibold text-red-800">{{ check.label }}:</span>
+                            <span class="text-red-700 ml-1">{{ check.reason }}</span>
+                        </div>
+                        {% endif %}
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        {% if not eligibility_report.is_eligible %}
+        <div class="p-3.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+            <p class="font-bold text-amber-950">Notice: You currently do not meet exchange requirements</p>
+            <ul class="list-disc list-inside space-y-0.5">
+                {% for reason in eligibility_report.reasons %}
+                <li>{{ reason }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
     <!-- Main Container Card -->
     <div class="card p-4 sm:p-6 bg-white border border-slate-200 rounded-xl shadow-xs space-y-6">
         {% if form.non_field_errors %}
@@ -361,7 +446,7 @@
             <!-- Form Actions -->
             <div class="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
                 <a href="{% url 'exchange:request_list' %}" class="btn-secondary">Cancel</a>
-                <button type="submit" id="btn-submit-request" class="btn-primary flex items-center gap-2">
+                <button type="submit" id="btn-submit-request" class="btn-primary flex items-center gap-2 {% if not eligibility_report.is_eligible %}opacity-50 cursor-not-allowed{% endif %}" {% if not eligibility_report.is_eligible %}disabled title="You currently do not meet exchange requirements"{% endif %}>
                     <span id="submit-spinner" class="hidden animate-spin">&#9696;</span>
                     <span id="submit-text">{% if exchange_request %}Save Changes{% else %}Submit Exchange Request{% endif %}</span>
                 </button>

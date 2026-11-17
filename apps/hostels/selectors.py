@@ -297,6 +297,7 @@ def get_eligible_unallocated_students(institution, required_category: str | None
             groups__name="Student",
         )
         .exclude(id__in=active_occupant_ids)
+        .exclude(residential_eligibility=User.ResidentialEligibility.UNVERIFIED)
         .order_by("full_name")
     )
     if required_category:

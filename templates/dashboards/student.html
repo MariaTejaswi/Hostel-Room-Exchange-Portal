@@ -5,40 +5,92 @@
 
 {% block content %}
 <div class="student-page space-y-6">
-    <header class="student-welcome flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+    <header class="student-welcome flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between min-w-0">
+        <div class="min-w-0 flex-1">
             <p class="student-eyebrow">RoomLoop student portal</p>
-            <h1 class="student-title">Welcome back, {{ request.user.full_name }}</h1>
+            <h1 class="student-title break-words">Welcome back, {{ request.user.full_name }}</h1>
             <p class="student-subtitle">Everything you need for your university accommodation, in one place.</p>
         </div>
-        <a href="{% url 'exchange:request_create' %}" class="btn-primary student-primary-action">
+        {% if request.user.residential_eligibility != 'unverified' and current_occupancy %}
+        <a href="{% url 'exchange:request_create' %}" class="btn-primary student-primary-action flex-shrink-0">
             Start Exchange Request
             <span aria-hidden="true">&rarr;</span>
         </a>
+        {% endif %}
     </header>
 
+    <!-- Unverified Eligibility Notice Banner -->
+    {% if request.user.residential_eligibility == 'unverified' %}
+    <div class="card p-5 sm:p-6 border-l-4 border-amber-500 bg-amber-50/50 space-y-4">
+        <div class="flex items-start gap-4">
+            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center flex-shrink-0">
+                <svg width="24" height="24" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <div class="space-y-1 min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="text-base font-bold text-amber-950">Residential Eligibility Verification Pending</h2>
+                    <span class="badge-warning px-2.5 py-0.5 rounded-full text-xs font-semibold">Under Review</span>
+                </div>
+                <p class="text-xs text-amber-900 leading-relaxed max-w-2xl break-words">
+                    Your institutional student account is active. However, your authoritative residential accommodation eligibility is currently awaiting review by the <strong>Hostel Administration</strong>.
+                    Once reviewed and verified, your eligible campus accommodation overview will unlock here. Bed allocations are subsequently assigned by the destination hostel warden.
+                </p>
+            </div>
+        </div>
+
+        <!-- Academic & Registration Confirmation -->
+        <div class="p-4 rounded-xl bg-white border border-amber-200/80 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+            <div class="min-w-0">
+                <span class="text-slate-400 block font-medium">Roll Number</span>
+                <span class="font-mono font-bold text-slate-800 break-all">{{ request.user.registration_number }}</span>
+            </div>
+            <div class="min-w-0">
+                <span class="text-slate-400 block font-medium">Department</span>
+                <span class="font-semibold text-slate-800 break-words">{{ request.user.department|default:"—" }}</span>
+            </div>
+            <div class="min-w-0">
+                <span class="text-slate-400 block font-medium">Academic Program</span>
+                <span class="font-semibold text-slate-800 break-words">{{ request.user.program|default:"—" }}</span>
+            </div>
+            <div class="min-w-0">
+                <span class="text-slate-400 block font-medium">Claimed Category</span>
+                <span class="font-semibold text-slate-800 capitalize truncate block">{{ request.user.claimed_residential_category|default:"unspecified" }}</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="student-dashboard-grid">
+    <!-- Current Accommodation -->
     <section class="student-accommodation card">
         <div class="card-header">
             <div>
                 <p class="student-eyebrow">Your accommodation</p>
                 <h2 class="student-section-title">Current room</h2>
             </div>
-            {% if current_occupancy %}<span class="student-status-pill">Active Allocation</span>{% endif %}
+            {% if current_occupancy %}
+            <span class="student-status-pill">Active Allocation</span>
+            {% elif request.user.residential_eligibility != 'unverified' %}
+            <span class="student-status-pill capitalize">
+                {{ request.user.get_residential_eligibility_display }}
+            </span>
+            {% endif %}
         </div>
         {% if current_occupancy %}
         <div class="card-body">
             <div class="student-location">
                 <div class="student-location-mark" aria-hidden="true">⌂</div>
-                <div>
-                    <p class="student-location-name">{{ current_occupancy.bed.room.floor.block.hostel.name }}</p>
-                    <p class="student-location-meta">
+                <div class="min-w-0 flex-1">
+                    <p class="student-location-name break-words">{{ current_occupancy.bed.room.floor.block.hostel.name }}</p>
+                    <p class="student-location-meta break-words">
                         Block {{ current_occupancy.bed.room.floor.block.name }} ·
                         {{ current_occupancy.bed.room.floor.floor_label }} ·
                         Room {{ current_occupancy.bed.room.room_number }}
                     </p>
                 </div>
-                <div class="student-bed-summary">
+                <div class="student-bed-summary flex-shrink-0">
                     <span>Bed</span>
                     <strong>{{ current_occupancy.bed.bed_label }}</strong>
                 </div>
@@ -47,39 +99,85 @@
         {% else %}
         <div class="card-body student-empty">
             <h3>No Accommodation Currently Allocated</h3>
-            <p>Contact your hostel office if you need help with your allocation.</p>
+            <p>
+                {% if request.user.residential_eligibility == 'unverified' %}
+                Bed allocation will be handled by the assigned hostel warden following residential verification.
+                {% else %}
+                Your eligibility has been verified. Specific room and bed allocation is completed by your assigned hostel warden.
+                {% endif %}
+            </p>
         </div>
         {% endif %}
     </section>
 
+    <!-- Exchange Centre -->
     <section class="student-request-panel card">
         <div class="student-panel-heading">
             <div>
                 <p class="student-eyebrow">Exchange centre</p>
                 <h2 class="student-section-title">Your exchange requests</h2>
             </div>
+            {% if current_occupancy %}
             <a href="{% url 'exchange:request_list' %}" class="student-text-link">View all</a>
+            {% endif %}
         </div>
         {% if exchange_requests %}
         <div class="student-request-list">
             {% for exchange_request in exchange_requests %}
             <a href="{% url 'exchange:request_detail' pk=exchange_request.pk %}" class="student-request-row">
-                <span>
-                    <strong>Request {{ exchange_request.pk|slice:":8" }}</strong>
-                    <small>Submitted {{ exchange_request.submitted_at|date:"M d, Y" }}</small>
+                <span class="min-w-0 flex-1">
+                    <strong class="truncate block">Request {{ exchange_request.pk|slice:":8" }}</strong>
+                    <small class="truncate block">Submitted {{ exchange_request.submitted_at|date:"M d, Y" }}</small>
                 </span>
-                <span class="student-status-pill student-status-{{ exchange_request.status }}">{{ exchange_request.get_status_display }}</span>
+                <span class="student-status-pill student-status-{{ exchange_request.status }} flex-shrink-0">{{ exchange_request.get_status_display }}</span>
             </a>
             {% endfor %}
         </div>
         {% else %}
         <div class="student-empty card">
             <h3>Ready for a change?</h3>
+            {% if request.user.residential_eligibility == 'unverified' %}
+            <p>Exchange requests become available once an active room is allocated by your warden.</p>
+            {% elif not current_occupancy %}
+            <p>An active hostel room allocation is required before you can request a room exchange.</p>
+            {% else %}
             <p>Choose an eligible hostel room and bed that suits you.</p>
             <a href="{% url 'exchange:request_create' %}" class="btn-primary btn-sm">Start your request</a>
+            {% endif %}
         </div>
         {% endif %}
     </section>
     </div>
+
+    <!-- Eligible Accommodation Overview (Verified Students) -->
+    {% if request.user.residential_eligibility != 'unverified' and eligible_hostels %}
+    <section class="card p-5 sm:p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-slate-100">
+            <div class="min-w-0 flex-1">
+                <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Eligible Campus Accommodation Overview</h2>
+                <p class="text-xs text-slate-500 mt-0.5 break-words">
+                    Facilities matching your verified status ({{ request.user.get_residential_eligibility_display }}). Specific allocation is managed by your assigned warden.
+                </p>
+            </div>
+            <span class="student-status-pill self-start sm:self-center flex-shrink-0">
+                {{ eligible_hostels|length }} Eligible Facilit{{ eligible_hostels|length|pluralize:"y,ies" }}
+            </span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for hostel in eligible_hostels %}
+            <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2 hover:border-[#D7B5BD] transition-colors">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="font-bold text-slate-900 text-sm truncate">{{ hostel.name }}</span>
+                    <span class="text-[10px] font-mono bg-slate-200/70 text-slate-700 px-1.5 py-0.5 rounded flex-shrink-0">{{ hostel.code }}</span>
+                </div>
+                <div class="text-xs text-slate-500 flex items-center justify-between">
+                    <span>{{ hostel.blocks.count }} Block{{ hostel.blocks.count|pluralize }}</span>
+                    <span>Total Beds: {{ hostel.total_capacity }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
 </div>
 {% endblock %}

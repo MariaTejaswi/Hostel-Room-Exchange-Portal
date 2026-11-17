@@ -11,20 +11,32 @@
             <h1 class="student-title">Your exchange request</h1>
             <p class="student-subtitle">Request {{ exchange_request.pk }}</p>
         </div>
-        {% if exchange_request.status == 'open' %}
+        {% if can_modify %}
         <div class="flex gap-2">
             <a href="{% url 'exchange:request_edit' pk=exchange_request.pk %}" class="btn-secondary btn-sm">Edit request</a>
             <form method="post" action="{% url 'exchange:request_withdraw' pk=exchange_request.pk %}">
                 {% csrf_token %}
-                <button type="submit" class="btn-danger btn-sm">Withdraw</button>
+                <button type="submit" class="btn-danger btn-sm" onclick="return confirm('Are you sure you want to withdraw this exchange request?');">Withdraw</button>
             </form>
         </div>
         {% endif %}
     </header>
 
+    {% if is_expired %}
+    <div class="card p-4 border-l-4 border-amber-500 bg-amber-50/60 text-xs text-amber-900 space-y-1">
+        <p class="font-bold text-amber-950">This exchange request has expired</p>
+        <p>The validity period configured by your institution has lapsed. You may submit a new request if you still require an exchange.</p>
+    </div>
+    {% elif has_active_proposal %}
+    <div class="card p-4 border-l-4 border-teal-600 bg-teal-50/60 text-xs text-teal-900 space-y-1">
+        <p class="font-bold text-teal-950">Active Proposal in Progress</p>
+        <p>This request is actively reserved in a matching proposal. Modification and withdrawal are locked while the proposal is under review.</p>
+    </div>
+    {% endif %}
+
     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
         <section class="card">
-            <div class="card-header"><h2 class="student-section-title">Request status</h2><span class="student-status-pill">{{ exchange_request.get_status_display }}</span></div>
+            <div class="card-header"><h2 class="student-section-title">Request status</h2><span class="student-status-pill student-status-{{ exchange_request.status }}">{{ exchange_request.get_status_display }}</span></div>
             <div class="card-body">
                 <dl class="data-list">
                     <div class="data-row"><dt class="data-label">Submitted</dt><dd class="data-value">{{ exchange_request.submitted_at|date:"M d, Y H:i" }}</dd></div>

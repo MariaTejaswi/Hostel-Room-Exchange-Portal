@@ -262,3 +262,30 @@ The expected 17 hostels (`BH-01..BH-10` and `GH-01..GH-07`) were missing due to 
 - **Render Validation**: Verified active record `#2322` and sample records with long emails (`student.bh01.14@student.roomloop.edu`), extreme student names, missing phone numbers, and active/released lifecycle states.
 - **Automated Test Suite**: Ran full test suites across `tests/test_occupancy.py` and `tests/test_dashboard_flows.py` — **26 of 26 tests passed**.
 - **Visual Verification**: Template, layout container, padding, and responsive CSS rules verified in code and DOM rendering. Visual verification via browser screenshots remains pending for user browser inspection at `http://127.0.0.1:8000/occupancy/2322/`.
+
+---
+
+## 11. Student Experience Theme Preservation Policy
+
+> [!IMPORTANT]
+> **Core Theme Rule**: “Preserve the coffee-brown theme. UI fixes should change only layout, spacing, responsiveness, and functionality unless the user explicitly requests a theme change.”
+
+### 11.1 Architectural Scoping
+The coffee-brown theme is strictly scoped to `.student-shell`, enabled automatically when `is_student` is true in `templates/layouts/dashboard_base.html`:
+```html
+<div class="min-h-screen flex {% if is_student %}student-shell{% endif %}" {% if not is_student %}style="background-color: #F5F7FA;"{% endif %}>
+```
+This isolates the student experience from operational administration portals, ensuring that System Administrator, Hostel Administrator, Warden, Chief Warden, and Dean consoles strictly retain their standard navy/slate/teal theme.
+
+### 11.2 Coffee-Brown Design Tokens (Recovered from Commit `e80352a`)
+| Token | Value | Semantic Application |
+|---|---|---|
+| `--rl-maroon` | `#702C3B` | Primary buttons, active sidebar, location marks, headers, highlights |
+| `--rl-maroon-dark` | `#5B2330` | Button hover states, sidebar footer background |
+| `--rl-cream` | `#F5EBDD` | Canvas page background, active sidebar badge backgrounds |
+| `--rl-ink` | `#49372F` | Primary text, titles, headings, and data values |
+| `--rl-muted` | `#8A7B72` | Subtitles, secondary metadata, timestamps, and captions |
+| `--rl-border` | `#E8DED4` | Card dividers, input borders, and component containers |
+| Pill background | `#F4E7EA` | Subtle maroon/rose tint for status pills, steps, and icons |
+| Pill border | `#E8C9D0` | Soft warm border for badges and status pills |
+| Secondary card | `#FCF8F4` | Soft warm background for nested cards and overview tiles |

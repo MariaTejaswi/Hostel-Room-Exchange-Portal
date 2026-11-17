@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block body %}
-<div class="min-h-screen flex {% if is_student %}student-shell{% endif %}" style="background-color: #F5F7FA;">
+<div class="min-h-screen flex {% if is_student %}student-shell{% endif %}" {% if not is_student %}style="background-color: #F5F7FA;"{% endif %}>
     <!-- Mobile Sidebar Backdrop -->
     <div id="sidebar-backdrop" class="hidden fixed inset-0 bg-slate-900/40 z-30 lg:hidden transition-opacity"></div>
 
@@ -97,7 +97,7 @@
         </header>
 
         <!-- Main Viewport Content Area -->
-        <main class="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main class="flex-1 p-4 sm:p-6 w-full min-w-0 max-w-7xl mx-auto">
             {% block content %}{% endblock %}
         </main>
 

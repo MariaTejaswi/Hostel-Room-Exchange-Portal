@@ -1,0 +1,148 @@
+{% extends 'layouts/dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Residential Eligibility Verification Queue — RoomLoop{% endblock %}
+{% block breadcrumb_current %}Eligibility Verification Queue{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Residential Eligibility Verification Queue</h1>
+            <p class="mt-1 text-sm text-slate-500">Review student academic credentials and record authoritative residential eligibility for accommodation allocation.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span>{{ pending_count }} Pending Verification{{ pending_count|pluralize }}</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Governance Notice -->
+    <div class="p-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-900 flex items-start gap-3">
+        <svg class="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        </svg>
+        <div class="text-xs space-y-1">
+            <p class="font-semibold text-teal-950">Authoritative Residential Verification</p>
+            <p class="text-teal-800 leading-relaxed">
+                As Hostel Administrator, your recorded verification establishes the authoritative boundary for hostel assignment.
+                Hostel wardens can only allocate beds to students whose verified eligibility matches their hostel's category (e.g. Verified Male &rarr; Boys Hostels).
+            </p>
+        </div>
+    </div>
+
+    <!-- Search & Filters -->
+    <div class="card p-4">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div class="md:col-span-2">
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search by student name, roll number, or email..." class="form-input w-full">
+            </div>
+            <div>
+                <select name="category" class="form-select w-full">
+                    <option value="">All Claimed Categories</option>
+                    <option value="male" {% if category_filter == 'male' %}selected{% endif %}>Claimed Male</option>
+                    <option value="female" {% if category_filter == 'female' %}selected{% endif %}>Claimed Female</option>
+                    <option value="unspecified" {% if category_filter == 'unspecified' %}selected{% endif %}>Unspecified</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="text" name="department" value="{{ dept_filter }}" placeholder="Department..." class="form-input flex-1">
+                <button type="submit" class="btn-primary py-2 px-3 text-xs">Filter</button>
+                {% if search_query or category_filter or dept_filter %}
+                <a href="{% url 'accounts:eligibility_verification_list' %}" class="btn-secondary py-2 px-2.5 text-xs">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Verification Table -->
+    <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-700">
+                <thead class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <tr>
+                        <th class="px-5 py-3.5">Student Details</th>
+                        <th class="px-4 py-3.5">Academic Cohort</th>
+                        <th class="px-4 py-3.5">Claimed Preference</th>
+                        <th class="px-4 py-3.5">Enrolled Date</th>
+                        <th class="px-4 py-3.5">Current Status</th>
+                        <th class="px-5 py-3.5 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for student in page_obj %}
+                    <tr class="hover:bg-slate-50/70 transition-colors">
+                        <td class="px-5 py-3.5">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-teal-700 text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
+                                    {{ student.full_name|slice:":2"|upper }}
+                                </div>
+                                <div>
+                                    <span class="font-semibold text-slate-900 block leading-tight">{{ student.full_name }}</span>
+                                    <span class="text-xs text-slate-500 font-mono">{{ student.registration_number }} · {{ student.email }}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3.5 text-xs">
+                            <div class="font-medium text-slate-800">{{ student.department|default:"—" }}</div>
+                            <div class="text-slate-500">{{ student.program|default:"" }}{% if student.academic_year %} · {{ student.get_academic_year_display }}{% endif %}</div>
+                        </td>
+                        <td class="px-4 py-3.5 text-xs">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 capitalize">
+                                {{ student.claimed_residential_category|default:"unspecified" }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3.5 text-xs text-slate-500 font-mono">
+                            {{ student.date_joined|date:"M d, Y" }}
+                        </td>
+                        <td class="px-4 py-3.5 text-xs">
+                            <span class="badge-warning inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                Awaiting Verification
+                            </span>
+                        </td>
+                        <td class="px-5 py-3.5 text-right text-xs">
+                            <a href="{% url 'accounts:eligibility_verify_student' pk=student.id %}" class="btn-primary py-1.5 px-3 text-xs">
+                                Review & Verify &rarr;
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center">
+                            <svg class="mx-auto h-10 w-10 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <h3 class="mt-2 text-sm font-semibold text-slate-900">All Students Verified</h3>
+                            <p class="mt-1 text-xs text-slate-500">
+                                There are currently no student accounts awaiting residential eligibility verification in this institution.
+                            </p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if page_obj.has_other_pages %}
+        <div class="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+            <div>
+                Showing page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            </div>
+            <div class="flex items-center gap-1">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="btn-secondary py-1 px-2.5">Previous</a>
+                {% endif %}
+                <span class="px-2 font-medium">{{ page_obj.number }}</span>
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="btn-secondary py-1 px-2.5">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

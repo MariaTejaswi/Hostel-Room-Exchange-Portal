@@ -1,0 +1,534 @@
+{% extends 'layouts/dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Student Directory — RoomLoop{% endblock %}
+{% block breadcrumb_current %}Student Directory{% endblock %}
+
+{% block content %}
+<style>
+/* Responsive layout for Student Directory: table on desktop, cards on mobile */
+.student-directory-table {
+    display: none;
+}
+.student-directory-cards {
+    display: block;
+}
+@media (min-width: 768px) {
+    .student-directory-table {
+        display: block !important;
+    }
+    .student-directory-cards {
+        display: none !important;
+    }
+}
+</style>
+
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Student Accounts Directory</h1>
+            <p class="mt-1 text-sm text-slate-500">Manage student accounts, review residential eligibility, and track accommodation.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="{% url 'accounts:student_import' %}" class="btn-secondary flex items-center gap-2">
+                <svg width="16" height="16" class="w-4 h-4 text-slate-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+                <span>Import CSV</span>
+            </a>
+            <a href="{% url 'accounts:student_create' %}" class="btn-primary flex items-center gap-2">
+                <svg width="16" height="16" class="w-4 h-4 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                <span>Add Student</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Metrics -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="card p-4 flex items-center justify-between">
+            <div class="min-w-0">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Enrolled</p>
+                <p class="text-2xl font-bold text-slate-900 mt-1">{{ total_count }}</p>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center flex-shrink-0">
+                <svg width="20" height="20" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="card p-4 flex items-center justify-between">
+            <div class="min-w-0">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Logins</p>
+                <p class="text-2xl font-bold text-emerald-700 mt-1">{{ active_count }}</p>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                <svg width="20" height="20" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="card p-4 flex items-center justify-between">
+            <div class="min-w-0">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Eligibility</p>
+                <p class="text-2xl font-bold text-amber-600 mt-1">{{ unverified_count }}</p>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+                <svg width="20" height="20" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search & Filters -->
+    <div class="card p-4">
+        <form method="get" class="flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
+            <!-- Search Input with Vertically Centered Icon -->
+            <div class="relative flex-1 min-w-0">
+                <label for="student-search-input" class="sr-only">Search students</label>
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <svg width="16" height="16" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+                <input id="student-search-input" type="text" name="q" value="{{ search_query }}" placeholder="Search students…" aria-label="Search students" class="form-input pl-10 pr-4 py-2 w-full text-xs">
+            </div>
+
+            <!-- Responsive Filter Dropdowns and Actions -->
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
+                <div class="w-full sm:w-auto min-w-[160px] flex-1 sm:flex-initial">
+                    <label for="status-filter-select" class="sr-only">Account Status</label>
+                    <select id="status-filter-select" name="status" class="form-select py-2 px-3 text-xs w-full">
+                        <option value="">All Account Statuses</option>
+                        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Accounts</option>
+                        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive / Deactivated</option>
+                    </select>
+                </div>
+                <div class="w-full sm:w-auto min-w-[180px] flex-1 sm:flex-initial">
+                    <label for="eligibility-filter-select" class="sr-only">Residential Eligibility</label>
+                    <select id="eligibility-filter-select" name="eligibility" class="form-select py-2 px-3 text-xs w-full">
+                        <option value="">All Eligibility Statuses</option>
+                        <option value="unverified" {% if eligibility_filter == 'unverified' %}selected{% endif %}>Pending Verification</option>
+                        <option value="male" {% if eligibility_filter == 'male' %}selected{% endif %}>Verified Male</option>
+                        <option value="female" {% if eligibility_filter == 'female' %}selected{% endif %}>Verified Female</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary py-2 px-4 text-xs font-medium whitespace-nowrap">Filter</button>
+                {% if search_query or status_filter or eligibility_filter %}
+                <a href="{% url 'accounts:student_list' %}" class="btn-secondary py-2 px-3 text-xs whitespace-nowrap" title="Clear Filters">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Filter Result Count Banner -->
+    <div class="flex items-center justify-between text-xs px-1">
+        <div class="text-slate-600 font-medium">
+            {% if is_filtered %}
+            <span class="font-semibold text-slate-900">{{ results_count }} student{{ results_count|pluralize }} found</span> matching filter criteria
+            {% else %}
+            <span>Showing all <strong class="text-slate-900">{{ results_count }}</strong> student{{ results_count|pluralize }}</span>
+            {% endif %}
+        </div>
+        {% if is_filtered %}
+        <a href="{% url 'accounts:student_list' %}" class="text-teal-700 hover:text-teal-800 font-semibold inline-flex items-center gap-1 transition-colors">
+            <span>Clear filters</span>
+            <svg width="14" height="14" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Student Table (Desktop / Tablet View) -->
+    <div class="card overflow-visible student-directory-table">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-700">
+                <thead class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <tr>
+                        <th class="px-5 py-3.5 min-w-[220px]">Student</th>
+                        <th class="px-4 py-3.5 min-w-[180px]">Academics</th>
+                        <th class="px-4 py-3.5 min-w-[160px]">Eligibility</th>
+                        <th class="px-4 py-3.5 min-w-[160px]">Accommodation</th>
+                        <th class="px-4 py-3.5 min-w-[120px]">Account status</th>
+                        <th class="px-5 py-3.5 text-right min-w-[130px]">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for student in page_obj %}
+                    <tr class="hover:bg-slate-50/70 transition-colors">
+                        <!-- 1. Student -->
+                        <td class="px-5 py-3.5">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 rounded-full bg-teal-700 text-white font-bold flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                                    {{ student.full_name|slice:":2"|upper }}
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <a href="{% url 'accounts:student_detail' pk=student.id %}" class="font-semibold text-slate-900 hover:text-teal-700 transition-colors block truncate max-w-[220px]">
+                                        {{ student.full_name }}
+                                    </a>
+                                    <span class="text-xs font-mono text-slate-600 block">{{ student.registration_number }}</span>
+                                    <span class="text-xs text-slate-500 break-all block leading-tight mt-0.5 max-w-[220px]">{{ student.email }}</span>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- 2. Academics -->
+                        <td class="px-4 py-3.5 text-xs">
+                            <div class="font-medium text-slate-900 leading-snug">{{ student.department|default:"—" }}</div>
+                            <div class="text-slate-500 mt-0.5 leading-snug">
+                                {{ student.program|default:"" }}{% if student.academic_year %} · {{ student.get_academic_year_display }}{% endif %}
+                            </div>
+                        </td>
+
+                        <!-- 3. Eligibility (Combined Verified + Claimed) -->
+                        <td class="px-4 py-3.5 text-xs">
+                            <div>
+                                {% if student.residential_eligibility == 'male' %}
+                                <span class="badge-success inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    Verified Male
+                                </span>
+                                {% elif student.residential_eligibility == 'female' %}
+                                <span class="badge-success inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    Verified Female
+                                </span>
+                                {% else %}
+                                <span class="badge-warning inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                    Pending verification
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% if student.claimed_residential_category %}
+                            <div class="text-[11px] text-slate-500 mt-1 leading-none">
+                                Claimed: <span class="capitalize text-slate-700">{{ student.claimed_residential_category }}</span>
+                            </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- 4. Accommodation -->
+                        <td class="px-4 py-3.5 text-xs">
+                            {% with occ=student.current_occupancy %}
+                            {% if occ %}
+                            <div class="font-medium text-slate-900 leading-tight">{{ occ.bed.room.floor.block.hostel.name }}</div>
+                            <div class="text-slate-500 mt-0.5 leading-tight">
+                                Room {{ occ.bed.room.room_number }} · {% if "bed" in occ.bed.bed_label|lower %}{{ occ.bed.bed_label }}{% else %}Bed {{ occ.bed.bed_label }}{% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-slate-400 italic">Not allocated</span>
+                            {% endif %}
+                            {% endwith %}
+                        </td>
+
+                        <!-- 5. Account status -->
+                        <td class="px-4 py-3.5 text-xs">
+                            {% if student.is_active %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
+                                Active
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5"></span>
+                                Inactive
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- 6. Actions (Visible View + Dropdown Menu) -->
+                        <td class="px-5 py-3.5 text-right text-xs">
+                            <div class="flex items-center justify-end gap-1.5">
+                                <a href="{% url 'accounts:student_detail' pk=student.id %}" class="btn-secondary py-1 px-2.5 text-xs font-medium" title="View Student">
+                                    View
+                                </a>
+
+                                <!-- More actions dropdown -->
+                                <div class="relative inline-block text-left" data-action-dropdown>
+                                    <button type="button" class="btn-secondary p-1 text-slate-500 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-600/30" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for {{ student.full_name }}" data-dropdown-toggle>
+                                        <svg width="16" height="16" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                                        </svg>
+                                    </button>
+
+                                    <!-- Dropdown menu panel -->
+                                    <div class="hidden absolute right-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-30 text-left" role="menu" data-dropdown-menu>
+                                        <a href="{% url 'accounts:student_edit' pk=student.id %}" class="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-teal-700 transition-colors" role="menuitem">
+                                            <svg width="14" height="14" class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                            </svg>
+                                            <span>Edit Details</span>
+                                        </a>
+
+                                        <form method="post" action="{% url 'accounts:student_password_reset' pk=student.id %}" class="w-full">
+                                            {% csrf_token %}
+                                            <button type="submit" class="w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-teal-700 transition-colors" role="menuitem" onclick="return confirm('Send password setup link to {{ student.email }}?');">
+                                                <svg width="14" height="14" class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                                                </svg>
+                                                <span>Send Password Link</span>
+                                            </button>
+                                        </form>
+
+                                        <div class="border-t border-slate-100 my-1"></div>
+
+                                        <a href="{% url 'accounts:student_toggle_status' pk=student.id %}" class="flex items-center gap-2 px-3 py-1.5 text-xs {% if student.is_active %}text-red-600 hover:bg-red-50{% else %}text-emerald-600 hover:bg-emerald-50{% endif %} transition-colors" role="menuitem">
+                                            {% if student.is_active %}
+                                            <svg width="14" height="14" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                            </svg>
+                                            <span>Deactivate Account</span>
+                                            {% else %}
+                                            <svg width="14" height="14" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                            <span>Activate Account</span>
+                                            {% endif %}
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center">
+                            <svg width="40" height="40" class="mx-auto h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                            </svg>
+                            {% if is_filtered %}
+                            <h3 class="mt-2 text-sm font-semibold text-slate-900">No students match these filters</h3>
+                            <p class="mt-1 text-xs text-slate-500">
+                                No student accounts matched your filter criteria. Try adjusting your search query or reset your filters.
+                            </p>
+                            <div class="mt-4">
+                                <a href="{% url 'accounts:student_list' %}" class="btn-secondary py-1.5 px-3 text-xs inline-flex items-center gap-1.5 font-medium">
+                                    <span>Clear filters</span>
+                                </a>
+                            </div>
+                            {% else %}
+                            <h3 class="mt-2 text-sm font-semibold text-slate-900">No student accounts enrolled</h3>
+                            <p class="mt-1 text-xs text-slate-500">
+                                No students have been enrolled yet. Use the buttons above to add or import students.
+                            </p>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination for Table -->
+        {% if page_obj.has_other_pages %}
+        <div class="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+            <div>
+                Showing page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} total records)
+            </div>
+            <div class="flex items-center gap-1">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if eligibility_filter %}&eligibility={{ eligibility_filter }}{% endif %}" class="btn-secondary py-1 px-2.5">
+                    Previous
+                </a>
+                {% endif %}
+                <span class="px-2 font-medium">{{ page_obj.number }}</span>
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if eligibility_filter %}&eligibility={{ eligibility_filter }}{% endif %}" class="btn-secondary py-1 px-2.5">
+                    Next
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Student Cards (Mobile View < 768px: zero horizontal overflow) -->
+    <div class="student-directory-cards space-y-3">
+        {% for student in page_obj %}
+        <div class="card p-4 space-y-3">
+            <!-- Header: Avatar, Name, Status -->
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-8 h-8 rounded-full bg-teal-700 text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
+                        {{ student.full_name|slice:":2"|upper }}
+                    </div>
+                    <div class="min-w-0">
+                        <a href="{% url 'accounts:student_detail' pk=student.id %}" class="font-semibold text-slate-900 text-sm hover:text-teal-700 block truncate">
+                            {{ student.full_name }}
+                        </a>
+                        <span class="text-xs font-mono text-slate-600">{{ student.registration_number }}</span>
+                    </div>
+                </div>
+                <div>
+                    {% if student.is_active %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Active
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">
+                        Inactive
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Email -->
+            <div class="text-xs text-slate-500 break-all font-mono">
+                {{ student.email }}
+            </div>
+
+            <!-- Academics & Eligibility Grid -->
+            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
+                <div>
+                    <span class="text-slate-400 block text-[10px] uppercase font-semibold">Academics</span>
+                    <span class="font-medium text-slate-800 block truncate">{{ student.department|default:"—" }}</span>
+                    <span class="text-slate-500 text-[11px] block truncate">{{ student.program|default:"" }}</span>
+                </div>
+                <div>
+                    <span class="text-slate-400 block text-[10px] uppercase font-semibold">Eligibility</span>
+                    {% if student.residential_eligibility == 'male' %}
+                    <span class="badge-success inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium">
+                        Verified Male
+                    </span>
+                    {% elif student.residential_eligibility == 'female' %}
+                    <span class="badge-success inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium">
+                        Verified Female
+                    </span>
+                    {% else %}
+                    <span class="badge-warning inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium">
+                        Pending
+                    </span>
+                    {% endif %}
+                    {% if student.claimed_residential_category %}
+                    <span class="text-[10px] text-slate-400 block truncate capitalize">Claimed: {{ student.claimed_residential_category }}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Accommodation -->
+            <div class="pt-2 border-t border-slate-100 text-xs flex items-center justify-between">
+                <div>
+                    <span class="text-slate-400 block text-[10px] uppercase font-semibold">Accommodation</span>
+                    {% with occ=student.current_occupancy %}
+                    {% if occ %}
+                    <span class="font-medium text-slate-800">{{ occ.bed.room.floor.block.hostel.name }}</span>
+                    <span class="text-slate-500 text-[11px] block">Room {{ occ.bed.room.room_number }} · {% if "bed" in occ.bed.bed_label|lower %}{{ occ.bed.bed_label }}{% else %}Bed {{ occ.bed.bed_label }}{% endif %}</span>
+                    {% else %}
+                    <span class="text-slate-400 italic">Not allocated</span>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center gap-2">
+                    <a href="{% url 'accounts:student_detail' pk=student.id %}" class="btn-secondary py-1 px-2.5 text-xs font-medium">
+                        View
+                    </a>
+                    <a href="{% url 'accounts:student_edit' pk=student.id %}" class="btn-secondary py-1 px-2 text-xs" title="Edit Student">
+                        Edit
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="card p-8 text-center space-y-2">
+            <svg width="32" height="32" class="mx-auto h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+            </svg>
+            {% if is_filtered %}
+            <h3 class="text-sm font-semibold text-slate-900">No students match these filters</h3>
+            <p class="text-xs text-slate-500">No student accounts matched your filter criteria.</p>
+            <div class="pt-2">
+                <a href="{% url 'accounts:student_list' %}" class="btn-secondary py-1.5 px-3 text-xs inline-flex items-center gap-1 font-medium">
+                    <span>Clear filters</span>
+                </a>
+            </div>
+            {% else %}
+            <h3 class="text-sm font-semibold text-slate-900">No student accounts enrolled</h3>
+            <p class="text-xs text-slate-500">No students have been enrolled yet. Use the buttons above to add or import students.</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <!-- Mobile Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs text-slate-600">
+            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            <div class="flex items-center gap-1">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if eligibility_filter %}&eligibility={{ eligibility_filter }}{% endif %}" class="btn-secondary py-1 px-2.5">
+                    Prev
+                </a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if eligibility_filter %}&eligibility={{ eligibility_filter }}{% endif %}" class="btn-secondary py-1 px-2.5">
+                    Next
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Accessible Dropdown Script -->
+<script>
+(function() {
+    function closeAllDropdowns() {
+        document.querySelectorAll('[data-dropdown-menu]').forEach(function(menu) {
+            menu.classList.add('hidden');
+            var trigger = menu.closest('[data-action-dropdown]').querySelector('[data-dropdown-toggle]');
+            if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    document.addEventListener('click', function(e) {
+        var toggle = e.target.closest('[data-dropdown-toggle]');
+        if (toggle) {
+            e.preventDefault();
+            e.stopPropagation();
+            var dropdown = toggle.closest('[data-action-dropdown]');
+            var menu = dropdown.querySelector('[data-dropdown-menu]');
+            var isHidden = menu.classList.contains('hidden');
+            closeAllDropdowns();
+            if (isHidden) {
+                menu.classList.remove('hidden');
+                toggle.setAttribute('aria-expanded', 'true');
+                var rect = menu.getBoundingClientRect();
+                if (rect.bottom > window.innerHeight) {
+                    menu.style.bottom = '100%';
+                    menu.style.top = 'auto';
+                    menu.classList.remove('mt-1');
+                    menu.classList.add('mb-1');
+                } else {
+                    menu.style.bottom = 'auto';
+                    menu.style.top = '100%';
+                    menu.classList.remove('mb-1');
+                    menu.classList.add('mt-1');
+                }
+            }
+            return;
+        }
+
+        if (!e.target.closest('[data-dropdown-menu]')) {
+            closeAllDropdowns();
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            var openMenu = document.querySelector('[data-dropdown-menu]:not(.hidden)');
+            if (openMenu) {
+                var trigger = openMenu.closest('[data-action-dropdown]').querySelector('[data-dropdown-toggle]');
+                closeAllDropdowns();
+                if (trigger) trigger.focus();
+            }
+        }
+    });
+})();
+</script>
+{% endblock %}
