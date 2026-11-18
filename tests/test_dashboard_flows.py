@@ -503,3 +503,181 @@ def test_capacity_metrics_distinguishes_maintenance_and_operational_beds(hostel_
     # Available operational beds = total (2) - occupied (1) - maintenance (1) = 0
     available_operational = max(0, h.total_beds - h.occupied_beds - h.maintenance_beds)
     assert available_operational == 0
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "fixture_name,dashboard_url,expected_links,forbidden_links,expected_theme_bg",
+    [
+        (
+            "student_user",
+            "accounts:dashboard_student",
+            [
+                "Dashboard",
+                "My Exchange Requests",
+                "My Exchange Proposals",
+                "Transfer Orders",
+                "Notifications",
+                "Profile",
+            ],
+            [
+                "Hostels Explorer",
+                "Room Inventory",
+                "Beds & Status",
+                "Occupancy Roster",
+                "Exchange Approvals",
+                "Eligibility Verification",
+                "Exchange Policies",
+                "System Console",
+                "Student Directory",
+            ],
+            "bg-[#702C3B]",
+        ),
+        (
+            "warden_user",
+            "accounts:dashboard_warden",
+            [
+                "Dashboard",
+                "Hostels Explorer",
+                "Room Inventory",
+                "Beds & Status",
+                "Occupancy Roster",
+                "Exchange Approvals",
+                "Transfer Orders",
+            ],
+            [
+                "System Console",
+                "Student Directory",
+                "Eligibility Verification",
+                "Exchange Policies",
+            ],
+            "bg-[#142635]",
+        ),
+        (
+            "chief_warden_user",
+            "accounts:dashboard_chief_warden",
+            [
+                "Dashboard",
+                "Hostels Explorer",
+                "Room Inventory",
+                "Beds & Status",
+                "Occupancy Roster",
+                "Exchange Approvals",
+                "Transfer Orders",
+            ],
+            [
+                "System Console",
+                "Student Directory",
+                "Eligibility Verification",
+                "Exchange Policies",
+            ],
+            "bg-[#142635]",
+        ),
+        (
+            "admin_user",
+            "accounts:dashboard_admin",
+            [
+                "Dashboard",
+                "Hostels Explorer",
+                "Room Inventory",
+                "Beds & Status",
+                "Occupancy Roster",
+                "Eligibility Verification",
+                "Exchange Policies",
+            ],
+            [
+                "Exchange Approvals",
+                "System Console",
+                "Student Directory",
+            ],
+            "bg-[#142635]",
+        ),
+        (
+            "dean_user",
+            "accounts:dashboard_dean",
+            [
+                "Dashboard",
+                "Hostels Explorer",
+                "Room Inventory",
+                "Beds & Status",
+                "Occupancy Roster",
+                "Exchange Approvals",
+                "Transfer Orders",
+            ],
+            [
+                "System Console",
+                "Student Directory",
+                "Eligibility Verification",
+                "Exchange Policies",
+            ],
+            "bg-[#142635]",
+        ),
+        (
+            "sysadmin_user",
+            "accounts:dashboard_sysadmin",
+            [
+                "System Console",
+                "Django Admin",
+                "Student Directory",
+                "Add Student",
+                "Import Students",
+            ],
+            [
+                "Hostels Explorer",
+                "Room Inventory",
+                "Beds & Status",
+                "Occupancy Roster",
+                "Exchange Approvals",
+                "Transfer Orders",
+                "Eligibility Verification",
+                "Exchange Policies",
+                "Phase 2",
+            ],
+            "bg-[#142635]",
+        ),
+    ],
+)
+def test_all_dashboards_sidebar_integrity_and_role_scoping(
+    client,
+    request,
+    fixture_name,
+    dashboard_url,
+    expected_links,
+    forbidden_links,
+    expected_theme_bg,
+    hostel_setup,
+):
+    """Verify all 6 dashboards render a single, conflict-free, role-accurate sidebar with 1 active item."""
+    user = request.getfixturevalue(fixture_name)
+    client.force_login(user)
+    resp = client.get(reverse(dashboard_url))
+    assert resp.status_code == 200
+    html = resp.content.decode()
+
+    # 1. Zero git conflict markers
+    assert "<<<<<<<" not in html
+    assert "=======" not in html
+    assert ">>>>>>>" not in html
+
+    # 2. Exactly one sidebar element rendered
+    assert html.count('id="app-sidebar"') == 1
+    assert html.count("<aside") == 1
+
+    # 3. Correct role-themed sidebar
+    assert expected_theme_bg in html
+
+    # Extract sidebar content
+    sidebar_html = html.split('id="app-sidebar"')[1].split("</aside>")[0]
+
+    # 4. Each expected link is present exactly once in sidebar
+    for link_text in expected_links:
+        count = sidebar_html.count(f">{link_text}<")
+        assert count == 1, f"Expected '{link_text}' to appear exactly once in sidebar for {fixture_name}, found {count}"
+
+    # 5. Forbidden links are strictly absent
+    for link_text in forbidden_links:
+        assert link_text not in sidebar_html, f"Forbidden '{link_text}' found in sidebar for {fixture_name}"
+
+    # 6. Exactly single active-page highlight in sidebar
+    assert sidebar_html.count('aria-current="page"') == 1
+

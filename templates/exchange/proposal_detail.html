@@ -52,13 +52,13 @@
     {% elif proposal.status == 'pending_approval' %}
     <div class="card p-4 border-l-4 border-emerald-500 bg-emerald-50/70 text-xs text-emerald-900 space-y-1 rounded-r-lg">
         <p class="font-bold text-emerald-950 text-sm">Accepted by All Participants — Pending Authority Approval</p>
-        <p>Every participant in this exchange cycle has accepted. The proposal is currently under administrative review by the authorized hostel authorities. Physical occupancy remains unchanged until formal approval and transfer execution.</p>
+        <p>Every participant in this exchange cycle has accepted. The proposal is currently under administrative review by {% if proposal.is_cross_hostel %}the Chief Warden{% else %}the assigned Hostel Warden{% endif %}. Physical occupancy remains unchanged until formal approval and transfer execution.</p>
     </div>
     {% elif can_respond %}
     <div class="card p-5 border-l-4 border-[#702C3B] bg-[#FDF9F5] text-xs text-slate-700 space-y-3 rounded-r-lg shadow-sm">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-                <p class="font-bold text-[#3B1720] text-sm">Action Required: Your Response is Pending</p>
+                <p class="font-bold text-[#3B1720] text-sm">Action Required: {% if sender_name %}Incoming Room Exchange Invitation from {{ sender_name }}{% else %}Your Response is Pending{% endif %}</p>
                 <p class="text-slate-600 mt-0.5">Please review the proposed destination accommodation and submit your response before the acceptance deadline.</p>
                 <p class="text-slate-500 text-[11px] mt-1 font-medium">Acceptance Deadline: <strong class="text-[#702C3B]">{{ proposal.expires_at|date:"M d, Y H:i" }}</strong></p>
             </div>
@@ -73,12 +73,20 @@
                 <form method="post" action="{% url 'exchange:proposal_respond' pk=proposal.pk %}" class="inline">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="decline">
-                    <button type="submit" class="btn-danger btn-sm px-4 py-2 font-semibold" onclick="return confirm('Are you sure you want to decline this proposal? Declining will cancel the proposal for all participants and return eligible requests to the open pool.');">
+                    <button type="submit" class="btn-danger btn-sm px-4 py-2 font-semibold" onclick="return confirm('Are you sure you want to decline this proposal? Declining will cancel the proposal for all participants.');">
                         ✕ Decline
                     </button>
                 </form>
             </div>
         </div>
+    </div>
+    {% elif my_participation.response_status == 'accepted' and proposal.status == 'pending_acceptance' %}
+    <div class="card p-5 border-l-4 border-amber-500 bg-amber-50/70 text-xs text-amber-900 space-y-2 rounded-r-lg shadow-sm">
+        <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+            <p class="font-bold text-amber-950 text-sm">Waiting for Occupant Response</p>
+        </div>
+        <p>Your room exchange submission has been recorded. We are waiting for {% if sender_name %}<strong>{{ sender_name }}</strong>{% else %}the other participant{% endif %} to review and respond before the acceptance deadline ({{ proposal.expires_at|date:"M d, Y H:i" }}).</p>
     </div>
     {% endif %}
 

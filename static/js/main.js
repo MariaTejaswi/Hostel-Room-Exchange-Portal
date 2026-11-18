@@ -83,32 +83,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // 5. Interactive Demo Account Quick-Fill on Login Page
-  const quickLoginBtns = document.querySelectorAll("[data-quick-login-email]");
-  quickLoginBtns.forEach((btn) => {
-    btn.addEventListener("click", function () {
-      const email = this.getAttribute("data-quick-login-email");
-      const pass = this.getAttribute("data-quick-login-password") || "RoomLoop2026!";
-      const emailInput = document.getElementById("id_email");
-      const passInput = document.getElementById("id_password");
-
-      if (emailInput && passInput) {
-        emailInput.value = email;
-        passInput.value = pass;
-
-        // Visual flash feedback
-        emailInput.classList.add("ring-2", "ring-teal-500", "bg-teal-50/50");
-        passInput.classList.add("ring-2", "ring-teal-500", "bg-teal-50/50");
-
-        setTimeout(() => {
-          emailInput.classList.remove("ring-2", "ring-teal-500", "bg-teal-50/50");
-          passInput.classList.remove("ring-2", "ring-teal-500", "bg-teal-50/50");
-        }, 600);
-      }
-    });
-  });
-
-  // 6. Real-time Client Table Search Filter
+  // 5. Real-time Client Table Search Filter
   const tableSearchInputs = document.querySelectorAll("[data-table-filter]");
   tableSearchInputs.forEach((input) => {
     input.addEventListener("input", function () {

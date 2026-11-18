@@ -47,6 +47,12 @@
                             Details in proposal
                         {% endif %}
                     </strong>
+                    {% if card.sender_name and card.my_participation %}
+                    <span class="text-[11px] text-slate-500 block mt-0.5">
+                        Offered by <strong class="text-[#702C3B]">{{ card.sender_name }}</strong>
+                        · Leaving Bed: {{ card.my_participation.current_occupancy.bed.bed_label }}
+                    </span>
+                    {% endif %}
                 </div>
 
                 <div>
@@ -87,8 +93,24 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <a href="{% url 'exchange:proposal_detail' pk=card.proposal.pk %}" class="btn-primary btn-sm">
-                        {% if card.can_respond %}Review & Respond &rarr;{% else %}View details &rarr;{% endif %}
+                    {% if card.can_respond %}
+                    <form method="post" action="{% url 'exchange:proposal_respond' pk=card.proposal.pk %}" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="accept">
+                        <button type="submit" class="btn-primary btn-sm px-3 py-1.5" onclick="return confirm('Accept this room exchange proposal?');">
+                            ✓ Accept
+                        </button>
+                    </form>
+                    <form method="post" action="{% url 'exchange:proposal_respond' pk=card.proposal.pk %}" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="decline">
+                        <button type="submit" class="btn-danger btn-sm px-3 py-1.5" onclick="return confirm('Decline this proposal?');">
+                            ✕ Decline
+                        </button>
+                    </form>
+                    {% endif %}
+                    <a href="{% url 'exchange:proposal_detail' pk=card.proposal.pk %}" class="btn-secondary btn-sm">
+                        {% if card.can_respond %}Review &rarr;{% else %}View details &rarr;{% endif %}
                     </a>
                 </div>
             </div>

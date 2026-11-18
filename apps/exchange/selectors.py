@@ -390,7 +390,7 @@ def get_approvals_queryset(user) -> QuerySet:
                 Q(hostel_count=1)
                 & Q(participants__current_occupancy__bed__room__floor__block__hostel_id__in=assigned_hostels)
             )
-        )
+        ).distinct()
     elif is_cw:
         qs = qs.filter(hostel_count__gt=1)
     elif is_w:
@@ -398,7 +398,7 @@ def get_approvals_queryset(user) -> QuerySet:
         qs = qs.filter(
             hostel_count=1,
             participants__current_occupancy__bed__room__floor__block__hostel_id__in=assigned_hostels,
-        )
+        ).distinct()
 
     return qs
 
@@ -420,6 +420,9 @@ def get_approval_proposal_detail(user, proposal_id) -> ExchangeProposal | None:
 def can_user_decide_proposal(user, proposal: ExchangeProposal) -> tuple[bool, str]:
     """
     Check if the user is authorized to render an approval/rejection decision on this proposal.
+    Confirmed single-authority policy:
+    - Cross-hostel: strictly Chief Warden.
+    - Same-hostel: strictly assigned Warden of that hostel.
     Returns (can_decide: bool, reason: str).
     """
     if not user or not user.is_authenticated:

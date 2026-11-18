@@ -46,7 +46,7 @@ from apps.exchange.models import (
 )
 from apps.exchange.services import (
     activate_exchange_proposal,
-    create_exchange_request,
+    create_exchange_request as _orig_create_exchange_request,
     is_candidate_suppressed,
     reconcile_all_institutions_matching,
     record_cycle_suppression,
@@ -56,6 +56,11 @@ from apps.exchange.services import (
     update_exchange_request,
     withdraw_exchange_request,
 )
+
+
+def create_exchange_request(*args, **kwargs):
+    kwargs.setdefault("direct_invitation", False)
+    return _orig_create_exchange_request(*args, **kwargs)
 from apps.hostels.models import (
     Bed,
     Block,

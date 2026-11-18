@@ -81,6 +81,7 @@ def create_exchange_request(
     status_adapter: ExternalEligibilityAdapter | None = None,
     now=None,
     ip_address=None,
+    direct_invitation: bool = True,
 ):
     """
     Create one validated, institution-scoped student exchange or vacant-bed transfer request.
@@ -112,13 +113,20 @@ def create_exchange_request(
     ).exists():
         raise ValidationError("You already have an active exchange or transfer request.")
 
-    if ProposalParticipant.objects.filter(student=student, is_active_reservation=True).exists():
+    if ProposalParticipant.objects.filter(
+        student=student,
+        response_status=ProposalParticipant.ResponseStatus.ACCEPTED,
+        is_active_reservation=True,
+    ).exists():
         raise ValidationError("You are currently part of an active exchange proposal.")
 
     values = _request_data(data)
     preferred_bed = values.get("preferred_bed")
     request_type = ExchangeRequest.RequestType.EXCHANGE
     initial_status = ExchangeRequest.Status.OPEN
+    matching_status = ExchangeRequest.MatchingStatus.WAITING
+    is_direct_occupied_exchange = False
+    target_occupant_occ = None
 
     if preferred_bed:
         if preferred_bed.id == locked_occupancy.bed_id:
@@ -131,14 +139,43 @@ def create_exchange_request(
             raise ValidationError("The selected bed is currently reserved by an active exchange proposal.")
 
         # Determine vacancy server-side from authoritative active occupancy and operational status
-        is_occupied = StudentOccupancy.objects.filter(
+        target_occupant_occ = StudentOccupancy.objects.select_for_update().filter(
             bed=preferred_bed,
             status=StudentOccupancy.OccupancyStatus.ACTIVE,
-        ).exists()
+        ).select_related("student", "bed__room__floor__block__hostel").first()
 
-        if not is_occupied:
+        if target_occupant_occ is None:
             request_type = ExchangeRequest.RequestType.VACANT_TRANSFER
             initial_status = ExchangeRequest.Status.PENDING_APPROVAL
+        elif direct_invitation:
+            is_direct_occupied_exchange = True
+            recipient = target_occupant_occ.student
+            if recipient.id == student.id:
+                raise ValidationError("You cannot exchange with yourself.")
+
+            if ProposalParticipant.objects.filter(
+                student=recipient,
+                response_status=ProposalParticipant.ResponseStatus.ACCEPTED,
+                is_active_reservation=True,
+            ).exists():
+                raise ValidationError("The current occupant of that bed is currently participating in another active exchange proposal.")
+
+            sender_hostel = locked_occupancy.bed.room.floor.block.hostel
+            if recipient.residential_eligibility != sender_hostel.resident_category:
+                raise ValidationError("The target bed occupant is not eligible for your hostel accommodation.")
+
+            recip_report = check_student_exchange_eligibility(
+                student=recipient,
+                occupancy=target_occupant_occ,
+                status_adapter=status_adapter,
+                today=now.date(),
+            )
+            if not recip_report.is_eligible:
+                raise ValidationError(f"The target bed occupant is currently ineligible for exchange: {'; '.join(recip_report.reasons)}")
+
+            request_type = ExchangeRequest.RequestType.EXCHANGE
+            initial_status = ExchangeRequest.Status.MATCHED
+            matching_status = ExchangeRequest.MatchingStatus.PROPOSAL_AVAILABLE
 
     validate_exchange_request_eligibility(
         student=student,
@@ -156,6 +193,7 @@ def create_exchange_request(
         current_occupancy=locked_occupancy,
         request_type=request_type,
         status=initial_status,
+        matching_status=matching_status,
         expires_at=get_request_expiry(institution=student.institution, now=now),
         **values,
     )
@@ -191,6 +229,94 @@ def create_exchange_request(
             ),
             exchange_request=exchange_request,
         )
+    elif is_direct_occupied_exchange:
+        recipient = target_occupant_occ.student
+        sender_hostel = locked_occupancy.bed.room.floor.block.hostel
+        cycle_signature = f"direct:user:{min(student.id, recipient.id)}:{max(student.id, recipient.id)}"
+
+        if ExchangeProposal.objects.filter(
+            cycle_signature=cycle_signature,
+            status__in=[
+                ExchangeProposal.Status.DRAFT,
+                ExchangeProposal.Status.PENDING_ACCEPTANCE,
+                ExchangeProposal.Status.ACCEPTED,
+                ExchangeProposal.Status.PENDING_APPROVAL,
+                ExchangeProposal.Status.APPROVED,
+            ],
+        ).exists():
+            raise ValidationError("An active exchange proposal already exists between you and the occupant.")
+
+        proposal = ExchangeProposal(
+            institution=student.institution,
+            status=ExchangeProposal.Status.PENDING_ACCEPTANCE,
+            cycle_length=2,
+            cycle_signature=cycle_signature,
+            expires_at=exchange_request.expires_at,
+            matched_at=now,
+            created_by=student,
+        )
+        proposal.full_clean()
+        proposal.save()
+
+        # Sender: consented by submission
+        ProposalParticipant.objects.create(
+            proposal=proposal,
+            exchange_request=exchange_request,
+            student=student,
+            current_occupancy=locked_occupancy,
+            proposed_bed=preferred_bed,
+            sequence_order=0,
+            response_status=ProposalParticipant.ResponseStatus.ACCEPTED,
+            responded_at=now,
+            is_active_reservation=True,
+        )
+
+        # Recipient: pending response, no fabricated request
+        ProposalParticipant.objects.create(
+            proposal=proposal,
+            exchange_request=None,
+            student=recipient,
+            current_occupancy=target_occupant_occ,
+            proposed_bed=locked_occupancy.bed,
+            sequence_order=1,
+            response_status=ProposalParticipant.ResponseStatus.PENDING,
+            responded_at=None,
+            is_active_reservation=False,
+        )
+
+        AuditLog.objects.create(
+            acting_user=student,
+            institution=student.institution,
+            action="EXCHANGE_PROPOSAL_ACTIVATED",
+            target_type="ExchangeProposal",
+            target_id=str(proposal.id),
+            change_summary=f"Direct exchange proposal {proposal.id} created between {student.full_name} and {recipient.full_name}",
+            ip_address=ip_address,
+        )
+
+        Notification.objects.create(
+            recipient=recipient,
+            notification_type=Notification.NotificationType.ACCEPTANCE_REQUIRED,
+            message=(
+                f"{student.full_name} has proposed a direct room exchange with you. "
+                f"Proposed accommodation: {sender_hostel.name}, Room {locked_occupancy.bed.room.room_number}, "
+                f"Bed {locked_occupancy.bed.bed_label}. Please review and respond before "
+                f"{proposal.expires_at.strftime('%b %d, %Y %H:%M') if proposal.expires_at else 'deadline'}."
+            ),
+            proposal=proposal,
+        )
+
+        Notification.objects.create(
+            recipient=student,
+            notification_type=Notification.NotificationType.ACCEPTANCE_UPDATED,
+            message=(
+                f"Your direct room exchange proposal for Bed {preferred_bed.bed_label}, "
+                f"Room {preferred_bed.room.room_number} ({preferred_bed.room.floor.block.hostel.name}) "
+                f"has been submitted. Waiting for occupant {recipient.full_name} to respond."
+            ),
+            proposal=proposal,
+            exchange_request=exchange_request,
+        )
     else:
         exchange_request.matching_status = ExchangeRequest.MatchingStatus.WAITING
         exchange_request.save(update_fields=["matching_status"])
@@ -203,6 +329,142 @@ def create_exchange_request(
     return exchange_request
 
 
+@transaction.atomic
+def activate_direct_occupied_bed_request(
+    *,
+    exchange_request,
+    now=None,
+    status_adapter: ExternalEligibilityAdapter | None = None,
+) -> tuple[bool, str, ExchangeProposal | None]:
+    """
+    Check if an existing open exchange request targeting a specific bed can be activated as a direct proposal.
+    If the target bed has an active occupant who is eligible and available, creates the direct proposal.
+    If the occupant has changed, bed is vacant, or cannot be determined, returns False with an explanation.
+    """
+    now = now or timezone.now()
+    if exchange_request.status != ExchangeRequest.Status.OPEN:
+        return False, f"Request is not open (current status: {exchange_request.status}).", None
+    if not exchange_request.preferred_bed_id:
+        return False, "Request does not target a specific bed.", None
+
+    if ProposalParticipant.objects.filter(
+        exchange_request=exchange_request,
+        is_active_reservation=True,
+    ).exists():
+        return False, "Request already has an active proposal reservation.", None
+
+    target_occ = StudentOccupancy.objects.select_for_update().filter(
+        bed=exchange_request.preferred_bed,
+        status=StudentOccupancy.OccupancyStatus.ACTIVE,
+    ).select_related("student", "bed__room__floor__block__hostel").first()
+
+    if not target_occ:
+        return False, "The target bed is no longer occupied. Please reconfirm your preference.", None
+
+    recipient = target_occ.student
+    sender = exchange_request.student
+
+    if recipient.id == sender.id:
+        return False, "Cannot exchange with self.", None
+
+    if ProposalParticipant.objects.filter(student=recipient, is_active_reservation=True).exists():
+        return False, "The occupant of the target bed is participating in another active proposal.", None
+
+    sender_occ = exchange_request.current_occupancy
+    if not sender_occ or sender_occ.status != StudentOccupancy.OccupancyStatus.ACTIVE:
+        return False, "Your active occupancy is no longer valid.", None
+
+    sender_hostel = sender_occ.bed.room.floor.block.hostel
+    if recipient.residential_eligibility != sender_hostel.resident_category:
+        return False, "The target bed occupant is not eligible for your hostel.", None
+
+    recip_report = check_student_exchange_eligibility(
+        student=recipient,
+        occupancy=target_occ,
+        status_adapter=status_adapter,
+        today=now.date(),
+    )
+    if not recip_report.is_eligible:
+        return False, f"The target bed occupant is currently ineligible: {'; '.join(recip_report.reasons)}", None
+
+    cycle_signature = f"direct:user:{min(sender.id, recipient.id)}:{max(sender.id, recipient.id)}"
+    existing_prop = ExchangeProposal.objects.filter(
+        cycle_signature=cycle_signature,
+        status__in=[
+            ExchangeProposal.Status.DRAFT,
+            ExchangeProposal.Status.PENDING_ACCEPTANCE,
+            ExchangeProposal.Status.ACCEPTED,
+            ExchangeProposal.Status.PENDING_APPROVAL,
+            ExchangeProposal.Status.APPROVED,
+        ],
+    ).first()
+    if existing_prop:
+        return False, "An active proposal already exists for this student pair.", None
+
+    proposal = ExchangeProposal(
+        institution=sender.institution,
+        status=ExchangeProposal.Status.PENDING_ACCEPTANCE,
+        cycle_length=2,
+        cycle_signature=cycle_signature,
+        expires_at=exchange_request.expires_at or get_request_expiry(institution=sender.institution, now=now),
+        matched_at=now,
+        created_by=sender,
+    )
+    proposal.full_clean()
+    proposal.save()
+
+    ProposalParticipant.objects.create(
+        proposal=proposal,
+        exchange_request=exchange_request,
+        student=sender,
+        current_occupancy=sender_occ,
+        proposed_bed=exchange_request.preferred_bed,
+        sequence_order=0,
+        response_status=ProposalParticipant.ResponseStatus.ACCEPTED,
+        responded_at=now,
+        is_active_reservation=True,
+    )
+
+    ProposalParticipant.objects.create(
+        proposal=proposal,
+        exchange_request=None,
+        student=recipient,
+        current_occupancy=target_occ,
+        proposed_bed=sender_occ.bed,
+        sequence_order=1,
+        response_status=ProposalParticipant.ResponseStatus.PENDING,
+        responded_at=None,
+        is_active_reservation=False,
+    )
+
+    exchange_request.status = ExchangeRequest.Status.MATCHED
+    exchange_request.matching_status = ExchangeRequest.MatchingStatus.PROPOSAL_AVAILABLE
+    exchange_request.save(update_fields=["status", "matching_status", "updated_at"])
+
+    AuditLog.objects.create(
+        acting_user=sender,
+        institution=sender.institution,
+        action="EXCHANGE_PROPOSAL_ACTIVATED",
+        target_type="ExchangeProposal",
+        target_id=str(proposal.id),
+        change_summary=f"Activated direct exchange proposal {proposal.id} from existing open request for {sender.full_name} and {recipient.full_name}",
+    )
+
+    Notification.objects.create(
+        recipient=recipient,
+        notification_type=Notification.NotificationType.ACCEPTANCE_REQUIRED,
+        message=(
+            f"{sender.full_name} has proposed a direct room exchange with you. "
+            f"Proposed accommodation: {sender_hostel.name}, Room {sender_occ.bed.room.room_number}, "
+            f"Bed {sender_occ.bed.bed_label}. Please review and respond before "
+            f"{proposal.expires_at.strftime('%b %d, %Y %H:%M') if proposal.expires_at else 'deadline'}."
+        ),
+        proposal=proposal,
+    )
+
+    return True, "Direct exchange proposal activated successfully.", proposal
+
+
 def update_exchange_request(
     *,
     exchange_request,
@@ -211,6 +473,7 @@ def update_exchange_request(
     status_adapter: ExternalEligibilityAdapter | None = None,
     now=None,
     ip_address=None,
+    direct_invitation: bool = True,
 ):
     """Edit an owned open exchange request after revalidating current eligibility."""
     _assert_student(student)
@@ -828,7 +1091,7 @@ def respond_to_proposal(
             all_parts = list(proposal.participants.select_related("exchange_request", "student"))
             for p in all_parts:
                 req = p.exchange_request
-                if req.status == ExchangeRequest.Status.MATCHED:
+                if req and req.status == ExchangeRequest.Status.MATCHED:
                     has_active_occ = StudentOccupancy.objects.filter(
                         student=p.student,
                         status=StudentOccupancy.OccupancyStatus.ACTIVE,
@@ -871,9 +1134,17 @@ def respond_to_proposal(
             return participant, proposal
 
         elif action == "accept":
+            if ProposalParticipant.objects.filter(
+                student=student,
+                response_status=ProposalParticipant.ResponseStatus.ACCEPTED,
+                is_active_reservation=True,
+            ).exclude(proposal=proposal).exists():
+                raise ValidationError("You already hold an active accepted reservation in another exchange proposal.")
+
             participant.response_status = ProposalParticipant.ResponseStatus.ACCEPTED
+            participant.is_active_reservation = True
             participant.responded_at = now
-            participant.save(update_fields=["response_status", "responded_at", "updated_at"])
+            participant.save(update_fields=["response_status", "is_active_reservation", "responded_at", "updated_at"])
 
             AuditLog.objects.create(
                 acting_user=student,
@@ -960,7 +1231,7 @@ def expire_single_proposal(proposal, *, now=None) -> bool:
         all_parts = list(locked_prop.participants.select_related("exchange_request", "student"))
         for p in all_parts:
             req = p.exchange_request
-            if req.status == ExchangeRequest.Status.MATCHED:
+            if req and req.status == ExchangeRequest.Status.MATCHED:
                 has_active_occ = StudentOccupancy.objects.filter(
                     student=p.student,
                     status=StudentOccupancy.OccupancyStatus.ACTIVE,
@@ -1110,7 +1381,7 @@ def decide_exchange_proposal(
 
         # Safe idempotence check: identical repeated submission by the same actor
         existing_approval = Approval.objects.filter(proposal=proposal).first()
-        if proposal.status == ExchangeProposal.Status.APPROVED and decision == "approve":
+        if proposal.status in (ExchangeProposal.Status.APPROVED, ExchangeProposal.Status.COMPLETED) and decision == "approve":
             if existing_approval and existing_approval.authority_user_id == actor.id:
                 return existing_approval, proposal
             raise ValidationError("This exchange proposal has already been approved.")
@@ -1137,7 +1408,7 @@ def decide_exchange_proposal(
         )
 
         student_ids = sorted(p.student_id for p in participants)
-        request_ids = sorted(p.exchange_request_id for p in participants)
+        request_ids = sorted(p.exchange_request_id for p in participants if p.exchange_request_id)
         bed_ids = sorted(
             set(
                 [p.current_occupancy.bed_id for p in participants]
@@ -1160,21 +1431,18 @@ def decide_exchange_proposal(
 
         if is_cross_hostel:
             if not actor.is_chief_warden_role:
-                raise PermissionDenied("Only the Chief Warden can decide cross-hostel exchange proposals.")
+                raise PermissionDenied("Cross-hostel proposals can only be decided by the Chief Warden.")
             authority_role = Approval.AuthorityRole.CHIEF_WARDEN
             scope_hostel = None
         else:
             if not actor.is_warden_role:
                 raise PermissionDenied("Only the assigned hostel Warden can decide same-hostel exchange proposals.")
             scope_hostel_id = next(iter(hostel_ids))
+            scope_hostel = Hostel.objects.get(id=scope_hostel_id)
             assigned_hostel_ids = get_warden_assigned_hostel_ids(actor)
             if scope_hostel_id not in assigned_hostel_ids:
-                scope_hostel_obj = participants[0].current_occupancy.bed.room.floor.block.hostel
-                raise PermissionDenied(
-                    f"You are not assigned to supervise hostel '{scope_hostel_obj.name}'."
-                )
+                raise PermissionDenied(f"You are not assigned to supervise hostel '{scope_hostel.name}'.")
             authority_role = Approval.AuthorityRole.WARDEN
-            scope_hostel = participants[0].current_occupancy.bed.room.floor.block.hostel
 
         # 1. Unanimous acceptance verification
         for p in participants:
@@ -1203,10 +1471,22 @@ def decide_exchange_proposal(
 
         # 4. Destination preferences and operational status still valid
         for p in participants:
-            if not room_satisfies_request(request=p.exchange_request, bed=p.proposed_bed):
-                raise ValidationError(
-                    f"Proposed accommodation for student {p.student.full_name} no longer satisfies preferences or operational requirements."
-                )
+            if p.exchange_request:
+                if not room_satisfies_request(request=p.exchange_request, bed=p.proposed_bed):
+                    raise ValidationError(
+                        f"Proposed accommodation for student {p.student.full_name} no longer satisfies preferences or operational requirements."
+                    )
+            else:
+                dest_bed = p.proposed_bed
+                dest_hostel = dest_bed.room.floor.block.hostel
+                if not dest_bed.is_active or dest_bed.operational_status != OperationalStatus.IN_SERVICE:
+                    raise ValidationError(f"Proposed bed {dest_bed.bed_label} is no longer in service.")
+                if not dest_bed.room.is_active or dest_bed.room.operational_status != "in_service":
+                    raise ValidationError(f"Proposed room {dest_bed.room.room_number} is no longer in service.")
+                if p.student.residential_eligibility != dest_hostel.resident_category:
+                    raise ValidationError(
+                        f"Proposed accommodation does not match student {p.student.full_name}'s residential eligibility."
+                    )
 
         # 5. Eligibility verification (cooling-off, fees, disciplinary holds)
         for p in participants:
@@ -1251,18 +1531,20 @@ def decide_exchange_proposal(
                 raise ValidationError("Participant does not belong to the proposal institution.")
 
         if decision == "approve":
-            proposal.status = ExchangeProposal.Status.APPROVED
-            proposal.save(update_fields=["status", "updated_at"])
-
-            approval = Approval.objects.create(
+            approval, _ = Approval.objects.update_or_create(
                 proposal=proposal,
                 authority_user=actor,
                 authority_role=authority_role,
                 scope_hostel=scope_hostel,
-                decision=Approval.Decision.APPROVED,
-                remarks=remarks,
-                decided_at=now,
+                defaults={
+                    "decision": Approval.Decision.APPROVED,
+                    "remarks": remarks,
+                    "decided_at": now,
+                },
             )
+
+            proposal.status = ExchangeProposal.Status.APPROVED
+            proposal.save(update_fields=["status", "updated_at"])
 
             AuditLog.objects.create(
                 acting_user=actor,
@@ -1292,7 +1574,7 @@ def decide_exchange_proposal(
                     dispatch_proposal_notification(
                         recipient=p.student,
                         notification_type=Notification.NotificationType.APPROVAL_UPDATED,
-                        message="Your room exchange proposal has been approved by the hostel authority. Room transfer execution is pending.",
+                        message="Your room exchange proposal has received official authority approval. Room transfer execution is pending.",
                         proposal=proposal,
                         exchange_request=p.exchange_request,
                         now=now,
@@ -1431,20 +1713,12 @@ def execute_exchange_transfer(
             )
 
         # Verify recorded approval
-        approval = (
+        approved_records = list(
             Approval.objects.filter(proposal=proposal, decision=Approval.Decision.APPROVED)
             .order_by("-decided_at")
-            .first()
         )
-        if not approval:
+        if not approved_records:
             raise ValidationError("Cannot execute proposal: No recorded authority approval found.")
-
-        acting_user = actor or approval.authority_user
-        if not acting_user:
-            raise PermissionDenied("No authorized acting user found to execute this transfer.")
-
-        if acting_user.institution_id != proposal.institution_id:
-            raise PermissionDenied("Approver/executor must belong to the proposal institution.")
 
         # Fetch participants
         participants = list(
@@ -1456,9 +1730,36 @@ def execute_exchange_transfer(
         if k < 2 or k > 5 or k != proposal.cycle_length:
             raise ValidationError(f"Invalid participant count {k} for proposal (cycle length {proposal.cycle_length}).")
 
+        # Validate that all required approvals are satisfied
+        prop_hostel_ids = {
+            p.current_occupancy.bed.room.floor.block.hostel_id
+            for p in participants
+        }
+        is_cross_hostel = len(prop_hostel_ids) > 1
+
+        if is_cross_hostel:
+            has_cw = any(a.authority_role == Approval.AuthorityRole.CHIEF_WARDEN for a in approved_records)
+            if not has_cw:
+                raise ValidationError("Cannot execute cross-hostel proposal: Chief Warden approval is required.")
+            approval = next(a for a in approved_records if a.authority_role == Approval.AuthorityRole.CHIEF_WARDEN)
+        else:
+            single_hostel_id = next(iter(prop_hostel_ids))
+            warden_approval = next(
+                (a for a in approved_records if a.authority_role == Approval.AuthorityRole.WARDEN and a.scope_hostel_id == single_hostel_id),
+                None
+            )
+            approval = warden_approval or approved_records[0]
+
+        acting_user = actor or approval.authority_user
+        if not acting_user:
+            raise PermissionDenied("No authorized acting user found to execute this transfer.")
+
+        if acting_user.institution_id != proposal.institution_id:
+            raise PermissionDenied("Approver/executor must belong to the proposal institution.")
+
         # Collect and sort IDs for global row lock ordering
         student_ids = sorted(p.student_id for p in participants)
-        request_ids = sorted(p.exchange_request_id for p in participants)
+        request_ids = sorted(p.exchange_request_id for p in participants if p.exchange_request_id)
         src_bed_ids = [p.current_occupancy.bed_id for p in participants]
         dest_bed_ids = [p.proposed_bed_id for p in participants]
         all_bed_ids = sorted(set(src_bed_ids + dest_bed_ids))
@@ -2127,8 +2428,11 @@ def record_cycle_suppression(*, proposal, reason: str, now=None) -> SuppressedCy
     revisions = {}
     for p in participants:
         req = p.exchange_request
-        ts = req.preference_updated_at or req.updated_at or now
-        revisions[str(req.id)] = ts.isoformat()
+        if req:
+            ts = req.preference_updated_at or req.updated_at or now
+            revisions[str(req.id)] = ts.isoformat()
+        else:
+            revisions[f"user:{p.student_id}"] = (p.updated_at or now).isoformat()
 
     suppressed = SuppressedCycle.objects.create(
         institution=proposal.institution,

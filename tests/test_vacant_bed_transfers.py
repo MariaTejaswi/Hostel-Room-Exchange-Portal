@@ -252,9 +252,10 @@ def test_create_request_targeting_occupied_bed_creates_exchange_request(institut
         ),
     )
 
-    # Must be EXCHANGE and OPEN
+    # Must be EXCHANGE and MATCHED with pending direct proposal
     assert req.request_type == ExchangeRequest.RequestType.EXCHANGE
-    assert req.status == ExchangeRequest.Status.OPEN
+    assert req.status == ExchangeRequest.Status.MATCHED
+    assert ExchangeProposal.objects.filter(participants__student=student1).filter(participants__student=student2).exists()
 
 
 @pytest.mark.django_db

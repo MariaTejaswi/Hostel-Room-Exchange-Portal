@@ -31,9 +31,14 @@ from apps.exchange.models import (
     ProposalParticipant,
 )
 from apps.exchange.services import (
-    create_exchange_request,
+    create_exchange_request as _orig_create_exchange_request,
     run_exchange_matching,
 )
+
+
+def create_exchange_request(*args, **kwargs):
+    kwargs.setdefault("direct_invitation", False)
+    return _orig_create_exchange_request(*args, **kwargs)
 from apps.hostels.models import (
     Bed,
     Block,
@@ -176,6 +181,7 @@ def test_valid_cycles_2_to_5_participants(
                 "preferred_bed": target_bed,
                 "reason": f"Participant {i} wants bed of participant {(i + 1) % cycle_length}",
             },
+            direct_invitation=False,
         )
 
     result = find_candidate_matches(institution=institution)

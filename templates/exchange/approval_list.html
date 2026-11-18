@@ -267,15 +267,15 @@
                         <td class="px-4 py-3.5">
                             {% if item.status == 'pending_approval' %}
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                {% if item.is_cross_hostel and not item.is_vacant_transfer %}
+                                ⏳ Awaiting Chief Warden approval
+                                {% else %}
                                 ⏳ Pending Approval
+                                {% endif %}
                             </span>
-                            {% elif item.status == 'approved' %}
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
-                                ✓ Approved (Transfer Pending)
-                            </span>
-                            {% elif item.status == 'completed' %}
+                            {% elif item.status == 'approved' or item.status == 'completed' %}
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
-                                ✓ Approved & Executed
+                                ✓ Approved &amp; Executed
                             </span>
                             {% elif item.status == 'rejected' %}
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-300">

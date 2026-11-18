@@ -426,14 +426,32 @@ def test_cross_hostel_exchange_execution_authority(institution, warden_user, chi
     prop.refresh_from_db()
     assert prop.status == ExchangeProposal.Status.PENDING_APPROVAL
 
-    # Warden is denied decision and execution on cross-hostel proposal
-    with pytest.raises(PermissionDenied, match="Chief Warden"):
+    # Unassigned warden is denied decision on cross-hostel proposal
+    unassigned_warden = create_user_with_role(
+        email="unassigned.w@apex.test",
+        full_name="Unassigned Warden",
+        role_name=ROLE_WARDEN,
+        institution=institution,
+        password="TestPassword123!",
+    )
+    with pytest.raises(PermissionDenied, match="Cross-hostel proposals can only be decided by the Chief Warden"):
+        decide_exchange_proposal(
+            proposal_id=prop.id,
+            actor=unassigned_warden,
+            decision="approved",
+            auto_execute=True,
+        )
+
+    # Assigned warden 1 is also denied decision on cross-hostel proposal (strictly Chief Warden)
+    with pytest.raises(PermissionDenied, match="Cross-hostel proposals can only be decided by the Chief Warden"):
         decide_exchange_proposal(
             proposal_id=prop.id,
             actor=warden_user,
             decision="approved",
+            remarks="Hostel 1 approved by Warden 1.",
             auto_execute=True,
         )
+    assert prop.status == ExchangeProposal.Status.PENDING_APPROVAL
 
     # Chief Warden approves and executes successfully
     appr, updated_prop = decide_exchange_proposal(

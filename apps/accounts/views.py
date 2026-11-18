@@ -1,4 +1,5 @@
 import csv
+import os
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
@@ -48,9 +49,84 @@ from apps.core.models import AuditLog
 
 
 def login_view(request):
-    """User login view supporting session persistence and role redirection."""
+    """User login view supporting session persistence, role redirection, and configurable demo shortcuts."""
     if request.user.is_authenticated:
         return redirect(get_dashboard_url_for_user(request.user))
+
+    show_demo_accounts = getattr(settings, "SHOW_DEMO_ACCOUNTS", True)
+    demo_accounts = []
+    default_demo_password = ""
+
+    if show_demo_accounts:
+        default_demo_password = os.getenv("DEMO_DEFAULT_PASSWORD", "RoomLoop2026!")
+        raw_demo_accounts = [
+            {
+                "role_id": "student",
+                "label": "Student",
+                "name": "Arun Kumar",
+                "email": "arun.kumar@student.roomloop.edu",
+                "badge": "Resident Student",
+                "description": "Student room dashboard & swap center",
+                "icon": "academic-cap",
+            },
+            {
+                "role_id": "warden",
+                "label": "Warden",
+                "name": "Dr. Alok Sharma",
+                "email": "warden.north@roomloop.edu",
+                "badge": "Hostel Authority",
+                "description": "North residence allocations & approvals",
+                "icon": "shield-check",
+            },
+            {
+                "role_id": "chief_warden",
+                "label": "Chief Warden",
+                "name": "Prof. Ramanathan K.",
+                "email": "chief.warden@roomloop.edu",
+                "badge": "Campus Authority",
+                "description": "Cross-hostel approvals & campus governance",
+                "icon": "badge-check",
+            },
+            {
+                "role_id": "hostel_admin",
+                "label": "Hostel Administrator",
+                "name": "Suresh Verma",
+                "email": "hostel.admin@roomloop.edu",
+                "badge": "Operations",
+                "description": "Residential policy & student onboarding",
+                "icon": "building-office",
+            },
+            {
+                "role_id": "dean",
+                "label": "Dean",
+                "name": "Prof. Aruna Roy",
+                "email": "dean@roomloop.edu",
+                "badge": "Student Welfare",
+                "description": "Institution-wide audit & live analytics",
+                "icon": "chart-bar",
+            },
+            {
+                "role_id": "sysadmin",
+                "label": "System Administrator",
+                "name": "System Administrator",
+                "email": "admin@roomloop.edu",
+                "badge": "Platform Tech",
+                "description": "Role governance & system health",
+                "icon": "cog",
+            },
+        ]
+
+        existing_emails = set(
+            User.objects.filter(
+                email__in=[d["email"] for d in raw_demo_accounts],
+                is_active=True,
+            ).values_list("email", flat=True)
+        )
+        existing_emails_lower = {e.lower() for e in existing_emails}
+        for item in raw_demo_accounts:
+            item["is_available"] = item["email"].lower() in existing_emails_lower
+            item["password"] = default_demo_password
+            demo_accounts.append(item)
 
     if request.method == "POST":
         form = LoginForm(request.POST)
@@ -81,7 +157,13 @@ def login_view(request):
     else:
         form = LoginForm()
 
-    return render(request, "accounts/login.html", {"form": form})
+    context = {
+        "form": form,
+        "show_demo_accounts": show_demo_accounts,
+        "demo_accounts": demo_accounts,
+        "default_demo_password": default_demo_password,
+    }
+    return render(request, "accounts/login.html", context)
 
 
 def logout_view(request):
@@ -177,11 +259,21 @@ def password_change_view(request):
 def student_dashboard_view(request):
     """Student Accommodation Dashboard."""
     from apps.hostels.selectors import get_student_dashboard_context
-    from apps.exchange.selectors import get_student_exchange_requests
+    from apps.exchange.selectors import get_student_exchange_requests, get_student_proposals
+    from apps.exchange.models import ExchangeProposal, ProposalParticipant
     from apps.hostels.models import Hostel
 
     context = get_student_dashboard_context(request.user)
     context["exchange_requests"] = get_student_exchange_requests(request.user)[:3]
+    context["incoming_proposals"] = (
+        get_student_proposals(request.user)
+        .filter(
+            status=ExchangeProposal.Status.PENDING_ACCEPTANCE,
+            participants__student=request.user,
+            participants__response_status=ProposalParticipant.ResponseStatus.PENDING,
+        )
+        .distinct()
+    )
     context["active_nav"] = "dashboard"
 
     # Eligible hostels overview for verified students

@@ -372,15 +372,41 @@ def test_warden_cannot_approve_cross_hostel_proposal(institution, warden_user):
     assert prop.status == ExchangeProposal.Status.PENDING_APPROVAL
     assert prop.is_cross_hostel is True
 
-    # Warden attempts to approve
+    # Unassigned warden attempts to approve: strictly denied
+    unassigned_w = create_user_with_role(
+        email="unassigned.cw.test@apex.test",
+        full_name="Unassigned Warden",
+        role_name=ROLE_WARDEN,
+        institution=institution,
+        password="Password123!",
+    )
+    with pytest.raises(PermissionDenied) as exc_info:
+        decide_exchange_proposal(
+            proposal_id=prop.id,
+            actor=unassigned_w,
+            decision="approved",
+            remarks="Trying to approve cross hostel without Chief Warden role.",
+        )
+    assert "cross-hostel proposals can only be decided by the chief warden" in str(exc_info.value).lower()
+
+    # Assigned warden A is also strictly denied (both approve and reject) under confirmed single Chief Warden policy
     with pytest.raises(PermissionDenied) as exc_info:
         decide_exchange_proposal(
             proposal_id=prop.id,
             actor=warden_user,
             decision="approved",
-            remarks="Trying to approve cross hostel.",
+            remarks="Hostel A approved by Warden A.",
         )
-    assert "chief warden can decide cross-hostel" in str(exc_info.value).lower()
+    assert "cross-hostel proposals can only be decided by the chief warden" in str(exc_info.value).lower()
+
+    with pytest.raises(PermissionDenied) as exc_info:
+        decide_exchange_proposal(
+            proposal_id=prop.id,
+            actor=warden_b,
+            decision="rejected",
+            remarks="Hostel B rejected by Warden B.",
+        )
+    assert "cross-hostel proposals can only be decided by the chief warden" in str(exc_info.value).lower()
 
 
 # =========================================================================

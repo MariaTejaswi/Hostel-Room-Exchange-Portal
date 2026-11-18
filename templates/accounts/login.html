@@ -1,125 +1,470 @@
-{% extends 'layouts/auth.html' %}
+{% extends 'layouts/base.html' %}
+{% load static %}
 
-{% block title %}Sign In — RoomLoop Portal{% endblock %}
+{% block title %}Sign In — RoomLoop University Accommodation Portal{% endblock %}
 
-{% block auth_content %}
-<div class="card p-6 sm:p-8 bg-white border border-slate-200 rounded-xl shadow-sm">
-    <!-- Header -->
-    <div class="mb-5">
-        <h2 class="text-xl font-bold text-slate-900 tracking-tight">Sign in to RoomLoop</h2>
-        <p class="mt-1 text-xs text-slate-500">Enter your university credentials to access your accommodation console.</p>
-    </div>
+{% block extra_head %}
+<style>
+    /* Scoped Coffee-Brown Theme for RoomLoop Login */
+    body {
+        background-color: #EDE4D8 !important;
+        color: #35251F !important;
+    }
 
-    <!-- Error Messages Container -->
-    {% if form.non_field_errors %}
-    <div class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 flex items-start gap-2">
-        <svg class="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-        <div class="space-y-0.5">
-            {% for error in form.non_field_errors %}
-            <p class="font-medium">{{ error }}</p>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
+    /* Strict font unification across all login elements */
+    .auth-page {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+        color: #35251F;
+    }
+    .auth-page *,
+    .auth-page button,
+    .auth-page input,
+    .auth-page label,
+    .auth-page a,
+    .auth-page p,
+    .auth-page h1,
+    .auth-page h2,
+    .auth-page h3,
+    .auth-page h4,
+    .auth-page span {
+        font-family: inherit !important;
+    }
 
-    <!-- Login Form -->
-    <form method="post" action="" class="space-y-4" novalidate>
-        {% csrf_token %}
-        {% if request.GET.next %}
-        <input type="hidden" name="next" value="{{ request.GET.next }}">
-        {% endif %}
+    .login-shell-bg {
+        background-color: #EDE4D8;
+    }
+    .login-card-shell {
+        background-color: #F7EFE5;
+        border-color: #E2D5C7;
+    }
 
-        <div>
-            <label for="id_email" class="block text-xs font-semibold text-slate-700 mb-1">
-                Institutional Email Address
-            </label>
-            <div class="relative">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/>
-                    </svg>
+    /* Form input styling (48–52px height) */
+    .auth-page .login-control {
+        width: 100%;
+        height: 50px;
+        background-color: #FFFFFF;
+        border: 1px solid #D9C8BA;
+        color: #35251F;
+        border-radius: 0.5rem;
+        font-size: 0.9375rem; /* ~15px readable body */
+        line-height: 1.5;
+        box-sizing: border-box;
+        transition: border-color 180ms ease, box-shadow 180ms ease;
+    }
+    .auth-page .login-control:focus {
+        border-color: #702C3B !important;
+        outline: none !important;
+        box-shadow: 0 0 0 3px rgba(112, 44, 59, 0.15) !important;
+    }
+
+    /* Primary Submit Button (48–52px height) */
+    .auth-page .btn-login-primary {
+        display: flex;
+        width: 100%;
+        height: 50px;
+        align-items: center;
+        justify-content: center;
+        background-color: #702C3B;
+        color: #FFFFFF;
+        border-radius: 0.625rem;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: background-color 180ms ease, transform 150ms ease, box-shadow 180ms ease;
+    }
+    .auth-page .btn-login-primary:hover {
+        background-color: #5A222F;
+    }
+    .auth-page .btn-login-primary:focus-visible {
+        outline: 2px solid #702C3B;
+        outline-offset: 2px;
+        box-shadow: 0 0 0 3px rgba(112, 44, 59, 0.25);
+    }
+    .auth-page .btn-login-primary:active {
+        transform: scale(0.99);
+    }
+
+    /* Password visibility control: positioned wrapper & button */
+    .auth-page .password-field-wrapper {
+        position: relative;
+        width: 100%;
+    }
+    .auth-page .password-toggle-btn {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 32px;
+        height: 32px;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        border-radius: 0.375rem;
+        color: #73665E;
+        cursor: pointer;
+        transition: color 150ms ease, background-color 150ms ease;
+    }
+    .auth-page .password-toggle-btn:hover {
+        color: #35251F;
+        background-color: rgba(245, 235, 221, 0.65);
+    }
+    .auth-page .password-toggle-btn:focus-visible {
+        outline: 2px solid #702C3B;
+        outline-offset: 1px;
+    }
+
+    /* Dark gradient overlay matching reference image */
+    .auth-page .photo-overlay-gradient {
+        background: linear-gradient(
+            to top,
+            rgba(20, 10, 8, 0.95) 0%,
+            rgba(20, 10, 8, 0.82) 35%,
+            rgba(20, 10, 8, 0.35) 65%,
+            transparent 100%
+        );
+    }
+
+    /* Hide visible scrollbar on login page and demo modal while preserving full scrolling functionality */
+    html.auth-scroll-hidden,
+    body.auth-scroll-hidden {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+    html.auth-scroll-hidden::-webkit-scrollbar,
+    body.auth-scroll-hidden::-webkit-scrollbar {
+        display: none !important;
+        width: 0px !important;
+        height: 0px !important;
+    }
+
+    .auth-modal-scroll {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+        overflow-y: auto !important;
+    }
+    .auth-modal-scroll::-webkit-scrollbar {
+        display: none !important;
+        width: 0px !important;
+        height: 0px !important;
+    }
+
+    /* Color token anchors for theme integrity */
+    .theme-token-cream { color: #F5EBDD; }
+    .theme-token-border { border-color: #E6D9CC; }
+
+    /* Accessible Reduced Motion */
+    @media (prefers-reduced-motion: reduce) {
+        *, ::before, ::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<main class="login-shell-bg min-h-screen flex items-center justify-center p-4 sm:p-6 auth-page">
+    <!-- Centered Card Shell (1160–1200px max width) -->
+    <div class="w-full max-w-[1160px] login-card-shell rounded-[20px] p-5 sm:p-7 lg:p-8 shadow-xl border border-[#E2D5C7] flex flex-col my-auto">
+
+        <!-- Top Header: Building Icon + RoomLoop Title + "Need help?" (Aligned to shell) -->
+        <header class="flex items-center justify-between pb-4 sm:pb-5 border-b border-[#E6D9CC]/60">
+            <div class="flex items-center">
+                <!-- University building / portico icon -->
+                <svg class="w-8 h-8 text-[#35251F]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 21h18M3 10h18M5 10v11M9 10v11M15 10v11M19 10v11M12 3L2 8h20L12 3z"/>
+                </svg>
+                <span class="h-7 w-px bg-[#D9C8BA] mx-3.5" aria-hidden="true"></span>
+                <div>
+                    <span class="text-xl font-bold tracking-tight text-[#35251F] block leading-none">RoomLoop</span>
+                    <span class="text-xs text-[#73665E] font-medium block mt-1">University Accommodation Portal</span>
                 </div>
-                {{ form.email }}
             </div>
-            {% if form.email.errors %}
-            <p class="mt-1 text-xs text-red-600 font-medium">
-                {{ form.email.errors.0 }}
-            </p>
-            {% endif %}
-        </div>
+            <a href="mailto:support@roomloop.edu" class="text-xs sm:text-sm font-semibold text-[#702C3B] hover:underline transition-colors">
+                Need help?
+            </a>
+        </header>
 
-        <div>
-            <div class="flex items-center justify-between mb-1">
-                <label for="id_password" class="block text-xs font-semibold text-slate-700">
-                    Password
-                </label>
-                <a href="{% url 'accounts:password_reset' %}" class="text-xs text-teal-700 hover:text-teal-800 font-medium transition-colors">
-                    Forgot password?
-                </a>
-            </div>
-            <div class="relative">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                    </svg>
+        <!-- Two Balanced Columns Grid (~20–24px gap from header, 24px column gap) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-5 sm:mt-6 items-stretch">
+
+            <!-- Left Column: Photograph (Matches right panel height via self-stretch & absolute inset-0) -->
+            <section class="relative rounded-2xl overflow-hidden min-h-[280px] sm:min-h-[340px] lg:min-h-0 self-stretch flex flex-col justify-end p-5 sm:p-7 shadow-xs border border-[#E2D5C7]/60" aria-label="RoomLoop Campus Overview">
+                <picture class="absolute inset-0 w-full h-full">
+                    <source srcset="{% static 'images/login/roomloop-campus.webp' %}" type="image/webp">
+                    <img
+                        src="{% static 'images/login/roomloop-campus.jpg' %}"
+                        alt="RoomLoop campus hostel courtyard"
+                        class="w-full h-full object-cover object-[center_35%]"
+                        loading="eager"
+                        decoding="async"
+                    >
+                </picture>
+
+                <!-- Dark gradient overlay strongest near overlay text -->
+                <div class="photo-overlay-gradient absolute inset-0 pointer-events-none" aria-hidden="true"></div>
+
+                <!-- Bottom text content inside visible panel -->
+                <div class="relative z-10 space-y-2.5">
+                    <div>
+                        <h2 class="text-2xl sm:text-3xl font-bold text-white tracking-tight leading-tight">
+                            Your campus. Your space.
+                        </h2>
+                        <p class="text-xs sm:text-sm text-[#F5EBDD] font-medium leading-relaxed mt-1 max-w-md">
+                            Manage your accommodation and room exchanges in one place.
+                        </p>
+                    </div>
+
+                    <!-- Badges below heading & description -->
+                    <div class="flex flex-wrap items-center gap-2 pt-1">
+                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-black/45 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/20 shadow-xs">
+                            <svg class="w-3.5 h-3.5 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            Verified student access
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-black/45 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/20 shadow-xs">
+                            <svg class="w-3.5 h-3.5 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                            </svg>
+                            Secure room exchanges
+                        </span>
+                    </div>
                 </div>
-                {{ form.password }}
-                <button type="button" data-toggle-password="id_password" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors focus:outline-none" aria-label="Toggle password visibility">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                </button>
+            </section>
+
+            <!-- Right Column: Dedicated White Card (Padding 28–32px) -->
+            <section class="bg-white rounded-2xl p-6 sm:p-7 lg:p-8 shadow-xs border border-[#EBE1D5] flex flex-col justify-between" aria-labelledby="login-header">
+                <div class="w-full max-w-[480px] mx-auto lg:mx-0">
+                    <!-- Eyebrow text -->
+                    <span class="text-xs font-bold uppercase tracking-wider text-[#702C3B] block">
+                        WELCOME TO ROOMLOOP
+                    </span>
+
+                    <!-- Main title -->
+                    <h1 id="login-header" class="text-2xl sm:text-3xl font-extrabold text-[#35251F] tracking-tight mt-1">
+                        Welcome back
+                    </h1>
+
+                    <!-- Subtitle (8px below title) -->
+                    <p class="text-xs sm:text-sm text-[#73665E] mt-2">
+                        Sign in with your university account.
+                    </p>
+
+                    <!-- Validation / Non-field Errors -->
+                    {% if form.non_field_errors %}
+                    <div class="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start gap-2" role="alert" aria-live="polite">
+                        <svg class="w-4 h-4 text-rose-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <div class="space-y-0.5 flex-1">
+                            {% for error in form.non_field_errors %}
+                            <p class="font-medium leading-relaxed">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Form with explicit field groups and breathing room (20–24px below intro text) -->
+                    <form method="post" action="{% url 'accounts:login' %}" class="mt-5 sm:mt-6" novalidate id="login-form">
+                        {% csrf_token %}
+                        {% if request.GET.next %}
+                        <input type="hidden" name="next" value="{{ request.GET.next }}">
+                        {% endif %}
+
+                        <!-- Field Group 1: University email (label to input gap ~7px) -->
+                        <div class="field-group">
+                            <label for="id_email" class="block text-xs sm:text-sm font-bold text-[#35251F] mb-1.5 sm:mb-2">
+                                University email
+                            </label>
+                            <div class="relative w-full">
+                                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#73665E]">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                    </svg>
+                                </div>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    id="id_email"
+                                    value="{{ form.email.value|default:'' }}"
+                                    class="login-control w-full pl-10 pr-3.5"
+                                    placeholder="name@university.edu"
+                                    autocomplete="email"
+                                    required
+                                    aria-required="true"
+                                    {% if form.email.errors %}aria-invalid="true" aria-describedby="email-error"{% endif %}
+                                >
+                            </div>
+                            {% if form.email.errors %}
+                            <p id="email-error" class="mt-1.5 text-xs text-rose-600 font-medium">
+                                {{ form.email.errors.0 }}
+                            </p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Field Group 2: Password (gap ~18px from email group) -->
+                        <div class="field-group mt-4.5 sm:mt-5">
+                            <label for="id_password" class="block text-xs sm:text-sm font-bold text-[#35251F] mb-1.5 sm:mb-2">
+                                Password
+                            </label>
+                            <!-- Positioned wrapper for password input + toggle button -->
+                            <div class="password-field-wrapper">
+                                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#73665E]">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                    </svg>
+                                </div>
+                                <input
+                                    type="password"
+                                    name="password"
+                                    id="id_password"
+                                    class="login-control pl-10 pr-12"
+                                    placeholder="••••••••••"
+                                    autocomplete="current-password"
+                                    required
+                                    aria-required="true"
+                                    {% if form.password.errors %}aria-invalid="true" aria-describedby="password-error"{% endif %}
+                                >
+                                <!-- Visibility Toggle: position absolute; right: 12px; top: 50%; transform: translateY(-50%) -->
+                                <button
+                                    type="button"
+                                    id="password-toggle-btn"
+                                    class="password-toggle-btn"
+                                    aria-label="Show password"
+                                    title="Show password"
+                                >
+                                    <svg id="eye-icon-show" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                    <svg id="eye-icon-hide" class="w-4 h-4 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            {% if form.password.errors %}
+                            <p id="password-error" class="mt-1.5 text-xs text-rose-600 font-medium">
+                                {{ form.password.errors.0 }}
+                            </p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Row: Remember me / Forgot password (gap ~14px from password group, wraps on narrow viewports) -->
+                        <div class="mt-3.5 sm:mt-4 flex flex-wrap items-center justify-between gap-2">
+                            <label class="inline-flex items-center cursor-pointer select-none" title="Remember this workstation">
+                                <input
+                                    type="checkbox"
+                                    name="remember_me"
+                                    id="id_remember_me"
+                                    {% if form.remember_me.value %}checked{% endif %}
+                                    class="w-4 h-4 rounded text-[#702C3B] border-[#D9C8BA] focus:ring-[#702C3B] cursor-pointer"
+                                >
+                                <span class="ml-2 text-xs sm:text-sm font-medium text-[#5A4A42]">Remember me</span>
+                            </label>
+                            <a href="{% url 'accounts:password_reset' %}" class="text-xs sm:text-sm font-semibold text-[#702C3B] hover:underline">
+                                Forgot password?
+                            </a>
+                        </div>
+
+                        <!-- Primary Sign in action (gap ~18px from options row) -->
+                        <div class="mt-4 sm:mt-4.5">
+                            <button
+                                type="submit"
+                                id="submit-signin-btn"
+                                class="btn-login-primary shadow-xs"
+                            >
+                                <span>Sign in</span>
+                                <span aria-hidden="true">&rarr;</span>
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Compact Demo Accounts Trigger & Modal (16px below Sign In) -->
+                    {% if show_demo_accounts %}
+                        {% include 'accounts/partials/demo_accounts.html' %}
+                    {% endif %}
+                </div>
+
+                <!-- Footer notes inside right card (16–20px below demo area) -->
+                <div class="mt-4.5 sm:mt-5 pt-3.5 border-t border-[#EBE1D5] max-w-[480px] mx-auto lg:mx-0">
+                    <p class="text-xs text-center text-[#5A4A42]">
+                        New student? Contact your hostel administrator.
+                    </p>
+                    <div class="text-[11px] text-[#73665E] flex items-center justify-center gap-1.5 mt-2">
+                        <svg class="w-3.5 h-3.5 text-[#73665E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                        <span>Secure institutional access</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Outer Footer: Copyright + Privacy Policy + Help Centre (Aligned with container) -->
+        <footer class="flex items-center justify-between pt-5 sm:pt-6 text-xs text-[#73665E]">
+            <div>&copy; RoomLoop</div>
+            <div class="flex items-center gap-3">
+                <a href="#" class="text-[#702C3B] hover:underline font-medium">Privacy Policy</a>
+                <span class="text-[#D4C5B9]">|</span>
+                <a href="#" class="text-[#702C3B] hover:underline font-medium">Help Centre</a>
             </div>
-            {% if form.password.errors %}
-            <p class="mt-1 text-xs text-red-600 font-medium">
-                {{ form.password.errors.0 }}
-            </p>
-            {% endif %}
-        </div>
-
-        <div class="flex items-center pt-1">
-            {{ form.remember_me }}
-            <label for="id_remember_me" class="ml-2 block text-xs font-normal text-slate-600 cursor-pointer select-none">
-                Remember this workstation
-            </label>
-        </div>
-
-        <div class="pt-1">
-            <button type="submit" class="btn-primary w-full py-2 text-xs font-semibold shadow-sm transition-all">
-                Sign In &rarr;
-            </button>
-        </div>
-    </form>
-
-    <!-- Quick Role Autofill Chips for Demo / Testing -->
-    <div class="mt-5 pt-4 border-t border-slate-100">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                Quick Role Autofill
-            </span>
-            <span class="text-[10px] text-teal-700">Click to fill</span>
-        </div>
-
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-            <button type="button" class="role-chip" data-quick-login-email="arun.kumar@student.roomloop.edu" title="Fill Student credentials">
-                <span class="truncate">Student</span>
-            </button>
-            <button type="button" class="role-chip" data-quick-login-email="warden.north@roomloop.edu" title="Fill Warden credentials">
-                <span class="truncate">Warden</span>
-            </button>
-            <button type="button" class="role-chip" data-quick-login-email="chief.warden@roomloop.edu" title="Fill Chief Warden credentials">
-                <span class="truncate">Chief Warden</span>
-            </button>
-            <button type="button" class="role-chip" data-quick-login-email="hostel.admin@roomloop.edu" title="Fill Hostel Admin credentials">
-                <span class="truncate">Hostel Admin</span>
-            </button>
-            <button type="button" class="role-chip" data-quick-login-email="dean@roomloop.edu" title="Fill Dean credentials">
-                <span class="truncate">Dean</span>
-            </button>
-            <button type="button" class="role-chip" data-quick-login-email="admin@roomloop.edu" title="Fill Sysadmin credentials">
-                <span class="truncate">Sysadmin</span>
-            </button>
-        </div>
+        </footer>
     </div>
-</div>
+</main>
+
+<!-- Vanilla JS for Password Visibility Toggle, Scrollbar Hiding & Form State -->
+<script>
+(function() {
+    // Hide scrollbars on login page without disabling scrolling
+    document.documentElement.classList.add('auth-scroll-hidden');
+    document.body.classList.add('auth-scroll-hidden');
+
+    // Password toggle
+    const toggleBtn = document.getElementById('password-toggle-btn');
+    const passwordInput = document.getElementById('id_password');
+    const eyeShow = document.getElementById('eye-icon-show');
+    const eyeHide = document.getElementById('eye-icon-hide');
+
+    if (toggleBtn && passwordInput && eyeShow && eyeHide) {
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const isPassword = passwordInput.getAttribute('type') === 'password';
+            passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+            const newLabel = isPassword ? 'Hide password' : 'Show password';
+            toggleBtn.setAttribute('aria-label', newLabel);
+            toggleBtn.setAttribute('title', newLabel);
+            eyeShow.classList.toggle('hidden', isPassword);
+            eyeHide.classList.toggle('hidden', !isPassword);
+        });
+    }
+
+    // Submit button state feedback
+    const loginForm = document.getElementById('login-form');
+    const submitBtn = document.getElementById('submit-signin-btn');
+    if (loginForm && submitBtn) {
+        loginForm.addEventListener('submit', function() {
+            submitBtn.setAttribute('disabled', 'true');
+            submitBtn.classList.add('opacity-80', 'cursor-wait');
+            submitBtn.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                </svg>
+                <span>Signing in...</span>
+            `;
+        });
+    }
+})();
+</script>
 {% endblock %}

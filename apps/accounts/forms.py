@@ -8,7 +8,7 @@ class LoginForm(forms.Form):
     """User login form supporting email-based credentials with remember-me checkbox."""
 
     email = forms.EmailField(
-        label="Institutional Email",
+        label="University email",
         widget=forms.EmailInput(
             attrs={
                 "class": "form-input",

@@ -1,0 +1,309 @@
+{# Isolated Demo Accounts Component with Accessible Modal Dialog #}
+{# Only rendered when settings.SHOW_DEMO_ACCOUNTS is True #}
+
+<!-- Compact Demo Accounts Trigger & Status Section (16px below Sign In button) -->
+<div class="mt-4 pt-1 flex flex-col items-center">
+    <!-- Single compact secondary trigger button -->
+    <button
+        type="button"
+        id="demo-modal-open-btn"
+        class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-[#D9C8BA] bg-[#FAF6F0] hover:bg-[#F3ECE2] hover:border-[#702C3B] text-xs sm:text-sm font-semibold text-[#702C3B] transition-colors focus:outline-none focus:ring-2 focus:ring-[#702C3B]/25 w-full sm:w-auto"
+        aria-haspopup="dialog"
+        aria-expanded="false"
+        aria-controls="demo-accounts-modal"
+    >
+        <svg class="w-4 h-4 text-[#702C3B]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+        </svg>
+        <span>Try a demo account</span>
+    </button>
+
+    <!-- Compact banner shown when a role has been selected -->
+    <div
+        id="demo-selected-banner"
+        class="hidden mt-2.5 py-1 px-3 rounded-full border border-[#D9C8BA] bg-[#FAF6F0] text-xs flex items-center gap-1.5 transition-all"
+        role="status"
+        aria-live="polite"
+    >
+        <span class="text-[#73665E]">Demo selected:</span>
+        <strong id="demo-selected-role-name" class="font-bold text-[#35251F]">Student</strong>
+        <span class="text-[#C4B5A5]">·</span>
+        <button
+            type="button"
+            id="demo-selected-change-btn"
+            class="font-semibold text-[#702C3B] hover:underline focus:outline-none focus:ring-1 focus:ring-[#702C3B] rounded"
+        >
+            Change
+        </button>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- Accessible Demo Accounts Modal Dialog                                     -->
+<!-- Max width ~560px, coffee-brown accents, white surface, subtle backdrop    -->
+<!-- ========================================================================= -->
+<div
+    id="demo-accounts-modal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 sm:p-6"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="demo-modal-title"
+    aria-describedby="demo-modal-description"
+>
+    <!-- Subtle backdrop -->
+    <div id="demo-modal-backdrop" class="fixed inset-0 bg-[#1F1412]/50 backdrop-blur-xs transition-opacity" aria-hidden="true"></div>
+
+    <!-- Modal Content Shell -->
+    <div
+        id="demo-accounts-panel"
+        class="relative w-full max-w-[560px] bg-white rounded-2xl shadow-2xl border border-[#E6D9CC] flex flex-col max-h-[85vh] z-10 overflow-hidden"
+    >
+        <!-- Modal Header -->
+        <div class="flex items-start justify-between p-4 sm:p-5 border-b border-[#EBE1D5] bg-[#FDFBF7]">
+            <div>
+                <h3 id="demo-modal-title" class="text-base sm:text-lg font-bold text-[#35251F] flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-[#702C3B]"></span>
+                    Try a demo account
+                </h3>
+                <p id="demo-modal-description" class="text-xs text-[#73665E] mt-1">
+                    Choose a role to fill in the demo credentials.
+                </p>
+            </div>
+            <!-- Visible Close Button -->
+            <button
+                type="button"
+                id="demo-modal-close-btn"
+                class="w-8 h-8 rounded-lg flex items-center justify-center text-[#73665E] hover:text-[#35251F] hover:bg-[#F5EBDD] transition-colors focus:outline-none focus:ring-2 focus:ring-[#702C3B]/25"
+                aria-label="Close dialog"
+                title="Close dialog (Escape)"
+            >
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Modal Body: 2-column grid, scrollable with hidden scrollbars -->
+        <div class="p-4 sm:p-5 overflow-y-auto auth-modal-scroll">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3" role="group" aria-label="Demo role credentials">
+                {% for demo in demo_accounts %}
+                <button
+                    type="button"
+                    class="demo-role-btn flex items-start gap-3 p-3 rounded-xl border border-[#E8DED4] bg-[#FAF6F0] hover:border-[#702C3B] hover:bg-[#F3ECE2] text-left transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[#702C3B]/25 min-h-[64px] {% if not demo.is_available %}opacity-50 cursor-not-allowed{% endif %}"
+                    data-role="{{ demo.role_id }}"
+                    data-email="{{ demo.email }}"
+                    data-password="{{ demo.password }}"
+                    data-name="{{ demo.name }}"
+                    data-badge="{{ demo.badge }}"
+                    data-label="{{ demo.label }}"
+                    data-available="{{ demo.is_available|yesno:'true,false' }}"
+                    {% if not demo.is_available %}disabled aria-disabled="true" title="Account not found in current database"{% else %}title="Select {{ demo.label }} credentials"{% endif %}
+                >
+                    <!-- Role Icon -->
+                    <span class="w-8 h-8 rounded-lg bg-white text-[#702C3B] flex items-center justify-center shrink-0 border border-[#E8DED4] mt-0.5">
+                        {% if demo.role_id == 'student' %}
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5"/>
+                        </svg>
+                        {% elif demo.role_id == 'warden' %}
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                        </svg>
+                        {% elif demo.role_id == 'chief_warden' %}
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
+                        </svg>
+                        {% elif demo.role_id == 'hostel_admin' %}
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                        </svg>
+                        {% elif demo.role_id == 'dean' %}
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
+                        </svg>
+                        {% elif demo.role_id == 'sysadmin' %}
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        {% endif %}
+                    </span>
+
+                    <!-- Label (wraps without truncation) & Name -->
+                    <div class="min-w-0 flex-1">
+                        <span class="text-xs sm:text-sm font-bold text-[#35251F] leading-tight block break-words">
+                            {{ demo.label }}
+                        </span>
+                        <span class="text-[11px] sm:text-xs text-[#73665E] block mt-0.5 truncate">
+                            {{ demo.name }}
+                        </span>
+                    </div>
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="px-5 py-3 bg-[#FAF6F0] border-t border-[#EBE1D5] flex items-center justify-between text-xs text-[#73665E]">
+            <span>Click to fill credentials</span>
+            <span class="font-medium text-[#702C3B]">Sign in remains manual</span>
+        </div>
+    </div>
+</div>
+
+{# Isolated client script for modal behavior and demo autofill #}
+<script>
+(function() {
+    function initDemoModal() {
+        const modal = document.getElementById('demo-accounts-modal');
+        const openBtn = document.getElementById('demo-modal-open-btn');
+        const changeBtn = document.getElementById('demo-selected-change-btn');
+        const closeBtn = document.getElementById('demo-modal-close-btn');
+        const backdrop = document.getElementById('demo-modal-backdrop');
+        const demoButtons = document.querySelectorAll('.demo-role-btn');
+        const emailInput = document.getElementById('id_email');
+        const passwordInput = document.getElementById('id_password');
+        const banner = document.getElementById('demo-selected-banner');
+        const bannerRoleName = document.getElementById('demo-selected-role-name');
+        const toggleBtn = document.getElementById('password-toggle-btn');
+        const eyeShow = document.getElementById('eye-icon-show');
+        const eyeHide = document.getElementById('eye-icon-hide');
+
+        if (!modal) return;
+
+        let lastFocusedElement = null;
+
+        function openModal() {
+            lastFocusedElement = document.activeElement;
+            modal.classList.remove('hidden');
+            if (openBtn) openBtn.setAttribute('aria-expanded', 'true');
+            document.body.style.overflow = 'hidden';
+
+            // Focus the first available role button or close button
+            const firstRoleBtn = modal.querySelector('.demo-role-btn:not([disabled])');
+            if (firstRoleBtn) {
+                firstRoleBtn.focus();
+            } else if (closeBtn) {
+                closeBtn.focus();
+            }
+        }
+
+        function closeModal() {
+            modal.classList.add('hidden');
+            if (openBtn) openBtn.setAttribute('aria-expanded', 'false');
+            document.body.style.overflow = '';
+
+            // Return focus cleanly
+            if (banner && !banner.classList.contains('hidden') && changeBtn) {
+                changeBtn.focus();
+            } else if (openBtn) {
+                openBtn.focus();
+            } else if (lastFocusedElement) {
+                lastFocusedElement.focus();
+            }
+        }
+
+        if (openBtn) openBtn.addEventListener('click', openModal);
+        if (changeBtn) changeBtn.addEventListener('click', openModal);
+        if (closeBtn) closeBtn.addEventListener('click', closeModal);
+        if (backdrop) backdrop.addEventListener('click', closeModal);
+
+        // Escape key to close modal
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+        // Tab focus trapping inside modal
+        modal.addEventListener('keydown', function(e) {
+            if (e.key !== 'Tab') return;
+
+            const focusables = modal.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+            if (!focusables.length) return;
+
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+
+            if (e.shiftKey) {
+                if (document.activeElement === first) {
+                    last.focus();
+                    e.preventDefault();
+                }
+            } else {
+                if (document.activeElement === last) {
+                    first.focus();
+                    e.preventDefault();
+                }
+            }
+        });
+
+        // Role selection
+        demoButtons.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                if (this.getAttribute('data-available') !== 'true') return;
+
+                const email = this.getAttribute('data-email');
+                const password = this.getAttribute('data-password') || 'RoomLoop2026!';
+                const label = this.getAttribute('data-label') || this.getAttribute('data-name');
+
+                // Populate form fields
+                if (emailInput) emailInput.value = email;
+                if (passwordInput) passwordInput.value = password;
+
+                // Explicitly keep password masked
+                if (passwordInput) {
+                    passwordInput.setAttribute('type', 'password');
+                }
+                if (toggleBtn && eyeShow && eyeHide) {
+                    toggleBtn.setAttribute('aria-label', 'Show password');
+                    toggleBtn.setAttribute('title', 'Show password');
+                    eyeShow.classList.remove('hidden');
+                    eyeHide.classList.add('hidden');
+                }
+
+                // Dispatch native events for reactive frameworks / listeners
+                if (emailInput) {
+                    emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (passwordInput) {
+                    passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    passwordInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+
+                // Highlight chosen button
+                demoButtons.forEach(b => {
+                    b.classList.remove('border-[#702C3B]', 'bg-[#F3ECE2]', 'ring-1', 'ring-[#702C3B]');
+                    b.classList.add('border-[#E8DED4]', 'bg-[#FAF6F0]');
+                });
+                this.classList.remove('border-[#E8DED4]', 'bg-[#FAF6F0]');
+                this.classList.add('border-[#702C3B]', 'bg-[#F3ECE2]', 'ring-1', 'ring-[#702C3B]');
+
+                // Update selected banner
+                if (banner && bannerRoleName) {
+                    bannerRoleName.textContent = label;
+                    banner.classList.remove('hidden');
+                }
+
+                // Visual flash on populated fields
+                if (emailInput) emailInput.classList.add('ring-2', 'ring-[#702C3B]', 'bg-[#FAF6F0]');
+                if (passwordInput) passwordInput.classList.add('ring-2', 'ring-[#702C3B]', 'bg-[#FAF6F0]');
+                setTimeout(() => {
+                    if (emailInput) emailInput.classList.remove('ring-2', 'ring-[#702C3B]', 'bg-[#FAF6F0]');
+                    if (passwordInput) passwordInput.classList.remove('ring-2', 'ring-[#702C3B]', 'bg-[#FAF6F0]');
+                }, 350);
+
+                // Close modal and focus Change button
+                closeModal();
+            });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDemoModal);
+    } else {
+        initDemoModal();
+    }
+})();
+</script>

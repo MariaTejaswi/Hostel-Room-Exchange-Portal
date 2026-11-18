@@ -515,7 +515,7 @@ def test_eligible_student_creates_exchange_request_with_derived_occupancy(
         data=_request_data(preferred_bed=hostel_setup["bed_b"]),
     )
 
-    assert req.status == ExchangeRequest.Status.OPEN
+    assert req.status == ExchangeRequest.Status.MATCHED
     assert req.current_occupancy_id == occupancy.id
     assert req.student_id == student_user.id
     assert req.institution_id == student_user.institution_id

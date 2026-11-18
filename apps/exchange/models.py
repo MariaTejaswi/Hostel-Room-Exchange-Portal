@@ -352,6 +352,8 @@ class ProposalParticipant(TimeStampedModel):
     exchange_request = models.ForeignKey(
         ExchangeRequest,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="proposal_participations",
     )
     student = models.ForeignKey(
@@ -393,6 +395,7 @@ class ProposalParticipant(TimeStampedModel):
             ),
             models.UniqueConstraint(
                 fields=["proposal", "exchange_request"],
+                condition=Q(exchange_request__isnull=False),
                 name="unique_request_per_exchange_proposal",
             ),
             models.UniqueConstraint(
@@ -411,7 +414,7 @@ class ProposalParticipant(TimeStampedModel):
             ),
             models.UniqueConstraint(
                 fields=["exchange_request"],
-                condition=Q(is_active_reservation=True),
+                condition=Q(is_active_reservation=True) & Q(exchange_request__isnull=False),
                 name="unique_active_exchange_reservation_per_request",
             ),
             models.CheckConstraint(
@@ -425,10 +428,11 @@ class ProposalParticipant(TimeStampedModel):
 
     def clean(self):
         super().clean()
-        if self.proposal_id and self.proposal.institution_id != self.exchange_request.institution_id:
-            raise ValidationError("Proposal and exchange request must share an institution.")
-        if self.student_id and self.exchange_request.student_id != self.student_id:
-            raise ValidationError("Proposal participant and exchange request student must match.")
+        if self.exchange_request_id:
+            if self.proposal_id and self.proposal.institution_id != self.exchange_request.institution_id:
+                raise ValidationError("Proposal and exchange request must share an institution.")
+            if self.student_id and self.exchange_request.student_id != self.student_id:
+                raise ValidationError("Proposal participant and exchange request student must match.")
         if self.current_occupancy_id and self.current_occupancy.student_id != self.student_id:
             raise ValidationError("Current occupancy must belong to the proposal participant.")
         if self.proposed_bed_id:

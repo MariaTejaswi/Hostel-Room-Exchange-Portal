@@ -377,6 +377,8 @@ def exchange_request_detail_view(request, pk):
 
     # Section 9 check: open exchange request whose target bed happens to be vacant
     is_target_bed_vacant = False
+    reconfirmation_needed = False
+    reconfirmation_message = ""
     if (
         exchange_request.request_type == ExchangeRequest.RequestType.EXCHANGE
         and exchange_request.status == ExchangeRequest.Status.OPEN
@@ -388,6 +390,16 @@ def exchange_request_detail_view(request, pk):
             bed=exchange_request.preferred_bed,
             status=StudentOccupancy.OccupancyStatus.ACTIVE,
         ).exists()
+
+        if not is_target_bed_vacant:
+            from .services import activate_direct_occupied_bed_request
+            activated, msg, prop = activate_direct_occupied_bed_request(exchange_request=exchange_request, now=now)
+            if activated and prop:
+                exchange_request.refresh_from_db()
+                active_proposal = prop
+            elif not activated:
+                reconfirmation_needed = True
+                reconfirmation_message = msg
 
     # Durable transfer record if completed
     transfer_record = None
@@ -401,7 +413,7 @@ def exchange_request_detail_view(request, pk):
         source_h = exchange_request.current_occupancy.bed.room.floor.block.hostel
         dest_h = exchange_request.preferred_bed.room.floor.block.hostel
         if source_h.id != dest_h.id:
-            required_authority_label = "Chief Warden (Cross-Hostel)"
+            required_authority_label = "Both Assigned Hostel Wardens (Cross-Hostel)"
 
     return render(
         request,
@@ -415,6 +427,8 @@ def exchange_request_detail_view(request, pk):
             "has_active_proposal": has_active_proposal,
             "active_proposal": active_proposal,
             "is_target_bed_vacant": is_target_bed_vacant,
+            "reconfirmation_needed": reconfirmation_needed,
+            "reconfirmation_message": reconfirmation_message,
             "transfer_record": transfer_record,
             "latest_approval": latest_approval,
             "required_authority_label": required_authority_label,
@@ -530,9 +544,13 @@ def proposal_list_view(request):
             and my_part.response_status == ProposalParticipant.ResponseStatus.PENDING
             and not is_expired
         )
+        other_part = next((p for p in proposal.participants.all() if p.student_id != request.user.id), None)
+        sender_name = other_part.student.full_name if other_part else None
         proposal_cards.append({
             "proposal": proposal,
             "my_participation": my_part,
+            "sender_name": sender_name,
+            "other_participation": other_part,
             "accepted_count": accepted_count,
             "total_count": total_count,
             "is_expired": is_expired,
@@ -585,6 +603,10 @@ def proposal_detail_view(request, pk):
         and not is_expired
     )
 
+    other_part = next((p for p in participants if p.student_id != request.user.id), None)
+    sender_name = other_part.student.full_name if other_part else None
+    is_sender = (my_part.sequence_order == 0)
+
     # Build cycle rotation cards with strict zero PII leakage:
     # No student email, phone number, or disciplinary/fee hold information.
     cycle_steps = []
@@ -613,6 +635,9 @@ def proposal_detail_view(request, pk):
         {
             "proposal": proposal,
             "my_participation": my_part,
+            "other_participation": other_part,
+            "sender_name": sender_name,
+            "is_sender": is_sender,
             "cycle_steps": cycle_steps,
             "accepted_count": accepted_count,
             "total_count": total_count,
@@ -872,7 +897,7 @@ def exchange_approval_list_view(request):
                 "is_cross_hostel": p.is_cross_hostel,
                 "scope_hostel": p.scope_hostel,
                 "status": p.status,
-                "status_display": p.get_status_display(),
+                "status_display": "Approved & Executed" if p.status == ExchangeProposal.Status.COMPLETED else p.get_status_display(),
                 "cycle_length": p.cycle_length,
                 "participants": list(p.participants.all()),
                 "can_decide": can_decide,
@@ -988,6 +1013,8 @@ def exchange_approval_detail_view(request, pk):
         .order_by("timestamp")
     )
 
+    hostel_approval_statuses = []
+
     context = {
         "proposal": proposal,
         "participants": participants,
@@ -996,6 +1023,7 @@ def exchange_approval_detail_view(request, pk):
         "cant_decide_reason": cant_decide_reason,
         "approvals": approvals,
         "latest_approval": latest_approval,
+        "hostel_approval_statuses": hostel_approval_statuses,
         "audit_logs": audit_logs,
         "transfer_records": list(
             proposal.transfer_records.select_related(
@@ -1048,7 +1076,7 @@ def exchange_approval_decide_view(request, pk):
         if decision == "approved":
             messages.success(
                 request,
-                f"Exchange proposal #{str(proposal.id)[:8]} has been approved successfully. Room transfers executed and all allocations updated.",
+                f"Exchange proposal #{str(proposal.id)[:8]} approved successfully. Room transfers executed.",
             )
         else:
             messages.success(

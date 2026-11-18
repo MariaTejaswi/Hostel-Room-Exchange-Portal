@@ -117,13 +117,37 @@
     </div>
     {% endif %}
 
+    <!-- Reconfirmation Needed Notice Banner (Requirement 5) -->
+    {% if reconfirmation_needed %}
+    <div class="card p-4 sm:p-5 border-l-4 border-amber-600 bg-amber-50/70 text-xs text-amber-950 space-y-2 rounded-r-xl shadow-xs">
+        <div class="flex items-center gap-2 font-bold text-sm text-amber-950">
+            <svg class="w-4 h-4 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <span>Reconfirmation Needed</span>
+        </div>
+        <p class="leading-relaxed">
+            {{ reconfirmation_message|default:"The occupancy or eligibility for your requested bed has changed. Please review and reconfirm or update your exchange request." }}
+        </p>
+        {% if can_edit %}
+        <div class="pt-1">
+            <a href="{% url 'exchange:request_edit' pk=exchange_request.pk %}" class="btn-primary btn-sm inline-flex">
+                Edit Request &rarr;
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Occupied-Bed Background Matching Status Panel -->
     {% if exchange_request.request_type == 'exchange' %}
     <section class="card p-5 border border-[#D5C2B1] bg-[#FDFBF9] rounded-2xl shadow-sm space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#EADFD6] pb-3">
             <div>
                 <span class="text-[10px] font-bold uppercase tracking-wider text-[#702C3B]">Automatic Workflow</span>
-                <h2 class="text-base font-bold text-[#3B1720]">Background Matching Status</h2>
+                <h2 class="text-base font-bold text-[#3B1720]">
+                    {% if exchange_request.preferred_bed %}Direct Exchange Status{% else %}Background Matching Status{% endif %}
+                </h2>
             </div>
             <div class="flex items-center gap-2">
                 {% if exchange_request.matching_status == 'waiting' %}
@@ -142,9 +166,9 @@
                     No Compatible Match Found
                 </span>
                 {% elif exchange_request.matching_status == 'proposal_available' %}
-                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300">
-                    <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
-                    Proposal Available
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300">
+                    <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    Waiting for Occupant Response
                 </span>
                 {% elif exchange_request.matching_status == 'unavailable' %}
                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-900 border border-rose-300">
@@ -183,11 +207,21 @@
                 No compatible exchange cycle could be formed at this time. RoomLoop will continuously re-evaluate your request as other students submit or modify exchange requests.
             </p>
             {% elif exchange_request.matching_status == 'proposal_available' %}
-            <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div class="p-3 bg-amber-50/70 border border-amber-300 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
-                    <strong class="text-emerald-900 block font-semibold">A room exchange proposal has been activated!</strong>
-                    <span class="text-emerald-800 text-[11px]">
+                    <strong class="text-amber-950 block font-semibold">
+                        {% if exchange_request.preferred_bed %}
+                        Waiting for Occupant Response
+                        {% else %}
+                        A room exchange proposal has been activated!
+                        {% endif %}
+                    </strong>
+                    <span class="text-amber-900 text-[11px]">
+                        {% if exchange_request.preferred_bed %}
+                        Your direct exchange invitation has been delivered to the bed's current occupant.
+                        {% else %}
                         All participants must accept before the deadline for authority approval to proceed.
+                        {% endif %}
                         {% if active_proposal and active_proposal.expires_at %}
                         <span class="font-medium underline">Acceptance Deadline: {{ active_proposal.expires_at|date:"M d, Y H:i" }}</span>
                         {% endif %}
@@ -195,7 +229,7 @@
                 </div>
                 {% if active_proposal %}
                 <a href="{% url 'exchange:proposal_detail' pk=active_proposal.pk %}" class="btn-primary btn-sm flex-shrink-0 whitespace-nowrap">
-                    Review Proposal &rarr;
+                    View Proposal &rarr;
                 </a>
                 {% endif %}
             </div>

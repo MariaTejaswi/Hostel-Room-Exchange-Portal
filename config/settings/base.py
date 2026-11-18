@@ -198,3 +198,6 @@ CELERY_BEAT_SCHEDULE = {
 # Email Backend
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "RoomLoop Portal <notifications@roomloop.edu>")
+
+# Demo Accounts Visibility Shortcut
+SHOW_DEMO_ACCOUNTS = os.getenv("SHOW_DEMO_ACCOUNTS", "True").lower() in ("true", "1", "yes")
