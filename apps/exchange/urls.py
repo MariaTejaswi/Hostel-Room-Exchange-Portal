@@ -54,6 +54,11 @@ urlpatterns = [
         name="transfer_approval_decide",
     ),
     path(
+        "exchange/transfers/",
+        views.exchange_my_transfers_view,
+        name="my_transfers",
+    ),
+    path(
         "exchange/transfers/<uuid:pk>/letter/",
         views.transfer_letter_view,
         name="transfer_letter",

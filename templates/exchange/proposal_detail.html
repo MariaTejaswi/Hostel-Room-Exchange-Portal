@@ -34,6 +34,21 @@
         <p class="font-bold text-rose-950 text-sm">Proposal Cancelled</p>
         <p>A participant declined this exchange proposal. All temporary reservations have been released and non-expired requests returned to the open matching pool.</p>
     </div>
+    {% elif proposal.status == 'completed' %}
+    <div class="card p-5 border-l-4 border-emerald-600 bg-emerald-50/70 text-xs text-emerald-950 space-y-2 rounded-r-lg shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <p class="font-bold text-emerald-950 text-sm">Exchange Completed & Room Transfer Executed</p>
+                <p class="text-emerald-900 mt-0.5">This room exchange proposal has received official authority approval and your physical room transfer has been executed in the system.</p>
+            </div>
+            {% if my_transfer_record %}
+            <a href="{% url 'exchange:transfer_letter' pk=my_transfer_record.pk %}?format=pdf" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-[#702C3B] hover:bg-[#5C2330] text-white shrink-0 shadow-sm transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Download Official PDF Order
+            </a>
+            {% endif %}
+        </div>
+    </div>
     {% elif proposal.status == 'pending_approval' %}
     <div class="card p-4 border-l-4 border-emerald-500 bg-emerald-50/70 text-xs text-emerald-900 space-y-1 rounded-r-lg">
         <p class="font-bold text-emerald-950 text-sm">Accepted by All Participants — Pending Authority Approval</p>

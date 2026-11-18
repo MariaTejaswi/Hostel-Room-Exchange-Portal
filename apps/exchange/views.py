@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
@@ -58,6 +58,7 @@ from .services import (
     get_institution_exchange_policies,
     reject_vacant_transfer,
     respond_to_proposal,
+    schedule_institution_matching,
     update_exchange_request,
     update_institution_exchange_policy,
     withdraw_exchange_request,
@@ -332,6 +333,20 @@ def exchange_request_detail_view(request, pk):
         get_student_exchange_requests(request.user),
         pk=pk,
     )
+
+    if request.method == "POST" and request.POST.get("action") == "refresh_matching":
+        if (
+            exchange_request.request_type == ExchangeRequest.RequestType.EXCHANGE
+            and exchange_request.status == ExchangeRequest.Status.OPEN
+        ):
+            schedule_institution_matching(
+                institution_id=exchange_request.institution_id,
+                trigger_reason="manual_refresh",
+                trigger_request_id=exchange_request.id,
+            )
+            messages.info(request, "Matching evaluation queued. Please check back shortly for updated status.")
+        return redirect("exchange:request_detail", pk=pk)
+
     now = timezone.now()
     is_expired = bool(exchange_request.expires_at and exchange_request.expires_at <= now)
     has_active_proposal = exchange_request.proposal_participations.filter(is_active_reservation=True).exists()
@@ -341,6 +356,24 @@ def exchange_request_detail_view(request, pk):
         and not is_expired
         and not has_active_proposal
     )
+
+    active_proposal = None
+    if exchange_request.request_type == ExchangeRequest.RequestType.EXCHANGE:
+        active_part = (
+            exchange_request.proposal_participations.filter(
+                proposal__status__in=[
+                    ExchangeProposal.Status.PENDING_ACCEPTANCE,
+                    ExchangeProposal.Status.ACCEPTED,
+                    ExchangeProposal.Status.PENDING_APPROVAL,
+                    ExchangeProposal.Status.APPROVED,
+                ]
+            )
+            .select_related("proposal")
+            .order_by("-proposal__created_at")
+            .first()
+        )
+        if active_part:
+            active_proposal = active_part.proposal
 
     # Section 9 check: open exchange request whose target bed happens to be vacant
     is_target_bed_vacant = False
@@ -380,6 +413,7 @@ def exchange_request_detail_view(request, pk):
             "can_withdraw": can_withdraw,
             "is_expired": is_expired,
             "has_active_proposal": has_active_proposal,
+            "active_proposal": active_proposal,
             "is_target_bed_vacant": is_target_bed_vacant,
             "transfer_record": transfer_record,
             "latest_approval": latest_approval,
@@ -963,6 +997,15 @@ def exchange_approval_detail_view(request, pk):
         "approvals": approvals,
         "latest_approval": latest_approval,
         "audit_logs": audit_logs,
+        "transfer_records": list(
+            proposal.transfer_records.select_related(
+                "student",
+                "previous_room__floor__block__hostel",
+                "previous_bed",
+                "new_room__floor__block__hostel",
+                "new_bed",
+            ).order_by("transferred_at", "id")
+        ),
         "is_dean": is_dean,
         "is_chief_warden": is_cw,
         "is_warden": is_w,
@@ -1000,11 +1043,12 @@ def exchange_approval_decide_view(request, pk):
             decision=decision,
             remarks=remarks,
             ip_address=request.META.get("REMOTE_ADDR"),
+            auto_execute=True,
         )
         if decision == "approved":
             messages.success(
                 request,
-                f"Exchange proposal #{str(proposal.id)[:8]} has been approved successfully. Status updated to 'Approved — transfer pending'.",
+                f"Exchange proposal #{str(proposal.id)[:8]} has been approved successfully. Room transfers executed and all allocations updated.",
             )
         else:
             messages.success(
@@ -1169,10 +1213,11 @@ def exchange_vacant_transfer_approval_decide_view(request, pk):
 @login_required
 def transfer_letter_view(request, pk):
     """
-    Render or download the official RoomLoop Accommodation Transfer Letter for a completed transfer.
+    Render or download the official RoomLoop Accommodation Transfer Order / Confirmation Letter.
+    Generates genuine PDF-1.4 binary when format=pdf is requested.
     Accessible by:
     - The transferred student.
-    - Wardens, Chief Wardens, and Deans of the institution.
+    - Wardens, Chief Wardens, Deans, and Hostel Administrators of the institution.
     """
     user = request.user
     transfer_record = (
@@ -1186,6 +1231,8 @@ def transfer_letter_view(request, pk):
             "new_room__floor__block__hostel",
             "new_bed",
             "approved_by",
+            "proposal",
+            "exchange_request",
         )
         .first()
     )
@@ -1199,13 +1246,23 @@ def transfer_letter_view(request, pk):
             getattr(user, "is_warden_role", False)
             or getattr(user, "is_chief_warden_role", False)
             or getattr(user, "is_dean_role", False)
+            or getattr(user, "is_hostel_admin_role", False)
         )
     )
 
     if not (is_owner or is_staff):
         raise PermissionDenied("You do not have permission to view this transfer document.")
 
-    download_format = request.GET.get("format") or request.GET.get("download")
+    download_format = (request.GET.get("format") or request.GET.get("download") or "").strip().lower()
+
+    if download_format == "pdf":
+        from .documents import generate_transfer_letter_pdf
+
+        pdf_bytes = generate_transfer_letter_pdf(transfer_record)
+        safe_reg = getattr(transfer_record.student, "registration_number", "student") or "student"
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="transfer_order_{safe_reg}_{str(transfer_record.id)[:8]}.pdf"'
+        return response
 
     context = {
         "transfer": transfer_record,
@@ -1216,174 +1273,49 @@ def transfer_letter_view(request, pk):
     }
 
     response = render(request, "exchange/transfer_letter.html", context)
-    if download_format in ("1", "true", "download"):
+    if download_format in ("html", "download", "1", "true"):
         safe_reg = getattr(transfer_record.student, "registration_number", "student") or "student"
         response["Content-Disposition"] = f'attachment; filename="transfer_letter_{safe_reg}.html"'
     return response
 
-    if decision == "rejected" and not remarks:
-        messages.error(request, "Remarks are mandatory when rejecting an exchange proposal.")
-        return redirect("exchange:approval_detail", pk=pk)
-
 
 @login_required
-def exchange_vacant_transfer_approval_detail_view(request, pk):
-    """Detailed view for reviewing a vacant-bed transfer request awaiting approval or decided."""
-    user = request.user
-    is_w = getattr(user, "is_warden_role", False)
-    is_cw = getattr(user, "is_chief_warden_role", False)
-    is_dean = getattr(user, "is_dean_role", False)
-
-    if not (is_w or is_cw or is_dean):
-        raise PermissionDenied("You do not have permission to access transfer approvals.")
-
-    transfer_request = get_vacant_transfer_detail(user, pk)
-    if not transfer_request:
-        raise Http404("Transfer request not found or access restricted.")
-
-    can_decide, cant_decide_reason = can_user_decide_vacant_transfer(user, transfer_request)
-
-    student = transfer_request.student
-    current_occupancy = transfer_request.current_occupancy
-    preferred_bed = transfer_request.preferred_bed
-
-    # Live vacancy check of destination bed
-    is_dest_vacant = False
-    dest_operational = False
-    if preferred_bed:
-        dest_operational = (
-            preferred_bed.is_active
-            and preferred_bed.operational_status == OperationalStatus.IN_SERVICE
-            and preferred_bed.room.is_active
-            and preferred_bed.room.operational_status == OperationalStatus.IN_SERVICE
-        )
-        is_dest_vacant = dest_operational and not StudentOccupancy.objects.filter(
-            bed=preferred_bed,
-            status=StudentOccupancy.OccupancyStatus.ACTIVE,
-        ).exists()
-
-    # Eligibility evaluation
-    eligibility_report = check_student_exchange_eligibility(
-        student=student,
-        occupancy=current_occupancy,
-    )
-
-    # Source and destination hostels
-    source_hostel = current_occupancy.bed.room.floor.block.hostel
-    dest_hostel = preferred_bed.room.floor.block.hostel if preferred_bed else None
-    is_cross_hostel = dest_hostel and (source_hostel.id != dest_hostel.id)
-
-    # Approvals & Audit logs
-    approvals = list(
-        transfer_request.approvals.select_related("authority_user", "scope_hostel").order_by("-decided_at", "-created_at")
-    )
-    latest_approval = approvals[0] if approvals else None
-
-    audit_logs = (
-        AuditLog.objects.filter(
-            institution=user.institution,
-            target_id=str(transfer_request.id),
-        )
-        .select_related("acting_user")
-        .order_by("timestamp")
-    )
-
-    # Check for transfer record if completed
-    transfer_record = TransferRecord.objects.filter(exchange_request=transfer_request).first()
-
-    context = {
-        "transfer_request": transfer_request,
-        "student": student,
-        "current_occupancy": current_occupancy,
-        "preferred_bed": preferred_bed,
-        "source_hostel": source_hostel,
-        "dest_hostel": dest_hostel,
-        "is_cross_hostel": is_cross_hostel,
-        "is_dest_vacant": is_dest_vacant,
-        "dest_operational": dest_operational,
-        "eligibility_report": eligibility_report,
-        "can_decide": can_decide,
-        "cant_decide_reason": cant_decide_reason,
-        "approvals": approvals,
-        "latest_approval": latest_approval,
-        "transfer_record": transfer_record,
-        "audit_logs": audit_logs,
-        "is_dean": is_dean,
-        "is_chief_warden": is_cw,
-        "is_warden": is_w,
-        "active_nav": "exchange_approvals",
-    }
-    return render(request, "exchange/transfer_approval_detail.html", context)
-
-
-@login_required
-@require_POST
-def exchange_vacant_transfer_approval_decide_view(request, pk):
-    """Handle authority decision (Approve & Execute / Reject) on a vacant-bed transfer."""
-    user = request.user
-    is_w = getattr(user, "is_warden_role", False)
-    is_cw = getattr(user, "is_chief_warden_role", False)
-
-    if not (is_w or is_cw):
-        raise PermissionDenied("You do not have authority to decide transfer requests.")
-
-    decision = request.POST.get("decision", "").strip().lower()
-    remarks = request.POST.get("remarks", "").strip()
-
-    if decision not in ("approved", "rejected"):
-        messages.error(request, "Invalid decision value.")
-        return redirect("exchange:transfer_approval_detail", pk=pk)
-
-    if decision == "rejected" and not remarks:
-        messages.error(request, "Remarks are mandatory when rejecting a transfer request.")
-        return redirect("exchange:transfer_approval_detail", pk=pk)
-
-    try:
-        if decision == "approved":
-            approval, transfer_record = approve_and_execute_vacant_transfer(
-                request_id=pk,
-                actor=user,
-                remarks=remarks,
-                ip_address=request.META.get("REMOTE_ADDR"),
-            )
-            messages.success(
-                request,
-                f"Transfer request approved and executed successfully. "
-                f"Student {transfer_record.student.full_name} is now allocated to {transfer_record.destination_hostel_name}, "
-                f"Room {transfer_record.destination_room_number}, Bed {transfer_record.destination_bed_label}.",
-            )
-        else:
-            approval, req = reject_vacant_transfer(
-                request_id=pk,
-                actor=user,
-                remarks=remarks,
-                ip_address=request.META.get("REMOTE_ADDR"),
-            )
-            messages.success(
-                request,
-                f"Transfer request for {req.student.full_name} has been rejected. Student's current room allocation is unchanged.",
-            )
-    except ValidationError as exc:
-        for msg in _validation_messages(exc):
-            messages.error(request, msg)
-    except PermissionDenied as exc:
-        messages.error(request, str(exc))
-
-    return redirect("exchange:transfer_approval_detail", pk=pk)
-
-
-@login_required
-def transfer_letter_view(request, pk):
+def exchange_my_transfers_view(request):
     """
-    Render or download the official RoomLoop Accommodation Transfer Letter for a completed transfer.
-    Accessible by:
-    - The transferred student.
-    - Wardens, Chief Wardens, and Deans of the institution.
+    List completed room transfers and downloadable official transfer orders.
+    - Students see their own completed transfers.
+    - Wardens, Chief Wardens, Deans see institution-wide completed transfers.
     """
     user = request.user
-    transfer_record = (
-        TransferRecord.objects.filter(Q(id=pk) | Q(exchange_request_id=pk))
-        .select_related(
+    is_student = getattr(user, "is_student_role", False)
+    is_staff = (
+        getattr(user, "is_warden_role", False)
+        or getattr(user, "is_chief_warden_role", False)
+        or getattr(user, "is_dean_role", False)
+        or getattr(user, "is_hostel_admin_role", False)
+    )
+
+    if is_student:
+        transfers_qs = TransferRecord.objects.filter(student=user)
+    elif is_staff:
+        transfers_qs = TransferRecord.objects.filter(institution=user.institution)
+    else:
+        raise PermissionDenied("You do not have access to transfer records.")
+
+    search_query = request.GET.get("q", "").strip()
+    if search_query:
+        transfers_qs = transfers_qs.filter(
+            Q(student__first_name__icontains=search_query)
+            | Q(student__last_name__icontains=search_query)
+            | Q(student__registration_number__icontains=search_query)
+            | Q(source_hostel_name__icontains=search_query)
+            | Q(destination_hostel_name__icontains=search_query)
+            | Q(source_room_number__icontains=search_query)
+            | Q(destination_room_number__icontains=search_query)
+        )
+
+    transfers = list(
+        transfers_qs.select_related(
             "student",
             "institution",
             "approval__authority_user",
@@ -1392,463 +1324,16 @@ def transfer_letter_view(request, pk):
             "new_room__floor__block__hostel",
             "new_bed",
             "approved_by",
-        )
-        .first()
+            "proposal",
+            "exchange_request",
+        ).order_by("-transferred_at")
     )
-    if not transfer_record:
-        raise Http404("Transfer record not found.")
-
-    is_owner = (user.id == transfer_record.student_id)
-    is_staff = (
-        user.institution_id == transfer_record.institution_id
-        and (
-            getattr(user, "is_warden_role", False)
-            or getattr(user, "is_chief_warden_role", False)
-            or getattr(user, "is_dean_role", False)
-        )
-    )
-
-    if not (is_owner or is_staff):
-        raise PermissionDenied("You do not have permission to view this transfer document.")
-
-    download_format = request.GET.get("format") or request.GET.get("download")
 
     context = {
-        "transfer": transfer_record,
-        "student": transfer_record.student,
-        "institution": transfer_record.institution,
-        "approval": transfer_record.approval,
-        "now": timezone.now(),
+        "transfers": transfers,
+        "is_student": is_student,
+        "is_staff": is_staff,
+        "search_query": search_query,
+        "active_nav": "my_transfers",
     }
-
-    response = render(request, "exchange/transfer_letter.html", context)
-    if download_format in ("1", "true", "download"):
-        safe_reg = getattr(transfer_record.student, "registration_number", "student") or "student"
-        response["Content-Disposition"] = f'attachment; filename="transfer_letter_{safe_reg}.html"'
-    return response
-
-    try:
-        approval, proposal = decide_exchange_proposal(
-            proposal_id=pk,
-            actor=user,
-            decision=decision,
-            remarks=remarks,
-            ip_address=request.META.get("REMOTE_ADDR"),
-        )
-        if decision == "approved":
-            messages.success(
-                request,
-                f"Proposal #{str(proposal.id)[:8]} has been approved successfully. "
-                "Workflow reservations are held for transfer execution (M6).",
-            )
-        else:
-            messages.success(
-                request,
-                f"Proposal #{str(proposal.id)[:8]} has been rejected. "
-                "Workflow reservations have been released and open requests returned to the matching pool.",
-            )
-    except ValidationError as exc:
-        for msg in _validation_messages(exc):
-            messages.error(request, msg)
-    except PermissionDenied as exc:
-        messages.error(request, str(exc))
-
-    return redirect("exchange:approval_detail", pk=pk)
-
-
-@login_required
-def exchange_vacant_transfer_approval_detail_view(request, pk):
-    """Detailed view for reviewing a vacant-bed transfer request awaiting approval or decided."""
-    user = request.user
-    is_w = getattr(user, "is_warden_role", False)
-    is_cw = getattr(user, "is_chief_warden_role", False)
-    is_dean = getattr(user, "is_dean_role", False)
-
-    if not (is_w or is_cw or is_dean):
-        raise PermissionDenied("You do not have permission to access transfer approvals.")
-
-    transfer_request = get_vacant_transfer_detail(user, pk)
-    if not transfer_request:
-        raise Http404("Transfer request not found or access restricted.")
-
-    can_decide, cant_decide_reason = can_user_decide_vacant_transfer(user, transfer_request)
-
-    student = transfer_request.student
-    current_occupancy = transfer_request.current_occupancy
-    preferred_bed = transfer_request.preferred_bed
-
-    # Live vacancy check of destination bed
-    is_dest_vacant = False
-    dest_operational = False
-    if preferred_bed:
-        dest_operational = (
-            preferred_bed.is_active
-            and preferred_bed.operational_status == OperationalStatus.IN_SERVICE
-            and preferred_bed.room.is_active
-            and preferred_bed.room.operational_status == OperationalStatus.IN_SERVICE
-        )
-        is_dest_vacant = dest_operational and not StudentOccupancy.objects.filter(
-            bed=preferred_bed,
-            status=StudentOccupancy.OccupancyStatus.ACTIVE,
-        ).exists()
-
-    # Eligibility evaluation
-    eligibility_report = check_student_exchange_eligibility(
-        student=student,
-        occupancy=current_occupancy,
-    )
-
-    # Source and destination hostels
-    source_hostel = current_occupancy.bed.room.floor.block.hostel
-    dest_hostel = preferred_bed.room.floor.block.hostel if preferred_bed else None
-    is_cross_hostel = dest_hostel and (source_hostel.id != dest_hostel.id)
-
-    # Approvals & Audit logs
-    approvals = list(
-        transfer_request.approvals.select_related("authority_user", "scope_hostel").order_by("-decided_at", "-created_at")
-    )
-    latest_approval = approvals[0] if approvals else None
-
-    audit_logs = (
-        AuditLog.objects.filter(
-            institution=user.institution,
-            target_id=str(transfer_request.id),
-        )
-        .select_related("acting_user")
-        .order_by("timestamp")
-    )
-
-    # Check for transfer record if completed
-    transfer_record = TransferRecord.objects.filter(exchange_request=transfer_request).first()
-
-    context = {
-        "transfer_request": transfer_request,
-        "student": student,
-        "current_occupancy": current_occupancy,
-        "preferred_bed": preferred_bed,
-        "source_hostel": source_hostel,
-        "dest_hostel": dest_hostel,
-        "is_cross_hostel": is_cross_hostel,
-        "is_dest_vacant": is_dest_vacant,
-        "dest_operational": dest_operational,
-        "eligibility_report": eligibility_report,
-        "can_decide": can_decide,
-        "cant_decide_reason": cant_decide_reason,
-        "approvals": approvals,
-        "latest_approval": latest_approval,
-        "transfer_record": transfer_record,
-        "audit_logs": audit_logs,
-        "is_dean": is_dean,
-        "is_chief_warden": is_cw,
-        "is_warden": is_w,
-        "active_nav": "exchange_approvals",
-    }
-    return render(request, "exchange/transfer_approval_detail.html", context)
-
-
-@login_required
-@require_POST
-def exchange_vacant_transfer_approval_decide_view(request, pk):
-    """Handle authority decision (Approve & Execute / Reject) on a vacant-bed transfer."""
-    user = request.user
-    is_w = getattr(user, "is_warden_role", False)
-    is_cw = getattr(user, "is_chief_warden_role", False)
-
-    if not (is_w or is_cw):
-        raise PermissionDenied("You do not have authority to decide transfer requests.")
-
-    decision = request.POST.get("decision", "").strip().lower()
-    remarks = request.POST.get("remarks", "").strip()
-
-    if decision not in ("approved", "rejected"):
-        messages.error(request, "Invalid decision value.")
-        return redirect("exchange:transfer_approval_detail", pk=pk)
-
-    if decision == "rejected" and not remarks:
-        messages.error(request, "Remarks are mandatory when rejecting a transfer request.")
-        return redirect("exchange:transfer_approval_detail", pk=pk)
-
-    try:
-        if decision == "approved":
-            approval, transfer_record = approve_and_execute_vacant_transfer(
-                request_id=pk,
-                actor=user,
-                remarks=remarks,
-                ip_address=request.META.get("REMOTE_ADDR"),
-            )
-            messages.success(
-                request,
-                f"Transfer request approved and executed successfully. "
-                f"Student {transfer_record.student.full_name} is now allocated to {transfer_record.destination_hostel_name}, "
-                f"Room {transfer_record.destination_room_number}, Bed {transfer_record.destination_bed_label}.",
-            )
-        else:
-            approval, req = reject_vacant_transfer(
-                request_id=pk,
-                actor=user,
-                remarks=remarks,
-                ip_address=request.META.get("REMOTE_ADDR"),
-            )
-            messages.success(
-                request,
-                f"Transfer request for {req.student.full_name} has been rejected. Student's current room allocation is unchanged.",
-            )
-    except ValidationError as exc:
-        for msg in _validation_messages(exc):
-            messages.error(request, msg)
-    except PermissionDenied as exc:
-        messages.error(request, str(exc))
-
-    return redirect("exchange:transfer_approval_detail", pk=pk)
-
-
-@login_required
-def transfer_letter_view(request, pk):
-    """
-    Render or download the official RoomLoop Accommodation Transfer Letter for a completed transfer.
-    Accessible by:
-    - The transferred student.
-    - Wardens, Chief Wardens, and Deans of the institution.
-    """
-    user = request.user
-    transfer_record = (
-        TransferRecord.objects.filter(Q(id=pk) | Q(exchange_request_id=pk))
-        .select_related(
-            "student",
-            "institution",
-            "approval__authority_user",
-            "previous_room__floor__block__hostel",
-            "previous_bed",
-            "new_room__floor__block__hostel",
-            "new_bed",
-            "approved_by",
-        )
-        .first()
-    )
-    if not transfer_record:
-        raise Http404("Transfer record not found.")
-
-    is_owner = (user.id == transfer_record.student_id)
-    is_staff = (
-        user.institution_id == transfer_record.institution_id
-        and (
-            getattr(user, "is_warden_role", False)
-            or getattr(user, "is_chief_warden_role", False)
-            or getattr(user, "is_dean_role", False)
-        )
-    )
-
-    if not (is_owner or is_staff):
-        raise PermissionDenied("You do not have permission to view this transfer document.")
-
-    download_format = request.GET.get("format") or request.GET.get("download")
-
-    context = {
-        "transfer": transfer_record,
-        "student": transfer_record.student,
-        "institution": transfer_record.institution,
-        "approval": transfer_record.approval,
-        "now": timezone.now(),
-    }
-
-    response = render(request, "exchange/transfer_letter.html", context)
-    if download_format in ("1", "true", "download"):
-        safe_reg = getattr(transfer_record.student, "registration_number", "student") or "student"
-        response["Content-Disposition"] = f'attachment; filename="transfer_letter_{safe_reg}.html"'
-    return response
-
-
-    if not (is_w or is_cw or is_dean):
-        raise PermissionDenied("You do not have permission to access transfer approvals.")
-
-    transfer_request = get_vacant_transfer_detail(user, pk)
-    if not transfer_request:
-        raise Http404("Transfer request not found or access restricted.")
-
-    can_decide, cant_decide_reason = can_user_decide_vacant_transfer(user, transfer_request)
-
-    student = transfer_request.student
-    current_occupancy = transfer_request.current_occupancy
-    preferred_bed = transfer_request.preferred_bed
-
-    # Live vacancy check of destination bed
-    is_dest_vacant = False
-    dest_operational = False
-    if preferred_bed:
-        dest_operational = (
-            preferred_bed.is_active
-            and preferred_bed.operational_status == OperationalStatus.IN_SERVICE
-            and preferred_bed.room.is_active
-            and preferred_bed.room.operational_status == OperationalStatus.IN_SERVICE
-        )
-        is_dest_vacant = dest_operational and not StudentOccupancy.objects.filter(
-            bed=preferred_bed,
-            status=StudentOccupancy.OccupancyStatus.ACTIVE,
-        ).exists()
-
-    # Eligibility evaluation
-    eligibility_report = check_student_exchange_eligibility(
-        student=student,
-        occupancy=current_occupancy,
-    )
-
-    # Source and destination hostels
-    source_hostel = current_occupancy.bed.room.floor.block.hostel
-    dest_hostel = preferred_bed.room.floor.block.hostel if preferred_bed else None
-    is_cross_hostel = dest_hostel and (source_hostel.id != dest_hostel.id)
-
-    # Approvals & Audit logs
-    approvals = list(
-        transfer_request.approvals.select_related("authority_user", "scope_hostel").order_by("-decided_at", "-created_at")
-    )
-    latest_approval = approvals[0] if approvals else None
-
-    audit_logs = (
-        AuditLog.objects.filter(
-            institution=user.institution,
-            target_id=str(transfer_request.id),
-        )
-        .select_related("acting_user")
-        .order_by("timestamp")
-    )
-
-    # Check for transfer record if completed
-    transfer_record = TransferRecord.objects.filter(exchange_request=transfer_request).first()
-
-    context = {
-        "transfer_request": transfer_request,
-        "student": student,
-        "current_occupancy": current_occupancy,
-        "preferred_bed": preferred_bed,
-        "source_hostel": source_hostel,
-        "dest_hostel": dest_hostel,
-        "is_cross_hostel": is_cross_hostel,
-        "is_dest_vacant": is_dest_vacant,
-        "dest_operational": dest_operational,
-        "eligibility_report": eligibility_report,
-        "can_decide": can_decide,
-        "cant_decide_reason": cant_decide_reason,
-        "approvals": approvals,
-        "latest_approval": latest_approval,
-        "transfer_record": transfer_record,
-        "audit_logs": audit_logs,
-        "is_dean": is_dean,
-        "is_chief_warden": is_cw,
-        "is_warden": is_w,
-        "active_nav": "exchange_approvals",
-    }
-    return render(request, "exchange/transfer_approval_detail.html", context)
-
-
-@login_required
-@require_POST
-def exchange_vacant_transfer_approval_decide_view(request, pk):
-    """Handle authority decision (Approve & Execute / Reject) on a vacant-bed transfer."""
-    user = request.user
-    is_w = getattr(user, "is_warden_role", False)
-    is_cw = getattr(user, "is_chief_warden_role", False)
-
-    if not (is_w or is_cw):
-        raise PermissionDenied("You do not have authority to decide transfer requests.")
-
-    decision = request.POST.get("decision", "").strip().lower()
-    remarks = request.POST.get("remarks", "").strip()
-
-    if decision not in ("approved", "rejected"):
-        messages.error(request, "Invalid decision value.")
-        return redirect("exchange:transfer_approval_detail", pk=pk)
-
-    if decision == "rejected" and not remarks:
-        messages.error(request, "Remarks are mandatory when rejecting a transfer request.")
-        return redirect("exchange:transfer_approval_detail", pk=pk)
-
-    try:
-        if decision == "approved":
-            approval, transfer_record = approve_and_execute_vacant_transfer(
-                request_id=pk,
-                actor=user,
-                remarks=remarks,
-                ip_address=request.META.get("REMOTE_ADDR"),
-            )
-            messages.success(
-                request,
-                f"Transfer request approved and executed successfully. "
-                f"Student {transfer_record.student.full_name} is now allocated to {transfer_record.destination_hostel_name}, "
-                f"Room {transfer_record.destination_room_number}, Bed {transfer_record.destination_bed_label}.",
-            )
-        else:
-            approval, req = reject_vacant_transfer(
-                request_id=pk,
-                actor=user,
-                remarks=remarks,
-                ip_address=request.META.get("REMOTE_ADDR"),
-            )
-            messages.success(
-                request,
-                f"Transfer request for {req.student.full_name} has been rejected. Student's current room allocation is unchanged.",
-            )
-    except ValidationError as exc:
-        for msg in _validation_messages(exc):
-            messages.error(request, msg)
-    except PermissionDenied as exc:
-        messages.error(request, str(exc))
-
-    return redirect("exchange:transfer_approval_detail", pk=pk)
-
-
-@login_required
-def transfer_letter_view(request, pk):
-    """
-    Render or download the official RoomLoop Accommodation Transfer Letter for a completed transfer.
-    Accessible by:
-    - The transferred student.
-    - Wardens, Chief Wardens, and Deans of the institution.
-    """
-    user = request.user
-    transfer_record = (
-        TransferRecord.objects.filter(Q(id=pk) | Q(exchange_request_id=pk))
-        .select_related(
-            "student",
-            "institution",
-            "approval__authority_user",
-            "previous_room__floor__block__hostel",
-            "previous_bed",
-            "new_room__floor__block__hostel",
-            "new_bed",
-            "approved_by",
-        )
-        .first()
-    )
-    if not transfer_record:
-        raise Http404("Transfer record not found.")
-
-    is_owner = (user.id == transfer_record.student_id)
-    is_staff = (
-        user.institution_id == transfer_record.institution_id
-        and (
-            getattr(user, "is_warden_role", False)
-            or getattr(user, "is_chief_warden_role", False)
-            or getattr(user, "is_dean_role", False)
-        )
-    )
-
-    if not (is_owner or is_staff):
-        raise PermissionDenied("You do not have permission to view this transfer document.")
-
-    download_format = request.GET.get("format") or request.GET.get("download")
-
-    context = {
-        "transfer": transfer_record,
-        "student": transfer_record.student,
-        "institution": transfer_record.institution,
-        "approval": transfer_record.approval,
-        "now": timezone.now(),
-    }
-
-    response = render(request, "exchange/transfer_letter.html", context)
-    if download_format in ("1", "true", "download"):
-        safe_reg = getattr(transfer_record.student, "registration_number", "student") or "student"
-        response["Content-Disposition"] = f'attachment; filename="transfer_letter_{safe_reg}.html"'
-    return response
-
-
+    return render(request, "exchange/transfer_list.html", context)

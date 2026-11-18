@@ -1,0 +1,142 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block title %}Accommodation Transfers & Orders — RoomLoop{% endblock %}
+{% block breadcrumb_current %}Completed Transfers{% endblock %}
+
+{% block content %}
+<div class="student-page w-full max-w-[1080px] mx-auto space-y-6">
+    <header class="student-welcome flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p class="student-eyebrow">Institutional Records</p>
+            <h1 class="student-title">Accommodation Transfers & Orders</h1>
+            <p class="student-subtitle">Official records of completed room exchanges and vacant-bed transfers with downloadable transfer orders.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            {% if is_student %}
+            <a href="{% url 'exchange:proposal_list' %}" class="btn-secondary btn-sm">My Proposals &rarr;</a>
+            {% else %}
+            <a href="{% url 'exchange:approval_list' %}" class="btn-secondary btn-sm">Approvals Queue &rarr;</a>
+            {% endif %}
+        </div>
+    </header>
+
+    {% if is_staff %}
+    <!-- Filter and Search Bar for Staff -->
+    <div class="card p-4 border border-[#D5C2B1] bg-white rounded-xl shadow-sm">
+        <form method="get" class="flex flex-col sm:flex-row gap-3">
+            <div class="flex-1 min-w-0">
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ search_query }}"
+                    placeholder="Search by student name, registration number, hostel or room..."
+                    class="form-input w-full text-xs rounded-lg border-slate-300 focus:border-[#702C3B] focus:ring-[#702C3B]/20 px-3 py-2"
+                >
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="submit" class="px-4 py-2 text-xs font-bold rounded-lg bg-[#702C3B] text-white hover:bg-[#5C2330] transition-colors">
+                    Search
+                </button>
+                {% if search_query %}
+                <a href="{% url 'exchange:my_transfers' %}" class="px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-800">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if transfers %}
+    <div class="space-y-3">
+        {% for t in transfers %}
+        <div class="card p-5 border border-[#D5C2B1] bg-white rounded-xl shadow-sm hover:border-[#702C3B]/40 transition-colors">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <!-- Transfer Details -->
+                <div class="space-y-2 flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            <svg class="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Transfer Executed
+                        </span>
+                        <span class="text-xs font-mono font-medium text-slate-500">
+                            Order #{{ t.id|stringformat:".8s" }}
+                        </span>
+                        <span class="text-xs text-slate-400">·</span>
+                        <span class="text-xs text-slate-500">
+                            {{ t.transferred_at|date:"M d, Y · H:i" }}
+                        </span>
+                        {% if t.proposal %}
+                        <span class="text-xs px-2 py-0.5 rounded bg-[#F5EBDD] text-[#702C3B] font-medium">
+                            {% if t.proposal.cycle_length == 2 %}Direct Swap{% else %}{{ t.proposal.cycle_length }}-Party Cycle{% endif %}
+                        </span>
+                        {% elif t.exchange_request and t.exchange_request.request_type == 'vacant_transfer' %}
+                        <span class="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-800 font-medium">
+                            Vacant-bed Transfer
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    {% if is_staff %}
+                    <div class="text-xs text-slate-900 font-semibold">
+                        Student: <span class="text-[#702C3B] font-bold">{{ t.student.full_name }}</span> ({{ t.student.registration_number|default:t.student.email }})
+                    </div>
+                    {% endif %}
+
+                    <!-- Movements Comparison Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Previous Room</span>
+                            <span class="font-bold text-slate-800">{{ t.source_hostel_name }}</span>
+                            <div class="text-slate-600 mt-0.5">Room {{ t.source_room_number }} · Bed {{ t.source_bed_label }}</div>
+                        </div>
+                        <div class="p-2.5 rounded-lg bg-[#FAF4ED] border border-[#E8D9CC] text-xs">
+                            <span class="block text-[10px] font-bold text-[#702C3B] uppercase tracking-wider mb-1">Allocated Destination</span>
+                            <span class="font-bold text-[#3B1720]">{{ t.destination_hostel_name }}</span>
+                            <div class="text-[#702C3B] font-semibold mt-0.5">Room {{ t.destination_room_number }} · Bed {{ t.destination_bed_label }}</div>
+                        </div>
+                    </div>
+
+                    {% if t.remarks %}
+                    <p class="text-xs text-slate-600 italic">
+                        Authority Remarks: "{{ t.remarks }}"
+                    </p>
+                    {% endif %}
+                </div>
+
+                <!-- Actions -->
+                <div class="flex flex-row lg:flex-col items-center lg:items-end justify-end gap-2 shrink-0 border-t lg:border-t-0 pt-3 lg:pt-0">
+                    <a
+                        href="{% url 'exchange:transfer_letter' pk=t.pk %}?format=pdf"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-[#702C3B] hover:bg-[#5C2330] text-white shadow-sm transition-colors"
+                        title="Download official PDF Transfer Order"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        Download PDF Order
+                    </a>
+                    <a
+                        href="{% url 'exchange:transfer_letter' pk=t.pk %}"
+                        class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                    >
+                        View Document
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="student-empty card p-10 text-center border border-[#D5C2B1] bg-white rounded-xl shadow-sm">
+        <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-[#F5EBDD] flex items-center justify-center text-[#702C3B]">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        </div>
+        <h2 class="text-base font-bold text-[#3B1720]">No Completed Transfers Found</h2>
+        <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            {% if search_query %}
+            No transfer orders match your search criteria. Try a different query.
+            {% else %}
+            When an exchange proposal or vacant-bed transfer is approved and executed by the hostel authority, official transfer orders will appear here.
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
