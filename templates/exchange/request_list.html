@@ -15,30 +15,84 @@
     </header>
 
     {% if exchange_requests %}
-    <div class="student-request-list min-w-0 w-full">
+    <div class="space-y-4">
         {% for exchange_request in exchange_requests %}
-        <a href="{% url 'exchange:request_detail' pk=exchange_request.pk %}" class="student-request-row min-w-0 w-full">
-            <span class="min-w-0 flex-1 overflow-hidden">
-                <strong class="truncate block">
-                    {% if exchange_request.request_type == 'vacant_transfer' %}Transfer{% else %}Request{% endif %} #{{ exchange_request.pk|stringformat:".8s" }}
-                </strong>
-                <small class="truncate block">
-                    {% if exchange_request.preferred_bed %}
-                    {{ exchange_request.preferred_bed.room.floor.block.hostel.name }} · Room {{ exchange_request.preferred_bed.room.room_number }} · {{ exchange_request.preferred_bed.bed_label }}
-                    {% else %}
-                    Room preference · Submitted {{ exchange_request.submitted_at|date:"M d, Y" }}
+        <div class="card p-5 border border-[#E8DED4] bg-white rounded-xl shadow-xs hover:border-[#702C3B]/40 transition-all">
+            <!-- Card Header: ID, Date, Status -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[#E8DED4]">
+                <div class="flex items-center gap-2.5 flex-wrap">
+                    <span class="font-mono text-xs font-bold text-[#702C3B] bg-[#FAF4EB] px-2.5 py-1 rounded-md border border-[#E8DED4]">
+                        {% if exchange_request.request_type == 'vacant_transfer' %}Transfer{% else %}Request{% endif %} #{{ exchange_request.pk|stringformat:".8s" }}
+                    </span>
+                    <span class="text-xs text-[#8A7B72]">
+                        Submitted {{ exchange_request.submitted_at|date:"M d, Y" }}
+                    </span>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="student-status-pill student-status-{{ exchange_request.status }}">
+                        {{ exchange_request.get_status_display }}
+                    </span>
+                    {% if exchange_request.request_type == 'exchange' and exchange_request.status == 'open' %}
+                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap
+                        {% if exchange_request.matching_status == 'waiting' %}bg-amber-50 text-amber-800 border-amber-200
+                        {% elif exchange_request.matching_status == 'processing' %}bg-blue-50 text-blue-800 border-blue-200
+                        {% elif exchange_request.matching_status == 'no_match' %}bg-stone-50 text-stone-700 border-stone-200
+                        {% elif exchange_request.matching_status == 'proposal_available' %}bg-emerald-50 text-emerald-800 border-emerald-200
+                        {% else %}bg-slate-50 text-slate-700 border-slate-200{% endif %}">
+                        {{ exchange_request.get_matching_status_display }}
+                    </span>
                     {% endif %}
-                </small>
-            </span>
-            <span class="student-status-pill student-status-{{ exchange_request.status }} flex-shrink-0 ml-2 whitespace-nowrap">{{ exchange_request.get_status_display }}</span>
-        </a>
+                </div>
+            </div>
+
+            <!-- Card Body: Preferred Accommodation & Movements -->
+            <div class="py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div class="space-y-1 min-w-0 flex-1">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-[#8A7B72] block">Preferred Accommodation</span>
+                    <p class="text-xs sm:text-sm font-semibold text-[#49372F] break-words">
+                        {% if exchange_request.preferred_bed %}
+                            {{ exchange_request.preferred_bed.room.floor.block.hostel.name }} ·
+                            Block {{ exchange_request.preferred_bed.room.floor.block.name }} ·
+                            Room {{ exchange_request.preferred_bed.room.room_number }} ·
+                            Bed {{ exchange_request.preferred_bed.bed_label }}
+                        {% elif exchange_request.preferred_hostel %}
+                            {{ exchange_request.preferred_hostel.name }} (Room Preference)
+                        {% else %}
+                            Campus-wide preference (any eligible accommodation)
+                        {% endif %}
+                    </p>
+                    {% if exchange_request.current_occupancy %}
+                    <p class="text-xs text-[#8A7B72] truncate">
+                        Current: {{ exchange_request.current_occupancy.bed.room.floor.block.hostel.name }} · Room {{ exchange_request.current_occupancy.bed.room.room_number }} (Bed {{ exchange_request.current_occupancy.bed.bed_label }})
+                    </p>
+                    {% endif %}
+                </div>
+
+                <!-- Action Controls: View details and Edit actions where permitted -->
+                <div class="flex items-center gap-2 pt-2 md:pt-0 flex-shrink-0">
+                    {% if exchange_request.is_open or exchange_request.status == 'open' %}
+                    <a href="{% url 'exchange:request_edit' pk=exchange_request.pk %}" class="btn-secondary btn-sm">
+                        Edit
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'exchange:request_detail' pk=exchange_request.pk %}" class="btn-primary btn-sm">
+                        View Details &rarr;
+                    </a>
+                </div>
+            </div>
+        </div>
         {% endfor %}
     </div>
     {% else %}
-    <div class="student-empty card p-10">
-        <h2 class="student-section-title">No exchange requests yet</h2>
-        <p>Choose an eligible hostel room and bed to begin.</p>
-        <a href="{% url 'exchange:request_create' %}" class="btn-primary btn-sm">Start your request</a>
+    <div class="student-empty card p-10 sm:p-12 border border-[#E8DED4] bg-white rounded-xl text-center space-y-4 shadow-xs">
+        <div class="w-12 h-12 rounded-full bg-[#FAF4EB] text-[#702C3B] border border-[#E8DED4] flex items-center justify-center mx-auto text-xl font-bold">
+            ⇄
+        </div>
+        <div class="space-y-1">
+            <h2 class="text-base font-bold text-[#49372F]">No Exchange Requests Yet</h2>
+            <p class="text-xs text-[#8A7B72] max-w-sm mx-auto">Choose an eligible hostel room and bed to begin your exchange or vacant-bed transfer request.</p>
+        </div>
+        <a href="{% url 'exchange:request_create' %}" class="btn-primary btn-sm inline-flex">Start your request &rarr;</a>
     </div>
     {% endif %}
 </div>

@@ -1,10 +1,14 @@
+import logging
+import uuid
+from datetime import datetime, timedelta
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.core.models import AuditLog
+from apps.core.models import AuditLog, Institution
 from apps.hostels.models import Bed, Hostel, OperationalStatus, StudentOccupancy
 
 from apps.hostels.selectors import get_warden_assigned_hostel_ids
@@ -19,12 +23,17 @@ from .models import (
     Approval,
     ExchangeProposal,
     ExchangeRequest,
+    MatchingJob,
+    MatchingOutbox,
     Notification,
     PolicyRule,
     ProposalParticipant,
+    SuppressedCycle,
     TransferRecord,
 )
 from .notifications import dispatch_proposal_notification
+
+logger = logging.getLogger(__name__)
 
 
 def _assert_student(student):
@@ -182,6 +191,14 @@ def create_exchange_request(
             ),
             exchange_request=exchange_request,
         )
+    else:
+        exchange_request.matching_status = ExchangeRequest.MatchingStatus.WAITING
+        exchange_request.save(update_fields=["matching_status"])
+        schedule_institution_matching(
+            institution_id=student.institution_id,
+            trigger_reason="request_created",
+            trigger_request_id=exchange_request.id,
+        )
 
     return exchange_request
 
@@ -261,11 +278,15 @@ def update_exchange_request(
         for field, value in values.items():
             setattr(locked_request, field, value)
         locked_request.current_occupancy = occupancy
+        locked_request.preference_updated_at = now
+        locked_request.matching_status = ExchangeRequest.MatchingStatus.WAITING
         locked_request.full_clean()
         locked_request.save(
             update_fields=[
                 *values.keys(),
                 "current_occupancy",
+                "preference_updated_at",
+                "matching_status",
                 "updated_at",
             ]
         )
@@ -278,6 +299,12 @@ def update_exchange_request(
             change_summary=f"Updated exchange request for {student.full_name}",
             ip_address=ip_address,
         )
+        if locked_request.request_type == ExchangeRequest.RequestType.EXCHANGE:
+            schedule_institution_matching(
+                institution_id=student.institution_id,
+                trigger_reason="preferences_updated",
+                trigger_request_id=locked_request.id,
+            )
         return locked_request
 
 
@@ -671,7 +698,9 @@ def activate_exchange_proposal(
 
         for req in locked_requests:
             req.status = ExchangeRequest.Status.MATCHED
-            req.save(update_fields=["status", "updated_at"])
+            req.matching_status = ExchangeRequest.MatchingStatus.PROPOSAL_AVAILABLE
+            req.last_matched_at = now
+            req.save(update_fields=["status", "matching_status", "last_matched_at", "updated_at"])
 
         AuditLog.objects.create(
             acting_user=acting_user,
@@ -807,9 +836,10 @@ def respond_to_proposal(
                     is_req_expired = req.expires_at and req.expires_at <= now
                     if not is_req_expired and has_active_occ:
                         req.status = ExchangeRequest.Status.OPEN
+                        req.matching_status = ExchangeRequest.MatchingStatus.WAITING
                     elif is_req_expired:
                         req.status = ExchangeRequest.Status.EXPIRED
-                    req.save(update_fields=["status", "updated_at"])
+                    req.save(update_fields=["status", "matching_status", "updated_at"])
 
             AuditLog.objects.create(
                 acting_user=student,
@@ -819,6 +849,13 @@ def respond_to_proposal(
                 target_id=str(proposal.id),
                 change_summary=f"Participant declined proposal {proposal.id}. Proposal cancelled and reservations released.",
                 ip_address=ip_address,
+            )
+
+            record_cycle_suppression(proposal=proposal, reason="declined", now=now)
+            schedule_institution_matching(
+                institution_id=proposal.institution_id,
+                trigger_reason="proposal_declined",
+                trigger_proposal_id=proposal.id,
             )
 
             for p in all_parts:
@@ -931,9 +968,10 @@ def expire_single_proposal(proposal, *, now=None) -> bool:
                 is_req_expired = req.expires_at and req.expires_at <= now
                 if not is_req_expired and has_active_occ:
                     req.status = ExchangeRequest.Status.OPEN
+                    req.matching_status = ExchangeRequest.MatchingStatus.WAITING
                 elif is_req_expired:
                     req.status = ExchangeRequest.Status.EXPIRED
-                req.save(update_fields=["status", "updated_at"])
+                req.save(update_fields=["status", "matching_status", "updated_at"])
 
         AuditLog.objects.create(
             acting_user=None,
@@ -942,6 +980,13 @@ def expire_single_proposal(proposal, *, now=None) -> bool:
             target_type="ExchangeProposal",
             target_id=str(locked_prop.id),
             change_summary=f"Proposal {locked_prop.id} expired at {locked_prop.expires_at}. Reservations released.",
+        )
+
+        record_cycle_suppression(proposal=locked_prop, reason="expired", now=now)
+        schedule_institution_matching(
+            institution_id=locked_prop.institution_id,
+            trigger_reason="proposal_expired",
+            trigger_proposal_id=locked_prop.id,
         )
 
         for p in all_parts:
@@ -993,6 +1038,7 @@ def decide_exchange_proposal(
     now=None,
     ip_address=None,
     status_adapter=None,
+    auto_execute: bool = False,
 ) -> tuple[Approval, ExchangeProposal]:
     """
     Record an authoritative approval or rejection decision on an exchange proposal awaiting approval.
@@ -1226,20 +1272,31 @@ def decide_exchange_proposal(
                 target_id=str(proposal.id),
                 change_summary=(
                     f"Proposal {proposal.id} approved by {actor.full_name} ({authority_role}). "
-                    f"Transfer execution pending. Remarks: {remarks or 'None'}"
+                    f"Remarks: {remarks or 'None'}"
                 ),
                 ip_address=ip_address,
             )
 
-            for p in participants:
-                dispatch_proposal_notification(
-                    recipient=p.student,
-                    notification_type=Notification.NotificationType.APPROVAL_UPDATED,
-                    message="Your room exchange proposal has been approved by the hostel authority. Room transfer execution is pending.",
-                    proposal=proposal,
-                    exchange_request=p.exchange_request,
+            if auto_execute:
+                execute_exchange_transfer(
+                    proposal_id=proposal.id,
+                    actor=actor,
+                    remarks=remarks,
                     now=now,
+                    ip_address=ip_address,
+                    status_adapter=status_adapter,
                 )
+                proposal.refresh_from_db()
+            else:
+                for p in participants:
+                    dispatch_proposal_notification(
+                        recipient=p.student,
+                        notification_type=Notification.NotificationType.APPROVAL_UPDATED,
+                        message="Your room exchange proposal has been approved by the hostel authority. Room transfer execution is pending.",
+                        proposal=proposal,
+                        exchange_request=p.exchange_request,
+                        now=now,
+                    )
 
             return approval, proposal
 
@@ -1260,9 +1317,10 @@ def decide_exchange_proposal(
                     is_expired = req.expires_at and req.expires_at <= now
                     if not is_expired and has_occ:
                         req.status = ExchangeRequest.Status.OPEN
+                        req.matching_status = ExchangeRequest.MatchingStatus.WAITING
                     elif is_expired:
                         req.status = ExchangeRequest.Status.EXPIRED
-                    req.save(update_fields=["status", "updated_at"])
+                    req.save(update_fields=["status", "matching_status", "updated_at"])
 
             approval = Approval.objects.create(
                 proposal=proposal,
@@ -1287,6 +1345,13 @@ def decide_exchange_proposal(
                 ip_address=ip_address,
             )
 
+            record_cycle_suppression(proposal=proposal, reason="rejected", now=now)
+            schedule_institution_matching(
+                institution_id=proposal.institution_id,
+                trigger_reason="proposal_rejected",
+                trigger_proposal_id=proposal.id,
+            )
+
             for p in participants:
                 dispatch_proposal_notification(
                     recipient=p.student,
@@ -1298,6 +1363,378 @@ def decide_exchange_proposal(
                 )
 
             return approval, proposal
+
+
+def execute_exchange_transfer(
+    *,
+    proposal_id,
+    actor=None,
+    remarks: str = "",
+    now=None,
+    ip_address: str | None = None,
+    status_adapter: ExternalEligibilityAdapter | None = None,
+) -> list[TransferRecord]:
+    """
+    Atomically execute an approved occupied-bed room exchange proposal.
+    Completes direct swaps (2 students) and multi-party rotation cycles (3-5 students).
+    All occupancy updates occur atomically in a single PostgreSQL transaction or not at all.
+
+    Canonical Lock Order:
+    1. Lock all Beds involved (sorted by ID) without outer joins to prevent PostgreSQL FOR UPDATE errors.
+    2. Lock all Student Users involved (sorted by ID).
+    3. Lock ExchangeProposal row.
+    4. Lock all ExchangeRequests involved (sorted by ID).
+    5. Lock all current active StudentOccupancies (sorted by ID).
+    """
+    now = now or timezone.now()
+
+    if actor is not None:
+        if not actor.is_authenticated:
+            raise PermissionDenied("Authentication required.")
+        if getattr(actor, "is_dean_role", False):
+            raise PermissionDenied("The Dean of Student Welfare has read-only analytics access and cannot execute transfers.")
+        if getattr(actor, "is_sysadmin_role", False):
+            raise PermissionDenied("System Administrators have no operational transfer authority.")
+        if getattr(actor, "is_hostel_admin_role", False):
+            raise PermissionDenied("Hostel Administrators manage policy configuration and cannot execute transfers.")
+        if getattr(actor, "is_student_role", False):
+            raise PermissionDenied("Students cannot execute transfers.")
+        if not (getattr(actor, "is_warden_role", False) or getattr(actor, "is_chief_warden_role", False)):
+            raise PermissionDenied("You do not have operational authority to execute transfers.")
+
+    with transaction.atomic():
+        try:
+            proposal = ExchangeProposal.objects.select_for_update().get(id=proposal_id)
+        except ExchangeProposal.DoesNotExist:
+            raise ValidationError(f"Exchange proposal {proposal_id} does not exist.")
+
+        # Safe Idempotency Check: if already completed, return existing transfer records
+        if proposal.status == ExchangeProposal.Status.COMPLETED:
+            records = list(
+                TransferRecord.objects.filter(proposal=proposal)
+                .select_related(
+                    "student",
+                    "previous_occupancy",
+                    "new_occupancy",
+                    "previous_bed__room__floor__block__hostel",
+                    "new_bed__room__floor__block__hostel",
+                    "approval",
+                )
+                .order_by("transferred_at", "id")
+            )
+            return records
+
+        if proposal.status != ExchangeProposal.Status.APPROVED:
+            raise ValidationError(
+                f"Exchange proposal #{str(proposal.id)[:8]} is in '{proposal.get_status_display()}' status. "
+                f"Only APPROVED proposals can be executed."
+            )
+
+        # Verify recorded approval
+        approval = (
+            Approval.objects.filter(proposal=proposal, decision=Approval.Decision.APPROVED)
+            .order_by("-decided_at")
+            .first()
+        )
+        if not approval:
+            raise ValidationError("Cannot execute proposal: No recorded authority approval found.")
+
+        acting_user = actor or approval.authority_user
+        if not acting_user:
+            raise PermissionDenied("No authorized acting user found to execute this transfer.")
+
+        if acting_user.institution_id != proposal.institution_id:
+            raise PermissionDenied("Approver/executor must belong to the proposal institution.")
+
+        # Fetch participants
+        participants = list(
+            ProposalParticipant.objects.filter(proposal=proposal)
+            .select_related("student", "exchange_request", "current_occupancy", "proposed_bed")
+            .order_by("sequence_order")
+        )
+        k = len(participants)
+        if k < 2 or k > 5 or k != proposal.cycle_length:
+            raise ValidationError(f"Invalid participant count {k} for proposal (cycle length {proposal.cycle_length}).")
+
+        # Collect and sort IDs for global row lock ordering
+        student_ids = sorted(p.student_id for p in participants)
+        request_ids = sorted(p.exchange_request_id for p in participants)
+        src_bed_ids = [p.current_occupancy.bed_id for p in participants]
+        dest_bed_ids = [p.proposed_bed_id for p in participants]
+        all_bed_ids = sorted(set(src_bed_ids + dest_bed_ids))
+        occ_ids = sorted(p.current_occupancy_id for p in participants)
+
+        # Distinct check: 2 to 5 distinct students and distinct source beds
+        if len(set(student_ids)) != k:
+            raise ValidationError("Proposal contains duplicate students.")
+        if len(set(src_bed_ids)) != k:
+            raise ValidationError("Proposal contains duplicate source beds.")
+        if len(set(dest_bed_ids)) != k:
+            raise ValidationError("Proposal contains duplicate proposed destination beds.")
+
+        # Closed permutation verification: {dest_beds} == {src_beds}
+        if set(dest_bed_ids) != set(src_bed_ids):
+            raise ValidationError("Proposal destination beds do not form a closed cycle permutation of source beds.")
+
+        # No self-swaps: B_dest != B_src for every participant
+        for p in participants:
+            if p.current_occupancy.bed_id == p.proposed_bed_id:
+                raise ValidationError(f"Participant {p.student.full_name} is assigned to their own bed (no self-swaps permitted).")
+
+        # Global row lock acquisition in canonical order:
+        # 1. Beds (NO outer joins on select_for_update)
+        locked_beds = {
+            b.id: b
+            for b in Bed.objects.select_for_update()
+            .filter(id__in=all_bed_ids)
+        }
+        # 2. Users (students)
+        User = get_user_model()
+        locked_students = {
+            u.id: u
+            for u in User.objects.select_for_update()
+            .filter(id__in=student_ids)
+        }
+        # 3. ExchangeRequests (NO outer joins on select_for_update)
+        locked_requests = {
+            r.id: r
+            for r in ExchangeRequest.objects.select_for_update()
+            .filter(id__in=request_ids)
+        }
+        # 4. StudentOccupancies (current active occupancies)
+        locked_occupancies = {
+            o.id: o
+            for o in StudentOccupancy.objects.select_for_update()
+            .filter(id__in=occ_ids)
+        }
+
+        # Validate Authority Scope
+        hostel_ids = {
+            locked_beds[p.current_occupancy.bed_id].room.floor.block.hostel_id
+            for p in participants
+        }
+        is_cross_hostel = len(hostel_ids) > 1
+
+        if is_cross_hostel:
+            if not getattr(acting_user, "is_chief_warden_role", False):
+                raise PermissionDenied("Only the Chief Warden can execute cross-hostel exchange transfers.")
+        else:
+            if not getattr(acting_user, "is_warden_role", False) and not getattr(acting_user, "is_chief_warden_role", False):
+                raise PermissionDenied("Only the assigned hostel Warden or Chief Warden can execute same-hostel exchange transfers.")
+            if getattr(acting_user, "is_warden_role", False) and not getattr(acting_user, "is_chief_warden_role", False):
+                assigned_hostels = get_warden_assigned_hostel_ids(acting_user)
+                single_hostel_id = next(iter(hostel_ids))
+                if single_hostel_id not in assigned_hostels:
+                    raise PermissionDenied("You are not assigned to supervise this hostel.")
+
+        # 1. Unanimous acceptance verification
+        for p in participants:
+            if p.response_status != ProposalParticipant.ResponseStatus.ACCEPTED:
+                raise ValidationError(f"Participant {p.student.full_name} has not accepted this proposal.")
+            if p.responded_at and proposal.expires_at and p.responded_at > proposal.expires_at:
+                raise ValidationError(f"Participant {p.student.full_name} accepted after the acceptance deadline.")
+
+        # 2. Workflow reservations still held by this proposal
+        for p in participants:
+            if not p.is_active_reservation:
+                raise ValidationError("Workflow reservation for this proposal has been released.")
+
+        foreign_conflicts = (
+            ProposalParticipant.objects.filter(is_active_reservation=True)
+            .filter(
+                Q(student_id__in=student_ids)
+                | Q(exchange_request_id__in=request_ids)
+                | Q(current_occupancy_id__in=occ_ids)
+            )
+            .exclude(proposal=proposal)
+        )
+        if foreign_conflicts.exists():
+            raise ValidationError("A participant, request, or bed is reserved by another proposal.")
+
+        # 3. Current active occupancy snapshot check
+        for p in participants:
+            occ = locked_occupancies.get(p.current_occupancy_id)
+            if not occ or occ.status != StudentOccupancy.OccupancyStatus.ACTIVE or occ.student_id != p.student_id:
+                raise ValidationError(
+                    f"Participant {p.student.full_name}'s current occupancy has changed or is no longer active."
+                )
+            if occ.bed_id != p.current_occupancy.bed_id:
+                raise ValidationError(
+                    f"Participant {p.student.full_name}'s allocated bed has changed since proposal creation."
+                )
+
+        # 4. Destination beds and rooms operational status, category matching, policy eligibility
+        for p in participants:
+            dest_bed = locked_beds[p.proposed_bed_id]
+            dest_room = dest_bed.room
+            dest_hostel = dest_room.floor.block.hostel
+
+            if not dest_bed.is_active or dest_bed.operational_status != OperationalStatus.IN_SERVICE:
+                raise ValidationError(f"Destination bed {dest_bed.bed_label} in Room {dest_room.room_number} is no longer in service.")
+            if not dest_room.is_active or dest_room.operational_status != OperationalStatus.IN_SERVICE:
+                raise ValidationError(f"Destination room {dest_room.room_number} is no longer in service.")
+            if not dest_room.floor.is_active or not dest_room.floor.block.is_active or dest_hostel.status != Hostel.Status.ACTIVE:
+                raise ValidationError(f"Destination hostel {dest_hostel.name} infrastructure is no longer active.")
+
+            student = locked_students[p.student_id]
+            if student.residential_eligibility != dest_hostel.resident_category:
+                raise ValidationError(
+                    f"Student {student.full_name} residential eligibility does not match destination hostel {dest_hostel.name} category."
+                )
+
+            # Check eligibility policies (cooling off, fees, disciplinary holds)
+            report = check_student_exchange_eligibility(
+                student=student,
+                occupancy=locked_occupancies[p.current_occupancy_id],
+                status_adapter=status_adapter,
+                today=now.date(),
+            )
+            if not report.is_eligible:
+                raise ValidationError(f"Student {student.full_name} is no longer eligible: {'; '.join(report.reasons)}")
+
+        # 5. Requests validation
+        for req in locked_requests.values():
+            if req.status not in (ExchangeRequest.Status.MATCHED, ExchangeRequest.Status.PENDING_APPROVAL):
+                raise ValidationError(f"Exchange request {req.id} is in status '{req.status}', expected MATCHED.")
+
+        # ATOMIC OCCUPANCY MUTATION:
+        # Step A: Close ALL current occupancies in the cycle
+        for p in participants:
+            old_occ = locked_occupancies[p.current_occupancy_id]
+            dest_bed = locked_beds[p.proposed_bed_id]
+            dest_hostel = dest_bed.room.floor.block.hostel
+            old_occ.status = StudentOccupancy.OccupancyStatus.TRANSFERRED
+            old_occ.end_date = now.date()
+            cycle_desc = "direct swap" if k == 2 else f"{k}-party rotation"
+            old_occ.release_reason = (
+                f"Completed room exchange {cycle_desc} (Proposal #{str(proposal.id)[:8]}) to "
+                f"{dest_hostel.name}, Room {dest_bed.room.room_number}, Bed {dest_bed.bed_label}"
+            )
+            old_occ.save(update_fields=["status", "end_date", "release_reason", "updated_at"])
+
+        # Step B: Create ALL new active occupancies
+        allocation_source = (
+            StudentOccupancy.AllocationSource.DIRECT_SWAP
+            if k == 2
+            else StudentOccupancy.AllocationSource.MULTI_SWAP
+        )
+        new_occupancies = {}
+        for p in participants:
+            student = locked_students[p.student_id]
+            dest_bed = locked_beds[p.proposed_bed_id]
+            new_occ = StudentOccupancy.objects.create(
+                institution=proposal.institution,
+                student=student,
+                bed=dest_bed,
+                start_date=now.date(),
+                status=StudentOccupancy.OccupancyStatus.ACTIVE,
+                source=allocation_source,
+                created_by=acting_user,
+            )
+            new_occupancies[p.id] = new_occ
+
+        # Step C: Create immutable TransferRecord for each participant
+        transfer_records = []
+        for p in participants:
+            student = locked_students[p.student_id]
+            src_bed = locked_beds[p.current_occupancy.bed_id]
+            dest_bed = locked_beds[p.proposed_bed_id]
+            old_occ = locked_occupancies[p.current_occupancy_id]
+            new_occ = new_occupancies[p.id]
+
+            rec = TransferRecord.objects.create(
+                institution=proposal.institution,
+                exchange_request=locked_requests.get(p.exchange_request_id),
+                proposal=proposal,
+                participant=p,
+                approval=approval,
+                approved_by=acting_user,
+                remarks=remarks or approval.remarks,
+                student=student,
+                previous_occupancy=old_occ,
+                previous_room=src_bed.room,
+                previous_bed=src_bed,
+                new_occupancy=new_occ,
+                new_room=dest_bed.room,
+                new_bed=dest_bed,
+                source_hostel_name=src_bed.room.floor.block.hostel.name,
+                source_room_number=src_bed.room.room_number,
+                source_bed_label=src_bed.bed_label,
+                destination_hostel_name=dest_bed.room.floor.block.hostel.name,
+                destination_room_number=dest_bed.room.room_number,
+                destination_bed_label=dest_bed.bed_label,
+                transferred_at=now,
+            )
+            transfer_records.append(rec)
+
+        # Step D: Update Proposal and Requests status
+        proposal.status = ExchangeProposal.Status.COMPLETED
+        proposal.save(update_fields=["status", "updated_at"])
+
+        for req in locked_requests.values():
+            req.status = ExchangeRequest.Status.COMPLETED
+            req.save(update_fields=["status", "updated_at"])
+
+        # Step E: Release workflow reservations
+        ProposalParticipant.objects.filter(proposal=proposal).update(is_active_reservation=False)
+
+        # Step F: Audit log
+        AuditLog.objects.create(
+            acting_user=acting_user,
+            institution=proposal.institution,
+            action="EXCHANGE_TRANSFER_EXECUTED",
+            target_type="ExchangeProposal",
+            target_id=str(proposal.id),
+            change_summary=(
+                f"Occupancy transfer executed for proposal {proposal.id} ({k}-student cycle) "
+                f"by {acting_user.full_name} ({approval.authority_role}). "
+                f"All allocations updated atomically. Remarks: {remarks or approval.remarks or 'None'}"
+            ),
+            ip_address=ip_address,
+        )
+
+        # Step G: Dispatch TRANSFER_COMPLETED notifications to all participants
+        for rec in transfer_records:
+            Notification.objects.create(
+                recipient=rec.student,
+                notification_type=Notification.NotificationType.TRANSFER_COMPLETED,
+                message=(
+                    f"Your room exchange proposal #{str(proposal.id)[:8]} has been approved and completed. "
+                    f"You have been successfully transferred to {rec.destination_hostel_name}, "
+                    f"Room {rec.destination_room_number}, Bed {rec.destination_bed_label}."
+                ),
+                proposal=proposal,
+                exchange_request=rec.exchange_request,
+            )
+
+        return transfer_records
+
+
+def approve_and_execute_exchange_proposal(
+    *,
+    proposal_id,
+    actor,
+    remarks: str = "",
+    now=None,
+    ip_address: str | None = None,
+    status_adapter: ExternalEligibilityAdapter | None = None,
+) -> tuple[Approval, ExchangeProposal, list[TransferRecord]]:
+    """
+    Approve an exchange proposal and execute all participant room transfers atomically.
+    Convenience wrapper that runs decide_exchange_proposal with auto_execute=True.
+    """
+    approval, proposal = decide_exchange_proposal(
+        proposal_id=proposal_id,
+        actor=actor,
+        decision="approved",
+        remarks=remarks,
+        now=now,
+        ip_address=ip_address,
+        status_adapter=status_adapter,
+        auto_execute=True,
+    )
+    records = list(TransferRecord.objects.filter(proposal=proposal).order_by("transferred_at", "id"))
+    return approval, proposal, records
 
 
 def approve_and_execute_vacant_transfer(
@@ -1668,4 +2105,461 @@ def reject_vacant_transfer(
     )
 
     return approval, locked_request
+
+
+# =========================================================================
+# Automatic Background Matching & Proposal Activation Services
+# =========================================================================
+
+def record_cycle_suppression(*, proposal, reason: str, now=None) -> SuppressedCycle | None:
+    """
+    Records cycle signature suppression snapshotting each participant's request timestamp.
+    Prevents the matching engine from repeatedly generating the exact same rejected/expired/declined cycle.
+    """
+    now = now or timezone.now()
+    if not proposal or not proposal.cycle_signature:
+        return None
+
+    participants = list(proposal.participants.select_related("exchange_request"))
+    if not participants:
+        return None
+
+    revisions = {}
+    for p in participants:
+        req = p.exchange_request
+        ts = req.preference_updated_at or req.updated_at or now
+        revisions[str(req.id)] = ts.isoformat()
+
+    suppressed = SuppressedCycle.objects.create(
+        institution=proposal.institution,
+        cycle_signature=proposal.cycle_signature,
+        proposal=proposal,
+        reason=reason,
+        request_revisions=revisions,
+        is_active=True,
+    )
+    return suppressed
+
+
+def is_candidate_suppressed(candidate, institution) -> bool:
+    """
+    Check if a candidate match is suppressed based on its cycle signature and participant request revisions.
+    If any participant updated preferences since the suppression occurred, the suppression is lifted.
+    """
+    suppressions = list(
+        SuppressedCycle.objects.filter(
+            institution=institution,
+            cycle_signature=candidate.cycle_signature,
+            is_active=True,
+        )
+    )
+    if not suppressions:
+        return False
+
+    req_ids = [uuid.UUID(rid) if isinstance(rid, str) else rid for rid in candidate.request_ids]
+    requests = {str(r.id): r for r in ExchangeRequest.objects.filter(id__in=req_ids)}
+
+    for supp in suppressions:
+        has_new_revision = False
+        revisions = supp.request_revisions or {}
+        for rid_str, recorded_ts_str in revisions.items():
+            req = requests.get(rid_str)
+            if not req:
+                has_new_revision = True
+                break
+            current_ts = req.preference_updated_at or req.updated_at
+            try:
+                recorded_dt = datetime.fromisoformat(recorded_ts_str)
+                if current_ts > recorded_dt:
+                    has_new_revision = True
+                    break
+            except (ValueError, TypeError):
+                has_new_revision = True
+                break
+
+        if has_new_revision:
+            supp.is_active = False
+            supp.save(update_fields=["is_active", "updated_at"])
+        else:
+            return True
+
+    return False
+
+
+def _candidate_sort_key(candidate, request_map):
+    """
+    Deterministic ordering for candidate matches.
+    Implementation choice for fairness:
+    1. min_submitted_at: Prioritize cycles that help students who have waited the longest (FIFO).
+    2. cycle_length: Prefer shorter cycles (direct 2-way swaps over 5-way rotations) for higher completion probability.
+    3. avg_submitted_at: Secondary fairness tie-breaker for group average wait time.
+    4. cycle_signature: Stable lexicographical tie-breaker.
+    """
+    reqs = [request_map[rid] for rid in candidate.request_ids if rid in request_map]
+    if not reqs:
+        return (timezone.now(), candidate.cycle_length, 0.0, candidate.cycle_signature)
+
+    sub_times = [r.submitted_at for r in reqs]
+    min_sub = min(sub_times)
+    avg_sub_timestamp = sum(r.submitted_at.timestamp() for r in reqs) / len(reqs)
+    return (min_sub, candidate.cycle_length, avg_sub_timestamp, candidate.cycle_signature)
+
+
+def select_and_activate_candidates(
+    *,
+    candidates,
+    institution,
+    request_map,
+    now=None,
+    status_adapter=None,
+) -> list[ExchangeProposal]:
+    """
+    Select non-overlapping candidates according to deterministic priority order
+    and activate them using activate_exchange_proposal.
+    Ensures no double-booking of students, requests, or beds across proposals.
+    """
+    from .matching import ACTIVE_PROPOSAL_STATUSES
+
+    now = now or timezone.now()
+    sorted_candidates = sorted(candidates, key=lambda c: _candidate_sort_key(c, request_map))
+
+    pass_reserved_request_ids = set()
+    pass_reserved_student_ids = set()
+    pass_reserved_bed_ids = set()
+
+    active_reservations = ProposalParticipant.objects.filter(
+        proposal__institution=institution,
+        is_active_reservation=True,
+    ).select_related("current_occupancy", "proposed_bed")
+
+    for p in active_reservations:
+        pass_reserved_request_ids.add(p.exchange_request_id)
+        pass_reserved_student_ids.add(p.student_id)
+        if p.current_occupancy:
+            pass_reserved_bed_ids.add(p.current_occupancy.bed_id)
+        if p.proposed_bed_id:
+            pass_reserved_bed_ids.add(p.proposed_bed_id)
+
+    activated_proposals = []
+
+    for candidate in sorted_candidates:
+        if ExchangeProposal.objects.filter(
+            institution=institution,
+            cycle_signature=candidate.cycle_signature,
+            status__in=ACTIVE_PROPOSAL_STATUSES,
+        ).exists():
+            continue
+
+        cand_request_ids = set(uuid.UUID(rid) if isinstance(rid, str) else rid for rid in candidate.request_ids)
+        cand_student_ids = set(p.student_id for p in candidate.participants)
+        cand_bed_ids = set(p.current_bed_id for p in candidate.participants) | set(p.proposed_bed_id for p in candidate.participants)
+
+        if cand_request_ids & pass_reserved_request_ids:
+            continue
+        if cand_student_ids & pass_reserved_student_ids:
+            continue
+        if cand_bed_ids & pass_reserved_bed_ids:
+            continue
+
+        valid_requests = True
+        for rid in candidate.request_ids:
+            req = request_map.get(rid)
+            if not req or req.status != ExchangeRequest.Status.OPEN:
+                valid_requests = False
+                break
+            if req.expires_at and req.expires_at <= now:
+                valid_requests = False
+                break
+        if not valid_requests:
+            continue
+
+        try:
+            with transaction.atomic():
+                expiry_values = [
+                    request_map[rid].expires_at
+                    for rid in candidate.request_ids
+                    if request_map.get(rid) and request_map[rid].expires_at is not None
+                ]
+                earliest_expiry = min(expiry_values) if expiry_values else None
+
+                draft_proposal = ExchangeProposal.objects.create(
+                    institution=institution,
+                    status=ExchangeProposal.Status.DRAFT,
+                    cycle_length=candidate.cycle_length,
+                    cycle_signature=candidate.cycle_signature,
+                    expires_at=earliest_expiry,
+                    matched_at=now,
+                )
+                for seq_order, part in enumerate(candidate.participants):
+                    req = request_map[part.request_id]
+                    ProposalParticipant.objects.create(
+                        proposal=draft_proposal,
+                        exchange_request=req,
+                        student=req.student,
+                        current_occupancy=req.current_occupancy,
+                        proposed_bed_id=part.proposed_bed_id,
+                        sequence_order=seq_order,
+                        is_active_reservation=False,
+                    )
+
+                activated = activate_exchange_proposal(
+                    proposal_id=draft_proposal.id,
+                    now=now,
+                    status_adapter=status_adapter,
+                )
+                activated_proposals.append(activated)
+
+                pass_reserved_request_ids.update(cand_request_ids)
+                pass_reserved_student_ids.update(cand_student_ids)
+                pass_reserved_bed_ids.update(cand_bed_ids)
+
+        except (ValidationError, IntegrityError) as exc:
+            logger.info("Candidate %s could not be activated: %s", candidate.cycle_signature, exc)
+            continue
+
+    return activated_proposals
+
+
+def schedule_institution_matching(
+    *,
+    institution_id,
+    trigger_reason: str = "manual",
+    trigger_request_id = None,
+    trigger_proposal_id = None,
+) -> MatchingOutbox:
+    """
+    Schedule institution-scoped background matching.
+    Persists durable outbox record to guarantee resilience against broker failure.
+    Dispatches Celery background worker task upon transaction commit.
+    """
+    with transaction.atomic():
+        outbox = MatchingOutbox.objects.create(
+            institution_id=institution_id,
+            event_type=trigger_reason,
+            request_id=trigger_request_id,
+            proposal_id=trigger_proposal_id,
+        )
+
+    def _dispatch_celery():
+        try:
+            from .tasks import run_institution_matching_task
+            run_institution_matching_task.delay(
+                institution_id=institution_id,
+                trigger_reason=trigger_reason,
+                trigger_request_id=str(trigger_request_id) if trigger_request_id else None,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Celery dispatch failed for institution %s (event %s): %s. "
+                "Event preserved in MatchingOutbox for periodic reconciliation.",
+                institution_id,
+                outbox.id,
+                exc,
+            )
+
+    transaction.on_commit(_dispatch_celery)
+    return outbox
+
+
+def run_institution_matching(
+    institution_id,
+    trigger_reason: str = "manual",
+    trigger_request_id = None,
+    now=None,
+    status_adapter=None,
+) -> MatchingJob:
+    """
+    Execute institution-scoped matching pass in background worker.
+    Coalesces rapid events: if an active job is already RUNNING for this institution,
+    sets needs_rerun=True so the worker performs another pass upon completion.
+    """
+    from .matching import find_candidate_matches
+
+    now = now or timezone.now()
+    institution = Institution.objects.get(id=institution_id)
+
+    with transaction.atomic():
+        running_job = (
+            MatchingJob.objects.select_for_update()
+            .filter(institution=institution, status=MatchingJob.Status.RUNNING)
+            .first()
+        )
+        if running_job:
+            running_job.needs_rerun = True
+            running_job.save(update_fields=["needs_rerun", "updated_at"])
+            logger.info("Matching already running for institution %s; flagged needs_rerun.", institution.code)
+            return running_job
+
+        tr_req = None
+        if trigger_request_id:
+            tr_req = ExchangeRequest.objects.filter(id=trigger_request_id).first()
+
+        job = MatchingJob.objects.create(
+            institution=institution,
+            status=MatchingJob.Status.RUNNING,
+            trigger_reason=trigger_reason,
+            trigger_request=tr_req,
+            started_at=now,
+        )
+
+    # Mark open exchange requests as PROCESSING
+    ExchangeRequest.objects.filter(
+        institution=institution,
+        status=ExchangeRequest.Status.OPEN,
+        request_type=ExchangeRequest.RequestType.EXCHANGE,
+    ).update(matching_status=ExchangeRequest.MatchingStatus.PROCESSING)
+
+    total_candidates_found = 0
+    total_proposals_activated = 0
+
+    try:
+        while True:
+            pass_now = timezone.now()
+            result = find_candidate_matches(
+                institution=institution,
+                now=pass_now,
+                status_adapter=status_adapter,
+                persist_candidates=False,
+            )
+            total_candidates_found += len(result.candidates)
+
+            all_open_reqs = list(
+                ExchangeRequest.objects.filter(
+                    institution=institution,
+                    status=ExchangeRequest.Status.OPEN,
+                    request_type=ExchangeRequest.RequestType.EXCHANGE,
+                ).select_related(
+                    "student",
+                    "current_occupancy__bed__room__floor__block__hostel",
+                    "preferred_bed__room__floor__block__hostel",
+                    "preferred_hostel",
+                    "preferred_block",
+                    "preferred_floor",
+                )
+            )
+            requests_by_id = {str(r.id): r for r in all_open_reqs}
+
+            unsuppressed_candidates = [
+                cand for cand in result.candidates
+                if not is_candidate_suppressed(cand, institution)
+            ]
+
+            activated = select_and_activate_candidates(
+                candidates=unsuppressed_candidates,
+                institution=institution,
+                request_map=requests_by_id,
+                now=pass_now,
+                status_adapter=status_adapter,
+            )
+            total_proposals_activated += len(activated)
+
+            activated_req_ids = set()
+            for prop in activated:
+                for p in prop.participants.all():
+                    activated_req_ids.add(p.exchange_request_id)
+
+            unmatched_req_ids = [r.id for r in all_open_reqs if r.id not in activated_req_ids]
+            if unmatched_req_ids:
+                ExchangeRequest.objects.filter(
+                    id__in=unmatched_req_ids,
+                    status=ExchangeRequest.Status.OPEN,
+                ).update(
+                    matching_status=ExchangeRequest.MatchingStatus.NO_MATCH,
+                    last_matched_at=pass_now,
+                )
+
+            MatchingOutbox.objects.filter(
+                institution=institution,
+                processed=False,
+            ).update(processed=True, processed_at=pass_now)
+
+            with transaction.atomic():
+                locked_job = MatchingJob.objects.select_for_update().get(id=job.id)
+                if locked_job.needs_rerun:
+                    locked_job.needs_rerun = False
+                    locked_job.save(update_fields=["needs_rerun", "updated_at"])
+                    continue
+                else:
+                    locked_job.status = MatchingJob.Status.COMPLETED
+                    locked_job.completed_at = timezone.now()
+                    locked_job.candidates_found_count = total_candidates_found
+                    locked_job.proposals_activated_count = total_proposals_activated
+                    locked_job.limit_reached = result.metrics.limit_reached
+                    locked_job.save(
+                        update_fields=[
+                            "status",
+                            "completed_at",
+                            "candidates_found_count",
+                            "proposals_activated_count",
+                            "limit_reached",
+                            "updated_at",
+                        ]
+                    )
+                    return locked_job
+
+    except Exception as exc:
+        logger.exception("Matching failed for institution %s: %s", institution.code, exc)
+        with transaction.atomic():
+            job.refresh_from_db()
+            job.status = MatchingJob.Status.FAILED
+            job.error_message = str(exc)
+            job.completed_at = timezone.now()
+            job.save(update_fields=["status", "error_message", "completed_at", "updated_at"])
+
+            ExchangeRequest.objects.filter(
+                institution=institution,
+                status=ExchangeRequest.Status.OPEN,
+                request_type=ExchangeRequest.RequestType.EXCHANGE,
+            ).update(
+                matching_status=ExchangeRequest.MatchingStatus.UNAVAILABLE,
+                matching_failure_reason=str(exc)[:500],
+            )
+        raise
+
+
+def reconcile_all_institutions_matching(now=None) -> list[int]:
+    """
+    Periodic sweep across all institutions:
+    1. Clean up expired requests and expired proposals.
+    2. Check for unprocessed MatchingOutbox entries or open requests waiting for matching.
+    3. Triggers matching runs for institutions requiring reconciliation.
+    """
+    now = now or timezone.now()
+
+    expire_exchange_requests(now=now)
+    expire_exchange_proposals(now=now)
+
+    institutions_to_run = set()
+
+    unprocessed_insts = (
+        MatchingOutbox.objects.filter(processed=False)
+        .values_list("institution_id", flat=True)
+        .distinct()
+    )
+    institutions_to_run.update(unprocessed_insts)
+
+    stale_cutoff = now - timedelta(minutes=15)
+    stale_insts = (
+        ExchangeRequest.objects.filter(
+            status=ExchangeRequest.Status.OPEN,
+            request_type=ExchangeRequest.RequestType.EXCHANGE,
+        )
+        .filter(
+            Q(matching_status=ExchangeRequest.MatchingStatus.WAITING)
+            | Q(last_matched_at__isnull=True)
+            | Q(last_matched_at__lt=stale_cutoff)
+        )
+        .values_list("institution_id", flat=True)
+        .distinct()
+    )
+    institutions_to_run.update(stale_insts)
+
+    for inst_id in institutions_to_run:
+        schedule_institution_matching(
+            institution_id=inst_id,
+            trigger_reason="reconciliation_sweep",
+        )
+
+    return list(institutions_to_run)
+
 

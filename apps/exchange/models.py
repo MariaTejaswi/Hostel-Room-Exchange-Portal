@@ -32,6 +32,13 @@ class ExchangeRequest(TimeStampedModel):
         EXPIRED = "expired", "Expired"
         COMPLETED = "completed", "Completed"
 
+    class MatchingStatus(models.TextChoices):
+        WAITING = "waiting", "Waiting for Matching"
+        PROCESSING = "processing", "Matching in Progress"
+        NO_MATCH = "no_match", "No Compatible Match Found"
+        PROPOSAL_AVAILABLE = "proposal_available", "Proposal Available"
+        UNAVAILABLE = "unavailable", "Matching Temporarily Unavailable"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     institution = models.ForeignKey(
         Institution,
@@ -97,6 +104,15 @@ class ExchangeRequest(TimeStampedModel):
         default=Status.OPEN,
         db_index=True,
     )
+    matching_status = models.CharField(
+        max_length=25,
+        choices=MatchingStatus.choices,
+        default=MatchingStatus.WAITING,
+        db_index=True,
+    )
+    last_matched_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    matching_failure_reason = models.TextField(blank=True)
+    preference_updated_at = models.DateTimeField(default=timezone.now, db_index=True)
     submitted_at = models.DateTimeField(default=timezone.now, db_index=True)
     expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
@@ -752,3 +768,123 @@ class Notification(TimeStampedModel):
 
     def __str__(self):
         return f"{self.notification_type} for {self.recipient.email}"
+
+
+class MatchingJob(TimeStampedModel):
+    """Tracks institution-level background matching runs and worker execution lifecycle."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        RUNNING = "running", "Running"
+        COMPLETED = "completed", "Completed"
+        FAILED = "failed", "Failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.CASCADE,
+        related_name="matching_jobs",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    trigger_reason = models.CharField(max_length=100, blank=True)
+    trigger_request = models.ForeignKey(
+        ExchangeRequest,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="triggered_matching_jobs",
+    )
+    needs_rerun = models.BooleanField(
+        default=False,
+        help_text="Flag indicating new events arrived while running, requiring another pass.",
+    )
+    candidates_found_count = models.IntegerField(default=0)
+    proposals_activated_count = models.IntegerField(default=0)
+    limit_reached = models.BooleanField(default=False)
+    attempts = models.IntegerField(default=0)
+    max_retries = models.IntegerField(default=3)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "exchange_matching_jobs"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["institution", "status"]),
+            models.Index(fields=["institution", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"MatchingJob {self.id} ({self.institution.code}) - {self.status}"
+
+
+class MatchingOutbox(TimeStampedModel):
+    """
+    Durable transactional outbox for broker failure resilience.
+    Guarantees that matching opportunities are not lost if the Celery message broker is down.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.CASCADE,
+        related_name="matching_outbox_events",
+    )
+    event_type = models.CharField(max_length=50)
+    request_id = models.UUIDField(null=True, blank=True)
+    proposal_id = models.UUIDField(null=True, blank=True)
+    processed = models.BooleanField(default=False, db_index=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "exchange_matching_outbox"
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["institution", "processed", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Outbox {self.event_type} ({self.institution.code}) - {'Done' if self.processed else 'Pending'}"
+
+
+class SuppressedCycle(TimeStampedModel):
+    """
+    Suppresses repeat proposals for declined or expired cycles.
+    Suppressed based on the exact directed cycle signature and participant request revisions.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.CASCADE,
+        related_name="suppressed_cycles",
+    )
+    cycle_signature = models.CharField(max_length=1024, db_index=True)
+    proposal = models.ForeignKey(
+        ExchangeProposal,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="suppressions",
+    )
+    reason = models.CharField(max_length=30)  # "declined", "expired", "rejected"
+    request_revisions = models.JSONField(
+        default=dict,
+        help_text="Map of request_id to timestamp string at time of decline/expiry.",
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "exchange_suppressed_cycles"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["institution", "cycle_signature", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"Suppression for {self.cycle_signature[:30]} ({self.reason})"

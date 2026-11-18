@@ -189,6 +189,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.exchange.tasks.expire_exchange_proposals_task",
         "schedule": 3600.0,  # Every hour
     },
+    "reconcile-exchange-matching-every-15-mins": {
+        "task": "apps.exchange.tasks.reconcile_all_institutions_matching_task",
+        "schedule": 900.0,  # Every 15 minutes
+    },
 }
 
 # Email Backend

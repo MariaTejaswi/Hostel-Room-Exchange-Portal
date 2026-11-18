@@ -10,9 +10,9 @@
     {% include 'components/sidebar.html' %}
 
     <!-- Main Content Area -->
-    <div class="main-content flex-1 flex flex-col min-w-0">
+    <div class="main-content flex-1 flex flex-col min-w-0 lg:ml-64">
         <!-- Topbar -->
-        <header class="topbar h-14 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-20">
+        <header class="topbar h-14 bg-white {% if is_student %}border-b border-[#E8DED4]{% else %}border-b border-slate-200{% endif %} px-4 sm:px-6 flex items-center justify-between sticky top-0 z-20">
             <!-- Left Section: Hamburger (mobile) + Breadcrumbs -->
             <div class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 mr-3">
                 <button id="mobile-sidebar-toggle" type="button" class="lg:hidden p-1.5 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-600/30 flex-shrink-0" aria-label="Open Navigation Menu">
@@ -20,13 +20,13 @@
                 </button>
 
                 <div class="flex items-center gap-2 text-xs sm:text-sm min-w-0">
-                    <a href="{% url 'accounts:dashboard' %}" class="text-slate-500 hover:text-teal-700 font-medium transition-colors flex-shrink-0">
+                    <a href="{% url 'accounts:dashboard' %}" class="{% if is_student %}text-[#8A7B72] hover:text-[#702C3B]{% else %}text-slate-500 hover:text-teal-700{% endif %} font-medium transition-colors flex-shrink-0">
                         <span class="hidden sm:inline">RoomLoop</span>
                         <span class="sm:hidden">RL</span>
                     </a>
-                    <span class="text-slate-300 flex-shrink-0">/</span>
+                    <span class="{% if is_student %}text-[#D5C2B1]{% else %}text-slate-300{% endif %} flex-shrink-0">/</span>
                     {% block breadcrumbs %}
-                    <span class="text-slate-900 font-semibold truncate">{% block breadcrumb_current %}Dashboard{% endblock %}</span>
+                    <span class="{% if is_student %}text-[#49372F]{% else %}text-slate-900{% endif %} font-semibold truncate">{% block breadcrumb_current %}Dashboard{% endblock %}</span>
                     {% endblock %}
                 </div>
             </div>
@@ -34,31 +34,31 @@
             <!-- Right Section: Role pill + User Menu -->
             <div class="flex items-center gap-2.5 sm:gap-3 flex-shrink-0">
                 <!-- Role Indicator Pill with SVG Icon -->
-                <div class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold">
-                    <span class="w-2 h-2 rounded-full bg-teal-600"></span>
+                <div class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full {% if is_student %}bg-[#FAF4EB] border border-[#E8DED4] text-[#702C3B]{% else %}bg-slate-50 border border-slate-200 text-slate-700{% endif %} text-xs font-semibold">
+                    <span class="w-2 h-2 rounded-full {% if is_student %}bg-[#702C3B]{% else %}bg-teal-600{% endif %}"></span>
                     <span>{{ user_role_label|default:user_role }}</span>
                 </div>
 
                 <!-- User Dropdown Menu -->
                 <div class="relative">
                     <button id="user-menu-button" type="button" class="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-600/30 group" aria-expanded="false" aria-haspopup="true">
-                        <div class="w-7 h-7 rounded bg-teal-700 text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
+                        <div class="w-7 h-7 rounded {% if is_student %}bg-[#702C3B]{% else %}bg-teal-700{% endif %} text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
                             {{ request.user.full_name|slice:":2"|upper }}
                         </div>
                         <div class="hidden md:block text-left text-xs pr-1">
-                            <span class="font-medium text-slate-900 block leading-tight truncate max-w-[120px]">{{ request.user.full_name }}</span>
+                            <span class="font-medium {% if is_student %}text-[#49372F]{% else %}text-slate-900{% endif %} block leading-tight truncate max-w-[120px]">{{ request.user.full_name }}</span>
                         </div>
                         <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
 
                     <!-- Dropdown Content -->
-                    <div id="user-menu-dropdown" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-30">
-                        <div class="px-4 py-2.5 border-b border-slate-100 bg-slate-50/50">
+                    <div id="user-menu-dropdown" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border {% if is_student %}border-[#E8DED4]{% else %}border-slate-200{% endif %} py-1.5 z-30">
+                        <div class="px-4 py-2.5 border-b {% if is_student %}border-[#E8DED4] bg-[#FAF4EB]/60{% else %}border-slate-100 bg-slate-50/50{% endif %}">
                             <p class="text-xs font-semibold text-slate-900 truncate">{{ request.user.full_name }}</p>
                             <p class="text-[11px] text-slate-500 truncate">{{ request.user.email }}</p>
                             <div class="mt-1.5 flex items-center justify-between text-[10px] text-slate-500">
                                 <span>Role:</span>
-                                <span class="font-medium text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                                <span class="font-medium {% if is_student %}text-[#702C3B] bg-[#FAF4EB] border border-[#E8DED4]{% else %}text-teal-800 bg-teal-50 border border-teal-200{% endif %} px-2 py-0.5 rounded">
                                     {{ user_role }}
                                 </span>
                             </div>
@@ -83,7 +83,7 @@
                             {% endif %}
                         </div>
 
-                        <div class="border-t border-slate-100 my-1"></div>
+                        <div class="border-t {% if is_student %}border-[#E8DED4]{% else %}border-slate-100{% endif %} my-1"></div>
 
                         <div class="px-2 pb-1">
                             <a href="{% url 'accounts:logout' %}" class="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-md transition-colors">
@@ -102,16 +102,16 @@
         </main>
 
         <!-- Compact Professional Footer -->
-        <footer class="mt-auto border-t border-slate-200 bg-white py-3 px-6 text-center sm:flex sm:justify-between sm:items-center sm:text-left text-xs text-slate-500">
+        <footer class="mt-auto {% if is_student %}border-t border-[#E8DED4] bg-white text-[#8A7B72]{% else %}border-t border-slate-200 bg-white text-slate-500{% endif %} py-3 px-6 text-center sm:flex sm:justify-between sm:items-center sm:text-left text-xs">
             <div class="flex items-center justify-center sm:justify-start gap-2">
-                <span class="font-medium text-slate-700">RoomLoop</span>
+                <span class="font-medium {% if is_student %}text-[#49372F]{% else %}text-slate-700{% endif %}">RoomLoop</span>
                 <span>•</span>
                 <span>University Hostel & Accommodation Platform</span>
             </div>
-            <div class="mt-2 sm:mt-0 flex flex-wrap gap-3 justify-center sm:justify-end items-center text-[11px] text-slate-500">
+            <div class="mt-2 sm:mt-0 flex flex-wrap gap-3 justify-center sm:justify-end items-center text-[11px] {% if is_student %}text-[#8A7B72]{% else %}text-slate-500{% endif %}">
                 <span>{{ current_institution.name|default:"Apex University" }}</span>
                 <span>•</span>
-                <span class="font-mono text-slate-600">Enterprise PostgreSQL 16</span>
+                <span class="font-mono {% if is_student %}text-[#49372F]{% else %}text-slate-600{% endif %}">Enterprise PostgreSQL 16</span>
             </div>
         </footer>
     </div>

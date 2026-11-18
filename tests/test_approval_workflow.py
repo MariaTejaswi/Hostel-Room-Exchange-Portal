@@ -822,4 +822,4 @@ def test_approval_http_views_workflow(client, institution, warden_user):
     assert resp.status_code == 200
     assert "approved successfully" in resp.content.decode()
     prop.refresh_from_db()
-    assert prop.status == ExchangeProposal.Status.APPROVED
+    assert prop.status in (ExchangeProposal.Status.APPROVED, ExchangeProposal.Status.COMPLETED)

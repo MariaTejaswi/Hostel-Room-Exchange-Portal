@@ -117,6 +117,97 @@
     </div>
     {% endif %}
 
+    <!-- Occupied-Bed Background Matching Status Panel -->
+    {% if exchange_request.request_type == 'exchange' %}
+    <section class="card p-5 border border-[#D5C2B1] bg-[#FDFBF9] rounded-2xl shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#EADFD6] pb-3">
+            <div>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-[#702C3B]">Automatic Workflow</span>
+                <h2 class="text-base font-bold text-[#3B1720]">Background Matching Status</h2>
+            </div>
+            <div class="flex items-center gap-2">
+                {% if exchange_request.matching_status == 'waiting' %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300">
+                    <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    Waiting for Matching
+                </span>
+                {% elif exchange_request.matching_status == 'processing' %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-900 border border-blue-300">
+                    <span class="w-2 h-2 rounded-full bg-blue-600 animate-spin"></span>
+                    Matching in Progress
+                </span>
+                {% elif exchange_request.matching_status == 'no_match' %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-stone-100 text-stone-700 border border-stone-300">
+                    <span class="w-2 h-2 rounded-full bg-stone-400"></span>
+                    No Compatible Match Found
+                </span>
+                {% elif exchange_request.matching_status == 'proposal_available' %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                    Proposal Available
+                </span>
+                {% elif exchange_request.matching_status == 'unavailable' %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-900 border border-rose-300">
+                    <span class="w-2 h-2 rounded-full bg-rose-600"></span>
+                    Matching Temporarily Unavailable
+                </span>
+                {% endif %}
+
+                {% if exchange_request.status == 'open' %}
+                <form method="post" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="refresh_matching">
+                    <button type="submit" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-[#D5C2B1] bg-white text-[#702C3B] hover:bg-[#F5EBDD] transition">
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh Status
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="text-xs text-[#5C4033] space-y-2 leading-relaxed">
+            {% if exchange_request.matching_status == 'waiting' %}
+            <p>
+                Your request has been recorded in the exchange pool. The automatic background worker will evaluate compatible 2-person swaps and 3-5 person rotation cycles shortly.
+            </p>
+            {% elif exchange_request.matching_status == 'processing' %}
+            <p>
+                The background engine is currently searching for matching swap cycles across your institution based on room and bed preferences.
+            </p>
+            {% elif exchange_request.matching_status == 'no_match' %}
+            <p>
+                Last evaluated: <strong>{{ exchange_request.last_matched_at|date:"M d, Y H:i"|default:"Recently" }}</strong>.
+                No compatible exchange cycle could be formed at this time. RoomLoop will continuously re-evaluate your request as other students submit or modify exchange requests.
+            </p>
+            {% elif exchange_request.matching_status == 'proposal_available' %}
+            <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                    <strong class="text-emerald-900 block font-semibold">A room exchange proposal has been activated!</strong>
+                    <span class="text-emerald-800 text-[11px]">
+                        All participants must accept before the deadline for authority approval to proceed.
+                        {% if active_proposal and active_proposal.expires_at %}
+                        <span class="font-medium underline">Acceptance Deadline: {{ active_proposal.expires_at|date:"M d, Y H:i" }}</span>
+                        {% endif %}
+                    </span>
+                </div>
+                {% if active_proposal %}
+                <a href="{% url 'exchange:proposal_detail' pk=active_proposal.pk %}" class="btn-primary btn-sm flex-shrink-0 whitespace-nowrap">
+                    Review Proposal &rarr;
+                </a>
+                {% endif %}
+            </div>
+            {% elif exchange_request.matching_status == 'unavailable' %}
+            <p class="text-rose-900">
+                Matching is temporarily paused due to a worker error: <em>{{ exchange_request.matching_failure_reason|default:"System error" }}</em>. Periodic reconciliation will retry automatically.
+            </p>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
         <section class="card">
             <div class="card-header flex items-center justify-between">

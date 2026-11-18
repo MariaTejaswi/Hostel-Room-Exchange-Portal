@@ -1,24 +1,24 @@
 {% load static %}
-<aside id="app-sidebar" class="sidebar w-64 fixed inset-y-0 left-0 z-40 flex flex-col bg-[#142635] border-r border-[#1E374D] text-white">
+<aside id="app-sidebar" class="sidebar w-64 fixed inset-y-0 left-0 z-40 flex flex-col {% if is_student %}bg-[#702C3B] border-r border-[#5C2330]{% else %}bg-[#142635] border-r border-[#1E374D]{% endif %} text-white -translate-x-full lg:translate-x-0 transition-transform duration-200 ease-in-out">
     <!-- Brand / Header -->
-    <div class="p-4 border-b border-slate-700/60 flex items-center justify-between">
+    <div class="p-4 border-b {% if is_student %}border-[#5C2330]{% else %}border-slate-700/60{% endif %} flex items-center justify-between">
         <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-3">
             <img src="{% static 'images/logo.svg' %}" alt="RoomLoop" class="w-7 h-7 rounded">
             <div>
                 <span class="font-bold text-base text-white tracking-tight leading-none block">RoomLoop</span>
-                <span class="text-[10px] text-teal-300 font-medium leading-none mt-0.5 block">Accommodation Portal</span>
+                <span class="text-[10px] {% if is_student %}text-[#F5EBDD]{% else %}text-teal-300{% endif %} font-medium leading-none mt-0.5 block">Accommodation Portal</span>
             </div>
         </a>
     </div>
 
     <!-- Institution Context -->
-    <div class="px-4 py-2.5 bg-slate-900/40 border-b border-slate-700/40 flex items-center gap-2">
-        <svg width="16" height="16" class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div class="px-4 py-2.5 {% if is_student %}bg-[#5C2330]/50 border-b border-[#5C2330]{% else %}bg-slate-900/40 border-b border-slate-700/40{% endif %} flex items-center gap-2">
+        <svg width="16" height="16" class="w-4 h-4 {% if is_student %}text-[#F5EBDD]/70{% else %}text-slate-400{% endif %} flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
         </svg>
         <div class="min-w-0 flex-1">
-            <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Institution</div>
-            <div class="text-xs font-medium text-slate-200 truncate" title="{{ current_institution.name|default:'Apex University' }}">
+            <div class="text-[10px] font-semibold {% if is_student %}text-[#F5EBDD]/70{% else %}text-slate-400{% endif %} uppercase tracking-wider">Institution</div>
+            <div class="text-xs font-medium text-white truncate" title="{{ current_institution.name|default:'Apex University' }}">
                 {{ current_institution.name|default:"Apex University" }}
             </div>
         </div>
@@ -27,6 +27,7 @@
     <!-- Navigation List with SVG Icons -->
     <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
         {% if is_student %}
+<<<<<<< HEAD
         <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-2 pb-1">My RoomLoop</div>
         <a href="{% url 'accounts:dashboard' %}" class="sidebar-nav-item {% if active_nav == 'dashboard' %}active{% endif %}" {% if active_nav == 'dashboard' %}aria-current="page"{% endif %}>
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
@@ -45,6 +46,30 @@
             <span>Notifications</span>
         </a>
         <a href="{% url 'accounts:profile' %}" class="sidebar-nav-item {% if active_nav == 'profile' %}active{% endif %}" {% if active_nav == 'profile' %}aria-current="page"{% endif %}>
+=======
+        <div class="text-[10px] font-bold text-[#F5EBDD]/70 uppercase tracking-wider px-3 pt-2 pb-1">My RoomLoop</div>
+        <a href="{% url 'accounts:dashboard' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'dashboard' %}active{% endif %}">
+            <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
+            <span>Dashboard</span>
+        </a>
+        <a href="{% url 'exchange:request_list' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'exchange' %}active{% endif %}">
+            <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4"/></svg>
+            <span>My Exchange Requests</span>
+        </a>
+        <a href="{% url 'exchange:proposal_list' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'proposals' %}active{% endif %}">
+            <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>My Exchange Proposals</span>
+        </a>
+        <a href="{% url 'exchange:my_transfers' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'my_transfers' %}active{% endif %}">
+            <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <span>Transfer Orders</span>
+        </a>
+        <a href="{% url 'exchange:notifications' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'notifications' %}active{% endif %}">
+            <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.5-2.5V10a6.5 6.5 0 10-13 0v4.5L4 17h5m6 0a3 3 0 01-6 0"/></svg>
+            <span>Notifications</span>
+        </a>
+        <a href="{% url 'accounts:profile' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'profile' %}active{% endif %}">
+>>>>>>> cffe5d65ffbf2a981b60324629772f7c70a076f3
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0M4 21a8 8 0 0116 0"/></svg>
             <span>Profile</span>
         </a>
@@ -54,7 +79,11 @@
         </div>
         
         <!-- Dashboard Link -->
+<<<<<<< HEAD
         <a href="{% url 'accounts:dashboard' %}" class="sidebar-nav-item {% if active_nav == 'dashboard' %}active{% endif %}" {% if active_nav == 'dashboard' %}aria-current="page"{% endif %}>
+=======
+        <a href="{% url 'accounts:dashboard' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'dashboard' %}active{% endif %}">
+>>>>>>> cffe5d65ffbf2a981b60324629772f7c70a076f3
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
             </svg>
@@ -62,7 +91,11 @@
         </a>
 
         <!-- Hostels (M8) -->
+<<<<<<< HEAD
         <a href="{% url 'hostels:hostel_list' %}" class="sidebar-nav-item {% if active_nav == 'hostels' %}active{% endif %}" {% if active_nav == 'hostels' %}aria-current="page"{% endif %}>
+=======
+        <a href="{% url 'hostels:hostel_list' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'hostels' %}active{% endif %}">
+>>>>>>> cffe5d65ffbf2a981b60324629772f7c70a076f3
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
             </svg>
@@ -70,7 +103,11 @@
         </a>
 
         <!-- Room Inventory (M8) -->
+<<<<<<< HEAD
         <a href="{% url 'hostels:room_inventory' %}" class="sidebar-nav-item {% if active_nav == 'rooms' %}active{% endif %}" {% if active_nav == 'rooms' %}aria-current="page"{% endif %}>
+=======
+        <a href="{% url 'hostels:room_inventory' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'rooms' %}active{% endif %}">
+>>>>>>> cffe5d65ffbf2a981b60324629772f7c70a076f3
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
             </svg>
@@ -79,7 +116,11 @@
 
         <!-- Bed Management (M8) -->
         {% if can_manage_inventory or is_warden %}
+<<<<<<< HEAD
         <a href="{% url 'hostels:bed_list' %}" class="sidebar-nav-item {% if active_nav == 'beds' %}active{% endif %}" {% if active_nav == 'beds' %}aria-current="page"{% endif %}>
+=======
+        <a href="{% url 'hostels:bed_list' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'beds' %}active{% endif %}">
+>>>>>>> cffe5d65ffbf2a981b60324629772f7c70a076f3
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
             </svg>
@@ -89,7 +130,11 @@
 
         <!-- Occupancy Management (M8) - Authorized Staff -->
         {% if not is_student %}
+<<<<<<< HEAD
         <a href="{% url 'hostels:occupancy_list' %}" class="sidebar-nav-item {% if active_nav == 'occupancy' %}active{% endif %}" {% if active_nav == 'occupancy' %}aria-current="page"{% endif %}>
+=======
+        <a href="{% url 'hostels:occupancy_list' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'occupancy' %}active{% endif %}">
+>>>>>>> cffe5d65ffbf2a981b60324629772f7c70a076f3
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
             </svg>
@@ -111,6 +156,12 @@
                 {{ pending_approval_count }}
             </span>
             {% endif %}
+        </a>
+        <a href="{% url 'exchange:my_transfers' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'my_transfers' %}active{% endif %}">
+            <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <span class="truncate">Transfer Orders</span>
         </a>
         {% endif %}
 
@@ -139,19 +190,19 @@
 
         {% if is_sysadmin %}
         <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">Students</div>
-        <a href="{% url 'accounts:student_list' %}" class="sidebar-nav-item {% if active_nav == 'students_directory' %}active{% endif %}">
+        <a href="{% url 'accounts:student_list' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'students_directory' %}active{% endif %}">
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
             </svg>
             <span>Student Directory</span>
         </a>
-        <a href="{% url 'accounts:student_create' %}" class="sidebar-nav-item {% if active_nav == 'students_add' %}active{% endif %}">
+        <a href="{% url 'accounts:student_create' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'students_add' %}active{% endif %}">
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
             </svg>
             <span>Add Student</span>
         </a>
-        <a href="{% url 'accounts:student_import' %}" class="sidebar-nav-item {% if active_nav == 'students_import' %}active{% endif %}">
+        <a href="{% url 'accounts:student_import' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'students_import' %}active{% endif %}">
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
             </svg>
@@ -159,7 +210,7 @@
         </a>
 
         <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">Technical Admin</div>
-        <a href="{% url 'accounts:dashboard_sysadmin' %}" class="sidebar-nav-item {% if active_nav == 'sysadmin' %}active{% endif %}">
+        <a href="{% url 'accounts:dashboard_sysadmin' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'sysadmin' %}active{% endif %}">
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
             </svg>
@@ -173,7 +224,7 @@
             <span class="text-[9px] bg-slate-800 text-teal-400 px-1.5 py-0.5 rounded font-medium">Phase 2</span>
         </div>
         
-        <div class="sidebar-nav-item opacity-50 cursor-not-allowed text-slate-400" title="Available in Phase 2">
+        <div class="sidebar-nav-item flex items-center gap-3 opacity-50 cursor-not-allowed text-slate-400" title="Available in Phase 2">
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
             </svg>
@@ -181,7 +232,7 @@
             <span class="text-[9px] bg-slate-800 text-slate-400 rounded px-1.5 py-0.5">Soon</span>
         </div>
 
-        <div class="sidebar-nav-item opacity-50 cursor-not-allowed text-slate-400" title="Available in Phase 2">
+        <div class="sidebar-nav-item flex items-center gap-3 opacity-50 cursor-not-allowed text-slate-400" title="Available in Phase 2">
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
@@ -192,16 +243,16 @@
     </nav>
 
     <!-- Bottom User Bar -->
-    <div class="p-3 border-t border-slate-700/60 bg-slate-900/50">
-        <div class="flex items-center gap-2.5 p-2 rounded-lg bg-slate-800/80 border border-slate-700/60">
-            <div class="w-7 h-7 rounded bg-teal-700 text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
+    <div class="p-3 border-t {% if is_student %}border-[#5C2330] bg-[#5C2330]/60{% else %}border-slate-700/60 bg-slate-900/50{% endif %}">
+        <div class="flex items-center gap-2.5 p-2 rounded-lg {% if is_student %}bg-[#491C26]/40 border border-[#702C3B]/50{% else %}bg-slate-800/80 border border-slate-700/60{% endif %}">
+            <div class="w-7 h-7 rounded {% if is_student %}bg-[#FAF4EB] text-[#702C3B]{% else %}bg-teal-700 text-white{% endif %} font-bold flex items-center justify-center text-xs flex-shrink-0">
                 {{ request.user.full_name|slice:":2"|upper }}
             </div>
             <div class="min-w-0 flex-1">
                 <div class="text-xs font-semibold text-slate-200 truncate">{{ request.user.full_name }}</div>
-                <div class="text-[10px] text-teal-300 font-medium truncate">{{ user_role_label|default:user_role }}</div>
+                <div class="text-[10px] {% if is_student %}text-[#F5EBDD]{% else %}text-teal-300{% endif %} font-medium truncate">{{ user_role_label|default:user_role }}</div>
             </div>
-            <a href="{% url 'accounts:logout' %}" class="text-slate-400 hover:text-red-400 p-1 rounded transition-colors flex-shrink-0" title="Sign out" aria-label="Sign out">
+            <a href="{% url 'accounts:logout' %}" class="{% if is_student %}text-[#F5EBDD]/70 hover:text-white{% else %}text-slate-400 hover:text-red-400{% endif %} p-1 rounded transition-colors flex-shrink-0" title="Sign out" aria-label="Sign out">
                 <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
             </a>
         </div>
