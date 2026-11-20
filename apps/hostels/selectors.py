@@ -522,6 +522,15 @@ def get_student_dashboard_context(user: User) -> dict:
 
 
 def get_warden_dashboard_context(user: User) -> dict:
+    from django.urls import reverse
+    from apps.exchange.models import ExchangeProposal, ExchangeRequest
+    from apps.exchange.selectors import (
+        get_approvals_queryset,
+        get_pending_approvals_count,
+        get_vacant_transfers_queryset,
+        get_pending_vacant_transfers_count,
+    )
+
     hostels_qs = get_hostel_queryset_with_stats(institution=user.institution, user=user)
     hostels = list(hostels_qs)
 
@@ -536,29 +545,85 @@ def get_warden_dashboard_context(user: User) -> dict:
         h.occupancy_rate = round((h.occupied_beds / h.total_beds * 100), 1) if h.total_beds > 0 else 0
 
     assigned_hostel_ids = [h.id for h in hostels]
-    recent_occupancies = (
+    recent_occupancies = list(
         StudentOccupancy.objects.filter(
             bed__room__floor__block__hostel_id__in=assigned_hostel_ids,
             status=StudentOccupancy.OccupancyStatus.ACTIVE,
         )
-        .select_related("student", "bed__room__floor__block__hostel")
+        .select_related("student", "bed__room__floor__block__hostel", "bed__room")
         .order_by("-created_at")[:10]
     )
 
+    # Scoped reviews awaiting warden approval (same-hostel only)
+    pending_proposals_qs = get_approvals_queryset(user).filter(
+        status=ExchangeProposal.Status.PENDING_APPROVAL
+    )
+    pending_transfers_qs = get_vacant_transfers_queryset(user).filter(
+        status=ExchangeRequest.Status.PENDING_APPROVAL
+    )
+    pending_reviews_count = pending_proposals_qs.count() + pending_transfers_qs.count()
+
+    review_items = []
+    for prop in pending_proposals_qs[:5]:
+        participants = list(prop.participants.all())
+        student_name = participants[0].student.full_name if participants else "Student"
+        student_reg = participants[0].student.registration_number if participants else ""
+        student_initials = student_name[:2].upper()
+        req_type = "Direct Swap (2-Way)" if prop.cycle_length == 2 else f"{prop.cycle_length}-Party Cycle"
+        review_items.append({
+            "id": prop.id,
+            "is_vacant_transfer": False,
+            "student_name": student_name,
+            "student_reg": student_reg,
+            "student_initials": student_initials,
+            "request_type": req_type,
+            "status": "Pending Review",
+            "url": reverse("exchange:approval_detail", kwargs={"pk": prop.id}),
+            "created_at": prop.created_at,
+        })
+
+    for trans in pending_transfers_qs[:5]:
+        s_name = trans.student.full_name if trans.student else "Student"
+        s_reg = trans.student.registration_number if trans.student else ""
+        review_items.append({
+            "id": trans.id,
+            "is_vacant_transfer": True,
+            "student_name": s_name,
+            "student_reg": s_reg,
+            "student_initials": s_name[:2].upper(),
+            "request_type": "Vacant-bed Transfer",
+            "status": "Pending Review",
+            "url": reverse("exchange:transfer_approval_detail", kwargs={"pk": trans.id}),
+            "created_at": trans.created_at,
+        })
+
+    review_items.sort(key=lambda x: x["created_at"], reverse=True)
+    recent_reviews = review_items[:5]
+
     return {
         "hostels": hostels,
+        "primary_hostel": hostels[0] if hostels else None,
+        "has_multiple_hostels": len(hostels) > 1,
         "total_rooms": total_rooms,
         "total_beds": total_beds,
         "occupied_beds": occupied_beds,
         "available_beds": available_beds,
+        "vacant_beds": available_beds,
         "available_operational_beds": available_beds,
         "maintenance_beds": maintenance_beds,
         "occupancy_pct": occupancy_pct,
+        "pending_reviews_count": pending_reviews_count,
+        "recent_reviews": recent_reviews,
         "recent_occupancies": recent_occupancies,
+        "recent_allocations": recent_occupancies[:5],
     }
 
 
 def get_chief_warden_dashboard_context(user: User) -> dict:
+    from django.urls import reverse
+    from apps.exchange.selectors import get_approvals_queryset
+    from apps.exchange.models import ExchangeProposal
+
     hostels_qs = get_hostel_queryset_with_stats(institution=user.institution)
     hostels = list(hostels_qs)
 
@@ -573,8 +638,48 @@ def get_chief_warden_dashboard_context(user: User) -> dict:
     for h in hostels:
         h.occupancy_rate = round((h.occupied_beds / h.total_beds * 100), 1) if h.total_beds > 0 else 0
 
+    # Cross-hostel proposals awaiting chief warden approval
+    cross_proposals_qs = get_approvals_queryset(user).filter(
+        status=ExchangeProposal.Status.PENDING_APPROVAL
+    )
+    cross_hostel_requests_count = cross_proposals_qs.count()
+
+    cross_hostel_reviews = []
+    for prop in cross_proposals_qs[:5]:
+        participants = list(prop.participants.all())
+        if participants:
+            p1 = participants[0]
+            student_name = p1.student.full_name
+            src_h = (
+                f"{p1.current_occupancy.bed.room.floor.block.hostel.name} ({p1.current_occupancy.bed.room.room_number}-{p1.current_occupancy.bed.bed_label})"
+                if p1.current_occupancy and getattr(p1.current_occupancy, "bed", None)
+                else "Source Hostel"
+            )
+            dst_h = (
+                f"{p1.proposed_bed.room.floor.block.hostel.name} ({p1.proposed_bed.room.room_number}-{p1.proposed_bed.bed_label})"
+                if p1.proposed_bed
+                else "Destination Hostel"
+            )
+        else:
+            student_name = "Student"
+            src_h = "Hostel A"
+            dst_h = "Hostel B"
+
+        cross_hostel_reviews.append({
+            "id": prop.id,
+            "student_name": student_name,
+            "request_type": "Room swap" if prop.cycle_length == 2 else f"{prop.cycle_length}-Party Cycle",
+            "source_hostel": src_h,
+            "destination_hostel": dst_h,
+            "url": reverse("exchange:approval_detail", kwargs={"pk": prop.id}),
+        })
+
+    # Sort top 5 hostels by occupancy rate for the visual progress chart
+    top_hostels = sorted(hostels, key=lambda h: h.occupancy_rate, reverse=True)[:5]
+
     return {
         "hostels": hostels,
+        "top_hostels": top_hostels,
         "total_hostels": total_hostels,
         "total_rooms": total_rooms,
         "total_beds": total_beds,
@@ -583,6 +688,9 @@ def get_chief_warden_dashboard_context(user: User) -> dict:
         "available_operational_beds": available_beds,
         "maintenance_beds": maintenance_beds,
         "occupancy_pct": occupancy_pct,
+        "cross_hostel_requests_count": cross_hostel_requests_count,
+        "cross_hostel_reviews": cross_hostel_reviews,
+        "escalations_count": 0,
     }
 
 
@@ -599,6 +707,14 @@ def get_admin_dashboard_context(user: User) -> dict:
     available_beds = sum(h.available_beds for h in hostels)
     maintenance_beds = sum(h.maintenance_beds for h in hostels)
     occupancy_pct = round((occupied_beds / total_beds * 100), 1) if total_beds > 0 else 0
+
+    boys_hostels = [h for h in hostels if h.resident_category == "male"]
+    girls_hostels = [h for h in hostels if h.resident_category == "female"]
+    boys_hostels_count = len(boys_hostels)
+    girls_hostels_count = len(girls_hostels)
+
+    primary_male_hostel = boys_hostels[0] if boys_hostels else (hostels[0] if hostels else None)
+    primary_female_hostel = girls_hostels[0] if girls_hostels else None
 
     for h in hostels:
         h.occupancy_rate = round((h.occupied_beds / h.total_beds * 100), 1) if h.total_beds > 0 else 0
@@ -622,6 +738,10 @@ def get_admin_dashboard_context(user: User) -> dict:
         "available_operational_beds": available_beds,
         "maintenance_beds": maintenance_beds,
         "occupancy_pct": occupancy_pct,
+        "boys_hostels_count": boys_hostels_count,
+        "girls_hostels_count": girls_hostels_count,
+        "primary_male_hostel": primary_male_hostel,
+        "primary_female_hostel": primary_female_hostel,
         "recent_occupancies": recent_occupancies,
     }
 

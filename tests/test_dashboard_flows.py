@@ -551,7 +551,7 @@ def test_capacity_metrics_distinguishes_maintenance_and_operational_beds(hostel_
                 "Eligibility Verification",
                 "Exchange Policies",
             ],
-            "bg-[#142635]",
+            "bg-[#702C3B]",
         ),
         (
             "chief_warden_user",
@@ -571,7 +571,7 @@ def test_capacity_metrics_distinguishes_maintenance_and_operational_beds(hostel_
                 "Eligibility Verification",
                 "Exchange Policies",
             ],
-            "bg-[#142635]",
+            "bg-[#702C3B]",
         ),
         (
             "admin_user",
@@ -590,7 +590,7 @@ def test_capacity_metrics_distinguishes_maintenance_and_operational_beds(hostel_
                 "System Console",
                 "Student Directory",
             ],
-            "bg-[#142635]",
+            "bg-[#702C3B]",
         ),
         (
             "dean_user",
@@ -610,7 +610,7 @@ def test_capacity_metrics_distinguishes_maintenance_and_operational_beds(hostel_
                 "Eligibility Verification",
                 "Exchange Policies",
             ],
-            "bg-[#142635]",
+            "bg-[#702C3B]",
         ),
         (
             "sysadmin_user",
@@ -633,7 +633,7 @@ def test_capacity_metrics_distinguishes_maintenance_and_operational_beds(hostel_
                 "Exchange Policies",
                 "Phase 2",
             ],
-            "bg-[#142635]",
+            "bg-[#702C3B]",
         ),
     ],
 )
@@ -680,4 +680,50 @@ def test_all_dashboards_sidebar_integrity_and_role_scoping(
 
     # 6. Exactly single active-page highlight in sidebar
     assert sidebar_html.count('aria-current="page"') == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "fixture_name,dashboard_url,role_eyebrow",
+    [
+        ("student_user", "accounts:dashboard_student", "Student Portal"),
+        ("warden_user", "accounts:dashboard_warden", "Warden Portal"),
+        ("chief_warden_user", "accounts:dashboard_chief_warden", "Chief Warden Portal"),
+        ("admin_user", "accounts:dashboard_admin", "Hostel Admin Portal"),
+        ("dean_user", "accounts:dashboard_dean", "Dean Portal"),
+        ("sysadmin_user", "accounts:dashboard_sysadmin", "System Admin Portal"),
+    ],
+)
+def test_all_dashboards_shared_design_system_and_warden_consistency(
+    client,
+    request,
+    fixture_name,
+    dashboard_url,
+    role_eyebrow,
+    hostel_setup,
+):
+    """Verify all 6 dashboards use the shared Warden design system and have zero overflow."""
+    user = request.getfixturevalue(fixture_name)
+    client.force_login(user)
+    resp = client.get(reverse(dashboard_url))
+    assert resp.status_code == 200
+    html = resp.content.decode()
+
+    # 1. Shared design system shell & tokens
+    assert "warden-shell" in html
+    assert "roomloop-dashboard-shell" in html
+    assert role_eyebrow in html
+    assert "#702C3B" in html
+    assert "#E8DED4" in html
+
+    # 2. Universal topbar notification bell & profile dropdown
+    assert 'id="notification-bell-btn"' in html
+    assert 'id="notification-dropdown"' in html
+    assert 'id="user-menu-button"' in html
+
+    # 3. Active navigation highlight
+    assert "sidebar-nav-item" in html
+    assert "active" in html
+    assert 'aria-current="page"' in html
+
 

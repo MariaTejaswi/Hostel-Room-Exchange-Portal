@@ -274,19 +274,54 @@ def exchange_request_list_view(request):
 
 @login_required
 def exchange_notifications_view(request):
-    _require_student(request)
+    """View notifications for the authenticated user across any profile or role."""
+    notifications_qs = (
+        Notification.objects.filter(
+            recipient=request.user,
+        )
+        .select_related("exchange_request", "proposal")
+        .order_by("-created_at")
+    )
     return render(
         request,
         "exchange/notifications.html",
         {
-            "notifications": Notification.objects.filter(
-                recipient=request.user,
-            )
-            .select_related("exchange_request", "proposal")
-            .order_by("-created_at"),
+            "notifications": notifications_qs,
             "active_nav": "notifications",
         },
     )
+
+
+@login_required
+@require_POST
+def mark_notifications_read_view(request):
+    """Mark a specific notification or all user notifications as read."""
+    from django.utils import timezone
+    from django.http import JsonResponse
+
+    notif_id = request.POST.get("notification_id")
+    if notif_id:
+        Notification.objects.filter(id=notif_id, recipient=request.user).update(
+            read_at=timezone.now()
+        )
+    else:
+        Notification.objects.filter(
+            recipient=request.user, read_at__isnull=True
+        ).update(read_at=timezone.now())
+
+    if (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or "application/json" in request.headers.get("Accept", "")
+    ):
+        unread_count = Notification.objects.filter(
+            recipient=request.user, read_at__isnull=True
+        ).count()
+        return JsonResponse({"status": "ok", "unread_count": unread_count})
+
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER")
+    if next_url and next_url.startswith("/"):
+        return redirect(next_url)
+    return redirect("exchange:notifications")
 
 
 @login_required

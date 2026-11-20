@@ -33,19 +33,48 @@ document.addEventListener("DOMContentLoaded", function () {
   // 2. User Profile Dropdown
   const userMenuBtn = document.getElementById("user-menu-button");
   const userMenuDropdown = document.getElementById("user-menu-dropdown");
+  const notifBellBtn = document.getElementById("notification-bell-btn");
+  const notifDropdown = document.getElementById("notification-dropdown");
 
   if (userMenuBtn && userMenuDropdown) {
     userMenuBtn.addEventListener("click", function (e) {
       e.stopPropagation();
+      if (notifDropdown) notifDropdown.classList.add("hidden");
       userMenuDropdown.classList.toggle("hidden");
     });
+  }
 
-    document.addEventListener("click", function (e) {
-      if (!userMenuDropdown.contains(e.target) && !userMenuBtn.contains(e.target)) {
-        userMenuDropdown.classList.add("hidden");
-      }
+  // 2b. Notification Bell Dropdown
+  if (notifBellBtn && notifDropdown) {
+    notifBellBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (userMenuDropdown) userMenuDropdown.classList.add("hidden");
+      notifDropdown.classList.toggle("hidden");
+      const isExpanded = !notifDropdown.classList.contains("hidden");
+      notifBellBtn.setAttribute("aria-expanded", isExpanded ? "true" : "false");
     });
   }
+
+  // Close open topbar dropdowns on outside click or ESC key
+  document.addEventListener("click", function (e) {
+    if (userMenuDropdown && !userMenuDropdown.contains(e.target) && userMenuBtn && !userMenuBtn.contains(e.target)) {
+      userMenuDropdown.classList.add("hidden");
+    }
+    if (notifDropdown && !notifDropdown.contains(e.target) && notifBellBtn && !notifBellBtn.contains(e.target)) {
+      notifDropdown.classList.add("hidden");
+      if (notifBellBtn) notifBellBtn.setAttribute("aria-expanded", "false");
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      if (userMenuDropdown) userMenuDropdown.classList.add("hidden");
+      if (notifDropdown) {
+        notifDropdown.classList.add("hidden");
+        if (notifBellBtn) notifBellBtn.setAttribute("aria-expanded", "false");
+      }
+    }
+  });
 
   // 3. Password visibility toggle
   const togglePasswordBtns = document.querySelectorAll("[data-toggle-password]");

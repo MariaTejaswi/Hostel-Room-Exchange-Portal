@@ -1,51 +1,128 @@
 {% extends 'layouts/dashboard_base.html' %}
+{% load static %}
 
 {% block title %}Notifications — RoomLoop{% endblock %}
 {% block breadcrumb_current %}Notifications{% endblock %}
 
 {% block content %}
-<div class="student-page w-full max-w-[980px] mx-auto space-y-6">
-    <header>
-        <p class="student-eyebrow">RoomLoop updates</p>
-        <h1 class="student-title">Notifications</h1>
-        <p class="student-subtitle">Important updates about your accommodation and exchange activity.</p>
+<div class="w-full max-w-4xl mx-auto space-y-6">
+    <!-- Notifications Header -->
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-[#E8DED4]">
+        <div class="min-w-0 flex-1">
+            <span class="text-[11px] font-bold text-[#702C3B] uppercase tracking-wider block">Communications</span>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-[#35251F] tracking-tight mt-0.5">
+                Notifications
+            </h1>
+            <p class="text-xs sm:text-sm text-[#8A7B72] mt-1 leading-relaxed">
+                Stay updated on room exchange proposals, approval reviews, allocations, and administrative decisions.
+            </p>
+        </div>
+
+        {% if notifications %}
+        <div class="flex items-center gap-3 shrink-0">
+            {% if unread_notifications_count and unread_notifications_count > 0 %}
+            <form method="post" action="{% url 'exchange:notifications_mark_read' %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#702C3B] bg-[#FAF4EB] hover:bg-[#F3ECE2] border border-[#E8DED4] rounded-xl shadow-2xs transition-colors">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span>Mark all as read</span>
+                </button>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
     </header>
+
+    <!-- Notification Cards List -->
     {% if notifications %}
     <div class="space-y-3">
         {% for notification in notifications %}
-        <div class="card p-4 sm:p-5 border border-[#E8DED4] bg-white rounded-xl shadow-xs hover:border-[#702C3B]/30 transition-all flex items-start gap-4">
-            <div class="w-10 h-10 rounded-full bg-[#FAF4EB] text-[#702C3B] border border-[#E8DED4] flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.5-2.5V10a6.5 6.5 0 10-13 0v4.5L4 17h5m6 0a3 3 0 01-6 0"/>
-                </svg>
+        <div class="card p-4 sm:p-5 border {% if not notification.read_at %}border-[#702C3B]/40 bg-[#FAF4EB]/30{% else %}border-[#E8DED4] bg-white{% endif %} rounded-2xl shadow-2xs hover:border-[#702C3B]/50 transition-all flex items-start gap-4">
+            <!-- Icon -->
+            <div class="w-10 h-10 rounded-xl {% if not notification.read_at %}bg-[#702C3B] text-white{% else %}bg-[#FAF4EB] text-[#702C3B] border border-[#E8DED4]{% endif %} flex items-center justify-center shrink-0 mt-0.5 shadow-2xs text-sm">
+                {% if notification.notification_type == 'transfer_completed' %}
+                    ✓
+                {% elif notification.notification_type == 'acceptance_required' or notification.notification_type == 'proposal_created' %}
+                    ⇄
+                {% elif notification.notification_type == 'approval_updated' %}
+                    🛡️
+                {% else %}
+                    🔔
+                {% endif %}
             </div>
-            <div class="min-w-0 flex-1 space-y-1">
+
+            <!-- Content Area -->
+            <div class="min-w-0 flex-1 space-y-1.5">
                 <div class="flex items-center justify-between gap-2 flex-wrap">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FAF4EB] text-[#702C3B] border border-[#E8DED4]">
-                        {{ notification.get_notification_type_display }}
-                    </span>
-                    <span class="text-xs text-[#8A7B72]">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FAF4EB] text-[#702C3B] border border-[#E8DED4]">
+                            {{ notification.get_notification_type_display }}
+                        </span>
+                        {% if not notification.read_at %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#702C3B] text-white">
+                            New
+                        </span>
+                        {% endif %}
+                    </div>
+                    <span class="text-xs text-[#8A7B72] font-mono">
                         {{ notification.created_at|date:"M d, Y · H:i" }}
                     </span>
                 </div>
-                <p class="text-xs sm:text-sm text-[#49372F] font-medium leading-relaxed break-words">
+
+                <p class="text-xs sm:text-sm text-[#35251F] font-medium leading-relaxed break-words">
                     {{ notification.message }}
                 </p>
+
+                <!-- Actions and References -->
+                <div class="pt-2 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div class="flex items-center gap-3">
+                        {% if notification.proposal %}
+                            {% if is_student %}
+                            <a href="{% url 'exchange:proposal_detail' pk=notification.proposal.pk %}" class="font-bold text-[#702C3B] hover:underline inline-flex items-center gap-1">
+                                <span>View proposal</span>
+                                <span aria-hidden="true">&rarr;</span>
+                            </a>
+                            {% else %}
+                            <a href="{% url 'exchange:approval_detail' pk=notification.proposal.pk %}" class="font-bold text-[#702C3B] hover:underline inline-flex items-center gap-1">
+                                <span>Review proposal</span>
+                                <span aria-hidden="true">&rarr;</span>
+                            </a>
+                            {% endif %}
+                        {% elif notification.exchange_request %}
+                            {% if is_student %}
+                            <a href="{% url 'exchange:request_detail' pk=notification.exchange_request.pk %}" class="font-bold text-[#702C3B] hover:underline inline-flex items-center gap-1">
+                                <span>View request</span>
+                                <span aria-hidden="true">&rarr;</span>
+                            </a>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+
+                    {% if not notification.read_at %}
+                    <form method="post" action="{% url 'exchange:notifications_mark_read' %}" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="notification_id" value="{{ notification.id }}">
+                        <input type="hidden" name="next" value="{{ request.path }}">
+                        <button type="submit" class="text-[11px] font-semibold text-[#8A7B72] hover:text-[#702C3B] hover:underline bg-transparent border-0 cursor-pointer p-0">
+                            Mark as read
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
             </div>
         </div>
         {% endfor %}
     </div>
     {% else %}
-    <div class="card p-10 sm:p-12 border border-[#E8DED4] bg-white rounded-xl text-center space-y-4 max-w-lg mx-auto shadow-xs">
-        <div class="w-14 h-14 rounded-full bg-[#FAF4EB] text-[#702C3B] border border-[#E8DED4] flex items-center justify-center mx-auto">
-            <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-            </svg>
+    <div class="card p-10 sm:p-14 border border-[#E8DED4] bg-white rounded-2xl text-center space-y-4 max-w-md mx-auto shadow-2xs">
+        <div class="w-14 h-14 rounded-2xl bg-[#FAF4EB] text-[#702C3B] border border-[#E8DED4] flex items-center justify-center mx-auto text-xl shadow-2xs">
+            🔔
         </div>
-        <div class="space-y-1">
-            <h2 class="text-lg font-bold text-[#49372F]">You're all caught up</h2>
+        <div class="space-y-1.5">
+            <h2 class="text-base sm:text-lg font-bold text-[#35251F]">You're all caught up</h2>
             <p class="text-xs text-[#8A7B72] leading-relaxed">
-                There are no new notifications at this time. Updates regarding your accommodation allocations, exchange proposals, and transfer decisions will appear here.
+                There are no new notifications at this time. Updates regarding room exchanges, proposals, approvals, and bed transfers will appear here.
             </p>
         </div>
     </div>

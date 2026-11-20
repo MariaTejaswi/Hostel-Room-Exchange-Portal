@@ -73,4 +73,19 @@ def navigation_context(request):
         from apps.exchange.selectors import get_pending_approvals_count
         context["pending_approval_count"] = get_pending_approvals_count(user)
 
+    # Universal notifications context across all user profiles
+    try:
+        from apps.exchange.models import Notification
+        context["unread_notifications_count"] = Notification.objects.filter(
+            recipient=user, read_at__isnull=True
+        ).count()
+        context["recent_notifications"] = list(
+            Notification.objects.filter(recipient=user)
+            .select_related("exchange_request", "proposal")
+            .order_by("-created_at")[:5]
+        )
+    except Exception:
+        context["unread_notifications_count"] = 0
+        context["recent_notifications"] = []
+
     return context

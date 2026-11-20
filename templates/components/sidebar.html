@@ -1,23 +1,23 @@
 {% load static %}
-<aside id="app-sidebar" class="sidebar w-64 fixed inset-y-0 left-0 z-40 flex flex-col {% if is_student %}bg-[#702C3B] border-r border-[#5C2330]{% else %}bg-[#142635] border-r border-[#1E374D]{% endif %} text-white -translate-x-full lg:translate-x-0 transition-transform duration-200 ease-in-out">
+<aside id="app-sidebar" class="sidebar w-64 fixed inset-y-0 left-0 z-40 flex flex-col bg-[#702C3B] border-r border-[#5C2330] text-white -translate-x-full lg:translate-x-0 transition-transform duration-200 ease-in-out shadow-lg">
     <!-- Brand / Header -->
-    <div class="p-4 border-b {% if is_student %}border-[#5C2330]{% else %}border-slate-700/60{% endif %} flex items-center justify-between">
+    <div class="p-4 border-b border-[#5C2330] flex items-center justify-between">
         <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-3">
             <img src="{% static 'images/logo.svg' %}" alt="RoomLoop" class="w-7 h-7 rounded">
             <div>
                 <span class="font-bold text-base text-white tracking-tight leading-none block">RoomLoop</span>
-                <span class="text-[10px] {% if is_student %}text-[#F5EBDD]{% else %}text-teal-300{% endif %} font-medium leading-none mt-0.5 block">Accommodation Portal</span>
+                <span class="text-[10px] text-[#F5EBDD] font-medium leading-none mt-0.5 block">Accommodation Portal</span>
             </div>
         </a>
     </div>
 
     <!-- Institution Context -->
-    <div class="px-4 py-2.5 {% if is_student %}bg-[#5C2330]/50 border-b border-[#5C2330]{% else %}bg-slate-900/40 border-b border-slate-700/40{% endif %} flex items-center gap-2">
-        <svg width="16" height="16" class="w-4 h-4 {% if is_student %}text-[#F5EBDD]/70{% else %}text-slate-400{% endif %} flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div class="px-4 py-2.5 bg-[#5C2330]/50 border-b border-[#5C2330] flex items-center gap-2">
+        <svg width="16" height="16" class="w-4 h-4 text-[#F5EBDD]/70 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
         </svg>
         <div class="min-w-0 flex-1">
-            <div class="text-[10px] font-semibold {% if is_student %}text-[#F5EBDD]/70{% else %}text-slate-400{% endif %} uppercase tracking-wider">Institution</div>
+            <div class="text-[10px] font-semibold text-[#F5EBDD]/70 uppercase tracking-wider">Institution</div>
             <div class="text-xs font-medium text-white truncate" title="{{ current_institution.name|default:'Apex University' }}">
                 {{ current_institution.name|default:"Apex University" }}
             </div>
@@ -54,7 +54,7 @@
         </a>
         {% else %}
         {% if is_warden or is_chief_warden or is_hostel_admin or is_dean %}
-        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-2 pb-1">
+        <div class="text-[10px] font-bold text-[#F5EBDD]/70 uppercase tracking-wider px-3 pt-2 pb-1">
             Core Modules
         </div>
         
@@ -100,7 +100,7 @@
         {% endif %}
 
         {% if is_warden or is_chief_warden or is_dean %}
-        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">Exchange Governance</div>
+        <div class="text-[10px] font-bold text-[#F5EBDD]/70 uppercase tracking-wider px-3 pt-3 pb-1">Exchange Governance</div>
         <a href="{% url 'exchange:approval_list' %}" class="sidebar-nav-item flex items-center justify-between {% if active_nav == 'exchange_approvals' %}active{% endif %}" {% if active_nav == 'exchange_approvals' %}aria-current="page"{% endif %}>
             <div class="flex items-center gap-3 min-w-0">
                 <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -109,7 +109,7 @@
                 <span class="truncate">Exchange Approvals</span>
             </div>
             {% if pending_approval_count > 0 %}
-            <span class="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-full flex-shrink-0">
+            <span class="text-[10px] font-bold bg-[#F5EBDD] text-[#702C3B] px-1.5 py-0.5 rounded-full flex-shrink-0">
                 {{ pending_approval_count }}
             </span>
             {% endif %}
@@ -123,7 +123,7 @@
         {% endif %}
 
         {% if is_hostel_admin %}
-        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">Residential Review</div>
+        <div class="text-[10px] font-bold text-[#F5EBDD]/70 uppercase tracking-wider px-3 pt-3 pb-1">Residential Review</div>
         <a href="{% url 'accounts:eligibility_verification_list' %}" class="sidebar-nav-item flex items-center justify-between {% if active_nav == 'eligibility_verification' %}active{% endif %}" {% if active_nav == 'eligibility_verification' %}aria-current="page"{% endif %}>
             <div class="flex items-center gap-3 min-w-0">
                 <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -132,7 +132,7 @@
                 <span class="truncate">Eligibility Verification</span>
             </div>
             {% if pending_eligibility_count > 0 %}
-            <span class="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-full flex-shrink-0">
+            <span class="text-[10px] font-bold bg-[#F5EBDD] text-[#702C3B] px-1.5 py-0.5 rounded-full flex-shrink-0">
                 {{ pending_eligibility_count }}
             </span>
             {% endif %}
@@ -146,7 +146,7 @@
         {% endif %}
 
         {% if is_sysadmin %}
-        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">Technical Admin</div>
+        <div class="text-[10px] font-bold text-[#F5EBDD]/70 uppercase tracking-wider px-3 pt-3 pb-1">Technical Admin</div>
         <a href="{% url 'accounts:dashboard_sysadmin' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'sysadmin' or active_nav == 'dashboard' %}active{% endif %}" {% if active_nav == 'sysadmin' or active_nav == 'dashboard' %}aria-current="page"{% endif %}>
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
@@ -160,7 +160,7 @@
             <span>Django Admin</span>
         </a>
 
-        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">Students</div>
+        <div class="text-[10px] font-bold text-[#F5EBDD]/70 uppercase tracking-wider px-3 pt-3 pb-1">Students</div>
         <a href="{% url 'accounts:student_list' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'students_directory' %}active{% endif %}" {% if active_nav == 'students_directory' %}aria-current="page"{% endif %}>
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
@@ -181,43 +181,43 @@
         </a>
         {% endif %}
 
-        {% if is_warden or is_chief_warden or is_hostel_admin or is_dean %}
+        {% if is_chief_warden or is_hostel_admin or is_dean %}
         <!-- Swap Modules (Phase 2 Preview) -->
-        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-4 pb-1 flex items-center justify-between">
+        <div class="text-[10px] font-bold text-[#F5EBDD]/70 uppercase tracking-wider px-3 pt-4 pb-1 flex items-center justify-between">
             <span>Exchange Modules</span>
-            <span class="text-[9px] bg-slate-800 text-teal-400 px-1.5 py-0.5 rounded font-medium">Phase 2</span>
+            <span class="text-[9px] bg-[#5C2330] text-[#F5EBDD] px-1.5 py-0.5 rounded font-medium">Phase 2</span>
         </div>
         
-        <div class="sidebar-nav-item flex items-center gap-3 opacity-50 cursor-not-allowed text-slate-400" title="Available in Phase 2">
+        <div class="sidebar-nav-item flex items-center gap-3 opacity-50 cursor-not-allowed text-[#F5EBDD]/60" title="Available in Phase 2">
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
             </svg>
             <span class="flex-1 text-xs">Room Exchange</span>
-            <span class="text-[9px] bg-slate-800 text-slate-400 rounded px-1.5 py-0.5">Soon</span>
+            <span class="text-[9px] bg-[#5C2330] text-[#F5EBDD]/70 rounded px-1.5 py-0.5">Soon</span>
         </div>
 
-        <div class="sidebar-nav-item flex items-center gap-3 opacity-50 cursor-not-allowed text-slate-400" title="Available in Phase 2">
+        <div class="sidebar-nav-item flex items-center gap-3 opacity-50 cursor-not-allowed text-[#F5EBDD]/60" title="Available in Phase 2">
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
             <span class="flex-1 text-xs">Multi-Party Swaps</span>
-            <span class="text-[9px] bg-slate-800 text-slate-400 rounded px-1.5 py-0.5">Soon</span>
+            <span class="text-[9px] bg-[#5C2330] text-[#F5EBDD]/70 rounded px-1.5 py-0.5">Soon</span>
         </div>
         {% endif %}
         {% endif %}
     </nav>
 
     <!-- Bottom User Bar -->
-    <div class="p-3 border-t {% if is_student %}border-[#5C2330] bg-[#5C2330]/60{% else %}border-slate-700/60 bg-slate-900/50{% endif %}">
-        <div class="flex items-center gap-2.5 p-2 rounded-lg {% if is_student %}bg-[#491C26]/40 border border-[#702C3B]/50{% else %}bg-slate-800/80 border border-slate-700/60{% endif %}">
-            <div class="w-7 h-7 rounded {% if is_student %}bg-[#FAF4EB] text-[#702C3B]{% else %}bg-teal-700 text-white{% endif %} font-bold flex items-center justify-center text-xs flex-shrink-0">
+    <div class="p-3 border-t border-[#5C2330] bg-[#5C2330]/60">
+        <div class="flex items-center gap-2.5 p-2 rounded-xl bg-[#491C26]/40 border border-[#702C3B]/50">
+            <div class="w-7 h-7 rounded-lg bg-[#FAF4EB] text-[#702C3B] font-bold flex items-center justify-center text-xs flex-shrink-0 shadow-2xs">
                 {{ request.user.full_name|slice:":2"|upper }}
             </div>
             <div class="min-w-0 flex-1">
-                <div class="text-xs font-semibold text-slate-200 truncate">{{ request.user.full_name }}</div>
-                <div class="text-[10px] {% if is_student %}text-[#F5EBDD]{% else %}text-teal-300{% endif %} font-medium truncate">{{ user_role_label|default:user_role }}</div>
+                <div class="text-xs font-semibold text-white truncate">{{ request.user.full_name }}</div>
+                <div class="text-[10px] text-[#F5EBDD] font-medium truncate">{{ user_role_label|default:user_role }}</div>
             </div>
-            <a href="{% url 'accounts:logout' %}" class="{% if is_student %}text-[#F5EBDD]/70 hover:text-white{% else %}text-slate-400 hover:text-red-400{% endif %} p-1 rounded transition-colors flex-shrink-0" title="Sign out" aria-label="Sign out">
+            <a href="{% url 'accounts:logout' %}" class="text-[#F5EBDD]/70 hover:text-white p-1 rounded-lg transition-colors flex-shrink-0" title="Sign out" aria-label="Sign out">
                 <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
             </a>
         </div>

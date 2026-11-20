@@ -86,20 +86,30 @@
   }
 
   .sidebar-nav-item.active {
-    background-color: rgba(245, 235, 221, 0.18);
-    border-color: rgba(245, 235, 221, 0.22);
-    color: var(--rl-white);
+    background-color: #FAF4EB !important;
+    border-color: #E8DED4 !important;
+    color: #702C3B !important;
+    box-shadow: inset 3px 0 0 #702C3B !important;
+    font-weight: 600 !important;
+    opacity: 1;
+  }
+
+  .sidebar-nav-item.active svg {
+    color: #702C3B !important;
+  }
+
+  .sidebar-nav-item.active:hover {
+    background-color: #F5EBDD !important;
+    border-color: #D4C3B3 !important;
+    color: #702C3B !important;
+  }
+
+  .sidebar-nav-item.active:hover svg {
+    color: #702C3B !important;
   }
 
   .sidebar-nav-item.active::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0.5rem;
-    bottom: 0.5rem;
-    width: 3px;
-    border-radius: 0 9999px 9999px 0;
-    background-color: var(--rl-cream);
+    display: none;
   }
 
   .sidebar-nav-item:focus-visible {
@@ -411,6 +421,78 @@
     background-color: #F5EBDD;
     color: #702C3B;
     border-color: #D5C2B1;
+  }
+
+  /* Warden-standard button classes extracted into shared design system */
+  .btn-maroon-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #702C3B !important;
+    color: #FFFFFF !important;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    transition: background-color 150ms ease, transform 100ms ease, box-shadow 150ms ease;
+    text-decoration: none;
+  }
+  .btn-maroon-primary:hover {
+    background-color: #5A222F !important;
+    color: #FFFFFF !important;
+  }
+  .btn-maroon-primary:active {
+    transform: scale(0.98);
+  }
+  .btn-maroon-primary:focus-visible {
+    outline: 2px solid #702C3B;
+    outline-offset: 2px;
+  }
+
+  .btn-cream-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #FAF4EB !important;
+    color: #702C3B !important;
+    border: 1px solid #E8DED4 !important;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    transition: background-color 150ms ease, border-color 150ms ease, transform 100ms ease;
+    text-decoration: none;
+  }
+  .btn-cream-secondary:hover {
+    background-color: #F3ECE2 !important;
+    border-color: #702C3B !important;
+    color: #702C3B !important;
+  }
+  .btn-cream-secondary:active {
+    transform: scale(0.98);
+  }
+  .btn-cream-secondary:focus-visible {
+    outline: 2px solid #702C3B;
+    outline-offset: 2px;
+  }
+
+  /* Shared scrollbar hiding utility preserving wheel, touch, and keyboard scrolling */
+  .rl-scroll-hidden,
+  .warden-scroll-hidden,
+  .student-scroll-hidden,
+  .chief-scroll-hidden,
+  .admin-scroll-hidden,
+  .dean-scroll-hidden,
+  .sysadmin-scroll-hidden {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  .rl-scroll-hidden::-webkit-scrollbar,
+  .warden-scroll-hidden::-webkit-scrollbar,
+  .student-scroll-hidden::-webkit-scrollbar,
+  .chief-scroll-hidden::-webkit-scrollbar,
+  .admin-scroll-hidden::-webkit-scrollbar,
+  .dean-scroll-hidden::-webkit-scrollbar,
+  .sysadmin-scroll-hidden::-webkit-scrollbar {
+    display: none !important;
+    width: 0px !important;
+    height: 0px !important;
   }
 
   .btn-primary {
@@ -749,14 +831,21 @@
     opacity: 1;
   }
   .student-shell .sidebar .sidebar-nav-item.active {
-    background-color: #5C2330 !important;
-    color: #FFFFFF !important;
-    box-shadow: inset 3px 0 0 #F5EBDD !important;
+    background-color: #FAF4EB !important;
+    color: #702C3B !important;
+    box-shadow: inset 3px 0 0 #702C3B !important;
     font-weight: 600 !important;
     opacity: 1;
   }
-  .student-shell .sidebar .sidebar-nav-item svg {
-    color: inherit !important;
+  .student-shell .sidebar .sidebar-nav-item.active svg {
+    color: #702C3B !important;
+  }
+  .student-shell .sidebar .sidebar-nav-item.active:hover {
+    background-color: #F5EBDD !important;
+    color: #702C3B !important;
+  }
+  .student-shell .sidebar .sidebar-nav-item.active:hover svg {
+    color: #702C3B !important;
   }
   .student-shell .sidebar > div:last-child {
     background-color: #5C2330 !important;
@@ -820,6 +909,159 @@
     border-color: #E8DED4 !important;
   }
   .student-shell .topbar #user-menu-dropdown a:hover {
+    background-color: #FAF4EB !important;
+    color: #702C3B !important;
+  }
+
+  /* ========================================================================= */
+  /* Shared RoomLoop Dashboard Shell — Coffee-Brown & Maroon Theme            */
+  /* Applied across all 6 dashboards (Warden, Student, Chief, Admin, Dean, Sys)*/
+  /* ========================================================================= */
+  .warden-shell,
+  .roomloop-dashboard-shell {
+    background-color: #F5EBDD !important;
+    color: #49372F !important;
+  }
+  .warden-shell .sidebar,
+  .roomloop-dashboard-shell .sidebar {
+    background-color: #702C3B !important;
+    border-right-color: #5C2330 !important;
+  }
+  .warden-shell .sidebar .text-white,
+  .roomloop-dashboard-shell .sidebar .text-white {
+    color: #FFFFFF !important;
+  }
+  .warden-shell .sidebar .text-slate-200,
+  .roomloop-dashboard-shell .sidebar .text-slate-200 {
+    color: #FFFFFF !important;
+  }
+  .warden-shell .sidebar .bg-slate-900\/40,
+  .roomloop-dashboard-shell .sidebar .bg-slate-900\/40 {
+    background-color: #5C2330 !important;
+    border-bottom-color: #491C26 !important;
+  }
+  .warden-shell .sidebar .border-slate-700\/60,
+  .warden-shell .sidebar .border-slate-700\/40,
+  .roomloop-dashboard-shell .sidebar .border-slate-700\/60,
+  .roomloop-dashboard-shell .sidebar .border-slate-700\/40 {
+    border-color: #5C2330 !important;
+  }
+  .warden-shell .sidebar .sidebar-nav-item,
+  .roomloop-dashboard-shell .sidebar .sidebar-nav-item {
+    color: #F5EBDD !important;
+    opacity: 0.9;
+  }
+  .warden-shell .sidebar .sidebar-nav-item:hover,
+  .roomloop-dashboard-shell .sidebar .sidebar-nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.12) !important;
+    color: #FFFFFF !important;
+    opacity: 1;
+  }
+  /* Selected navigation: pale blush with burgundy text */
+  .warden-shell .sidebar .sidebar-nav-item.active,
+  .roomloop-dashboard-shell .sidebar .sidebar-nav-item.active {
+    background-color: #FAF4EB !important;
+    color: #702C3B !important;
+    box-shadow: inset 3px 0 0 #702C3B !important;
+    font-weight: 600 !important;
+    opacity: 1;
+  }
+  .warden-shell .sidebar .sidebar-nav-item.active svg,
+  .roomloop-dashboard-shell .sidebar .sidebar-nav-item.active svg {
+    color: #702C3B !important;
+  }
+  .warden-shell .sidebar .sidebar-nav-item.active:hover,
+  .roomloop-dashboard-shell .sidebar .sidebar-nav-item.active:hover {
+    background-color: #F5EBDD !important;
+    color: #702C3B !important;
+  }
+  .warden-shell .sidebar .sidebar-nav-item.active:hover svg,
+  .roomloop-dashboard-shell .sidebar .sidebar-nav-item.active:hover svg {
+    color: #702C3B !important;
+  }
+  .warden-shell .sidebar .sidebar-nav-item svg,
+  .roomloop-dashboard-shell .sidebar .sidebar-nav-item svg {
+    color: inherit !important;
+  }
+  .warden-shell .sidebar > div:last-child,
+  .roomloop-dashboard-shell .sidebar > div:last-child {
+    background-color: #5C2330 !important;
+    border-top-color: #491C26 !important;
+  }
+  .warden-shell .sidebar > div:last-child > div,
+  .roomloop-dashboard-shell .sidebar > div:last-child > div {
+    background-color: rgba(0, 0, 0, 0.15) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+  .warden-shell .sidebar > div:last-child .bg-teal-700,
+  .roomloop-dashboard-shell .sidebar > div:last-child .bg-teal-700 {
+    background-color: #FAF4EB !important;
+    color: #702C3B !important;
+  }
+  .warden-shell .sidebar > div:last-child .text-slate-200,
+  .roomloop-dashboard-shell .sidebar > div:last-child .text-slate-200 {
+    color: #FFFFFF !important;
+  }
+  .warden-shell .sidebar > div:last-child .text-teal-300,
+  .roomloop-dashboard-shell .sidebar > div:last-child .text-teal-300 {
+    color: #F5EBDD !important;
+    opacity: 0.85;
+  }
+
+  /* Scoped Shared Topbar */
+  .warden-shell .topbar,
+  .roomloop-dashboard-shell .topbar {
+    background-color: #FFFFFF !important;
+    border-bottom: 1px solid #E8DED4 !important;
+  }
+  .warden-shell .topbar a,
+  .roomloop-dashboard-shell .topbar a {
+    color: #8A7B72 !important;
+  }
+  .warden-shell .topbar a:hover,
+  .roomloop-dashboard-shell .topbar a:hover {
+    color: #702C3B !important;
+  }
+  .warden-shell .topbar .text-slate-300,
+  .roomloop-dashboard-shell .topbar .text-slate-300 {
+    color: #E8DED4 !important;
+  }
+  .warden-shell .topbar .text-slate-900,
+  .roomloop-dashboard-shell .topbar .text-slate-900 {
+    color: #49372F !important;
+  }
+  .warden-shell .topbar .bg-slate-50,
+  .roomloop-dashboard-shell .topbar .bg-slate-50 {
+    background-color: #FAF4EB !important;
+    border-color: #E8DED4 !important;
+    color: #702C3B !important;
+  }
+  .warden-shell .topbar .bg-teal-600,
+  .roomloop-dashboard-shell .topbar .bg-teal-600 {
+    background-color: #702C3B !important;
+  }
+  .warden-shell .topbar .bg-teal-700,
+  .roomloop-dashboard-shell .topbar .bg-teal-700 {
+    background-color: #702C3B !important;
+    color: #FFFFFF !important;
+  }
+  .warden-shell .topbar #user-menu-dropdown,
+  .roomloop-dashboard-shell .topbar #user-menu-dropdown {
+    border-color: #E8DED4 !important;
+  }
+  .warden-shell .topbar #user-menu-dropdown .bg-slate-50\/50,
+  .roomloop-dashboard-shell .topbar #user-menu-dropdown .bg-slate-50\/50 {
+    background-color: #FAF4EB !important;
+    border-bottom-color: #E8DED4 !important;
+  }
+  .warden-shell .topbar #user-menu-dropdown .text-teal-800,
+  .roomloop-dashboard-shell .topbar #user-menu-dropdown .text-teal-800 {
+    background-color: #FAF4EB !important;
+    color: #702C3B !important;
+    border-color: #E8DED4 !important;
+  }
+  .warden-shell .topbar #user-menu-dropdown a:hover,
+  .roomloop-dashboard-shell .topbar #user-menu-dropdown a:hover {
     background-color: #FAF4EB !important;
     color: #702C3B !important;
   }
@@ -1117,4 +1359,15 @@
   background-color: #F5EBDD !important;
   color: #702C3B !important;
 }
+
+/* Accessible Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 

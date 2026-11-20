@@ -26,6 +26,11 @@ urlpatterns = [
         views.exchange_notifications_view,
         name="notifications",
     ),
+    path(
+        "exchange/notifications/mark-read/",
+        views.mark_notifications_read_view,
+        name="notifications_mark_read",
+    ),
     # Module M5: Exchange Approval Workflow
     path(
         "exchange/approvals/",

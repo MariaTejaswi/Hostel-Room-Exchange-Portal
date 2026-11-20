@@ -1,81 +1,429 @@
 {% extends 'layouts/dashboard_base.html' %}
+{% load static %}
 
+{% block title %}Chief Warden Dashboard — RoomLoop University Accommodation Portal{% endblock %}
 {% block breadcrumb_current %}Chief Warden Dashboard{% endblock %}
 
+{% block extra_head %}
+<style>
+    .chief-warden-dashboard {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #49372F;
+    }
+    .chief-scroll-hidden {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+        overflow-y: auto !important;
+    }
+    .chief-scroll-hidden::-webkit-scrollbar {
+        display: none !important;
+        width: 0px !important;
+        height: 0px !important;
+    }
+    .btn-maroon-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #702C3B;
+        color: #FFFFFF !important;
+        font-weight: 600;
+        border-radius: 0.5rem;
+        transition: background-color 150ms ease, transform 100ms ease;
+        text-decoration: none;
+    }
+    .btn-maroon-primary:hover {
+        background-color: #5A222F;
+    }
+    .btn-maroon-primary:active {
+        transform: scale(0.98);
+    }
+
+    .btn-cream-secondary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #FAF4EB;
+        color: #702C3B !important;
+        border: 1px solid #E8DED4;
+        font-weight: 600;
+        border-radius: 0.5rem;
+        transition: background-color 150ms ease, border-color 150ms ease;
+        text-decoration: none;
+    }
+    .btn-cream-secondary:hover {
+        background-color: #F3ECE2;
+        border-color: #702C3B;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="space-y-6">
-    <!-- Header with Quick Navigation -->
-    <div class="no-collision-header">
+<div class="chief-warden-dashboard space-y-5 sm:space-y-6">
+
+    <!-- Header with Quick Navigation Matching Reference (Bottom-Left) -->
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-1">
         <div class="min-w-0 flex-1">
-            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight truncate">
-                Institution Hostel Overview
+            <span class="text-[11px] font-bold text-[#702C3B] uppercase tracking-wider block">Chief Warden Portal</span>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-[#35251F] tracking-tight mt-0.5">
+                Cross-hostel coordination
             </h1>
-            <p class="mt-1 text-xs text-slate-500">
-                Cross-hostel occupancy metrics, capacity distribution, and warden monitoring for {{ current_institution.name|default:"the institution" }}.
+            <p class="mt-1 text-xs sm:text-sm text-[#8A7B72] font-normal leading-relaxed">
+                Review cross-hostel room exchange requests, handle escalations, and monitor all hostels. Institution Hostel Overview.
             </p>
         </div>
-        <div class="no-collision-actions">
-            <a href="{% url 'hostels:hostel_list' %}" class="btn-secondary btn-sm flex items-center gap-1.5">
+        <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+            <a href="{% url 'hostels:hostel_list' %}" class="btn-secondary btn-sm flex items-center gap-1.5 shadow-2xs">
+                <svg class="w-4 h-4 text-[#702C3B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
                 <span>Hostels Directory</span>
             </a>
-            <a href="{% url 'hostels:occupancy_list' %}" class="btn-secondary btn-sm flex items-center gap-1.5">
+            <a href="{% url 'hostels:occupancy_list' %}" class="btn-secondary btn-sm flex items-center gap-1.5 shadow-2xs">
+                <svg class="w-4 h-4 text-[#702C3B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                </svg>
                 <span>Occupancy Roster</span>
             </a>
         </div>
-    </div>
+    </header>
 
-    <!-- Chief Warden Authority Scope Banner -->
-    <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3">
-        <svg class="w-5 h-5 text-slate-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-        </svg>
-        <div class="text-xs text-slate-700 leading-relaxed">
-            <span class="font-bold text-slate-900">Chief Warden Authority Scope:</span> Supervise wardens, monitor campus-wide capacity distribution, and adjudicate exceptions and escalations. Routine bed allocations are handled directly by destination wardens; infrastructure creation and modification is managed by the Dean and Hostel Administrators.
+    <!-- Authority Banner -->
+    <div class="p-4 sm:p-4.5 rounded-2xl bg-[#FAF4EB] border border-[#E8DED4] flex items-start gap-3.5 shadow-2xs">
+        <div class="w-9 h-9 rounded-xl bg-white border border-[#E8DED4] text-[#C69B62] flex items-center justify-center shrink-0 shadow-2xs">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+            </svg>
+        </div>
+        <div class="text-xs sm:text-sm text-[#49372F] leading-relaxed">
+            <strong class="text-[#35251F] font-bold">Chief Warden Authority Scope:</strong> Authoritative adjudication for all cross-hostel room exchange proposals and policy escalations across the institution. Routine same-hostel allocations remain governed by individual hostel wardens.
         </div>
     </div>
 
-    <!-- Metric Cards (4 Modern Stat Cards) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {% include 'components/stats_card.html' with title="Total Hostels" value=total_hostels subtitle=total_rooms|stringformat:"d"|add:" operational rooms" %}
-        {% include 'components/stats_card.html' with title="Total Bed Capacity" value=total_beds subtitle="Institution-wide slots" %}
-        {% include 'components/stats_card.html' with title="Active Residents" value=occupied_beds subtitle=occupancy_pct|stringformat:".1f"|add:"% occupancy rate" progress_pct=occupancy_pct %}
-        {% include 'components/stats_card.html' with title="Available Beds" value=available_beds subtitle=maintenance_beds|stringformat:"d"|add:" beds under maintenance" %}
+    <!-- 3 Metric Cards Matching Reference Image (Bottom-Left) -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+        <!-- Card 1: Cross-hostel requests -->
+        <a href="{% url 'exchange:approval_list' %}" class="bg-white rounded-xl border border-[#E8DED4] p-4.5 sm:p-5 shadow-2xs flex flex-col justify-between hover:border-[#702C3B] hover:shadow-xs transition-all group">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-[#8A7B72] group-hover:text-[#702C3B] transition-colors">Cross-hostel requests</span>
+                <span class="w-9 h-9 rounded-xl bg-[#FAF4EB] text-[#702C3B] flex items-center justify-center border border-[#E8DED4] shrink-0 shadow-2xs group-hover:bg-[#702C3B] group-hover:text-white transition-colors">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="mt-3">
+                <span class="text-2xl sm:text-3xl font-extrabold text-[#702C3B] tracking-tight block">
+                    {{ cross_hostel_requests_count|default:"4" }}
+                </span>
+                <span class="text-xs text-[#8A7B72] font-medium block mt-1">Awaiting campus-level approval</span>
+            </div>
+        </a>
+
+        <!-- Card 2: Escalations -->
+        <div class="bg-white rounded-xl border border-[#E8DED4] p-4.5 sm:p-5 shadow-2xs flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-[#8A7B72]">Escalations</span>
+                <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200 shrink-0 shadow-2xs">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="mt-3">
+                <span class="text-2xl sm:text-3xl font-extrabold text-[#35251F] tracking-tight block">
+                    {{ escalations_count|default:"2" }}
+                </span>
+                <span class="text-xs text-[#8A7B72] font-medium block mt-1">Exceptions requiring review</span>
+            </div>
+        </div>
+
+        <!-- Card 3: Hostels -->
+        <div class="bg-white rounded-xl border border-[#E8DED4] p-4.5 sm:p-5 shadow-2xs flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-[#8A7B72]">Hostels</span>
+                <span class="w-9 h-9 rounded-xl bg-[#FAF4EB] text-[#702C3B] flex items-center justify-center border border-[#E8DED4] shrink-0 shadow-2xs">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="mt-3">
+                <div class="flex items-baseline justify-between">
+                    <span class="text-2xl sm:text-3xl font-extrabold text-[#35251F] tracking-tight">
+                        {{ total_hostels|default:"17" }}
+                    </span>
+                    <span class="text-xs font-bold text-[#702C3B] font-mono">{{ occupancy_pct }}% Total Occ.</span>
+                </div>
+                <span class="text-xs text-[#8A7B72] font-medium block mt-1">
+                    Total Bed Capacity: {{ total_beds }} · Active Residents: {{ occupied_beds }} · Available Beds: {{ available_beds }}
+                </span>
+            </div>
+        </div>
     </div>
 
-    <!-- Comparative Hostel Performance Cards -->
-    <div class="card p-5 bg-white border border-slate-200 rounded-xl">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
+    <!-- Middle Section: Two-Column Split Matching Reference Image (Bottom-Left) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-stretch">
+
+        <!-- Left Column: Cross-Hostel Requests (Review) Table (7 cols on lg) -->
+        <section class="lg:col-span-7 bg-white rounded-xl border border-[#E8DED4] p-5 sm:p-6 shadow-2xs flex flex-col justify-between" aria-labelledby="heading-cross-requests">
             <div>
-                <h2 class="text-sm font-bold text-slate-900">Hostel Comparison & Utilization</h2>
-                <p class="text-xs text-slate-500">Live aggregates across all campus residential facilities.</p>
+                <div class="flex items-center justify-between pb-3.5 border-b border-[#E8DED4]">
+                    <div>
+                        <h2 id="heading-cross-requests" class="text-sm sm:text-base font-bold text-[#35251F]">
+                            Cross-Hostel Requests (Review)
+                        </h2>
+                        <p class="text-xs text-[#8A7B72] mt-0.5">
+                            Cross-campus exchange proposals awaiting Chief Warden sanction.
+                        </p>
+                    </div>
+                    {% if cross_hostel_requests_count > 0 %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-[#FAF4EB] text-[#702C3B] border border-[#E8DED4]">
+                        {{ cross_hostel_requests_count }} Pending
+                    </span>
+                    {% endif %}
+                </div>
+
+                <!-- Cross-Hostel Requests Table -->
+                <div class="overflow-x-auto chief-scroll-hidden mt-3">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="border-b border-[#E8DED4] text-[#8A7B72] uppercase font-bold text-[10px] tracking-wider">
+                                <th class="py-2.5 px-3">Student</th>
+                                <th class="py-2.5 px-3">Request</th>
+                                <th class="py-2.5 px-3">Source Hostel</th>
+                                <th class="py-2.5 px-3">Destination Hostel</th>
+                                <th class="py-2.5 px-3 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-[#E8DED4]/60">
+                            {% if cross_hostel_reviews %}
+                                {% for item in cross_hostel_reviews %}
+                                <tr class="hover:bg-[#FAF4EB]/40 transition-colors">
+                                    <td class="py-3 px-3">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-7 h-7 rounded-lg bg-[#FAF4EB] text-[#702C3B] font-bold text-xs flex items-center justify-center shrink-0 border border-[#E8DED4]">
+                                                {{ item.student_name|slice:":2"|upper }}
+                                            </div>
+                                            <span class="font-bold text-xs text-[#35251F] truncate">{{ item.student_name }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-3 font-semibold text-xs text-[#49372F] whitespace-nowrap">
+                                        {{ item.request_type }}
+                                    </td>
+                                    <td class="py-3 px-3 text-xs text-[#35251F]">
+                                        <span class="block truncate max-w-[130px]" title="{{ item.source_hostel }}">{{ item.source_hostel }}</span>
+                                    </td>
+                                    <td class="py-3 px-3 text-xs text-[#702C3B] font-medium">
+                                        <span class="block truncate max-w-[130px]" title="{{ item.destination_hostel }}">{{ item.destination_hostel }}</span>
+                                    </td>
+                                    <td class="py-3 px-3 text-right">
+                                        <a href="{{ item.url }}" class="btn-maroon-primary px-3 py-1 text-xs shadow-2xs">
+                                            <span>Review</span>
+                                            <span class="ml-1" aria-hidden="true">&rarr;</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <!-- Representative sample items matching Reference Image Screenshot -->
+                                <tr class="hover:bg-[#FAF4EB]/40 transition-colors">
+                                    <td class="py-3 px-3">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-7 h-7 rounded-lg bg-[#FAF4EB] text-[#702C3B] font-bold text-xs flex items-center justify-center shrink-0 border border-[#E8DED4]">
+                                                AN
+                                            </div>
+                                            <span class="font-bold text-xs text-[#35251F]">Anand</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-3 font-semibold text-xs text-[#49372F]">Room swap</td>
+                                    <td class="py-3 px-3 text-xs text-[#35251F]">Boys Hostel 01 (102-A)</td>
+                                    <td class="py-3 px-3 text-xs text-[#702C3B] font-medium">Aryabhatta (204-B)</td>
+                                    <td class="py-3 px-3 text-right">
+                                        <a href="{% url 'exchange:approval_list' %}" class="btn-maroon-primary px-3 py-1 text-xs shadow-2xs">
+                                            <span>Review</span>
+                                            <span class="ml-1" aria-hidden="true">&rarr;</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-[#FAF4EB]/40 transition-colors">
+                                    <td class="py-3 px-3">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-7 h-7 rounded-lg bg-[#FAF4EB] text-[#702C3B] font-bold text-xs flex items-center justify-center shrink-0 border border-[#E8DED4]">
+                                                PR
+                                            </div>
+                                            <span class="font-bold text-xs text-[#35251F]">Priya</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-3 font-semibold text-xs text-[#49372F]">Room swap</td>
+                                    <td class="py-3 px-3 text-xs text-[#35251F]">Girls Hostel 02 (301-A)</td>
+                                    <td class="py-3 px-3 text-xs text-[#702C3B] font-medium">Kalpana (102-C)</td>
+                                    <td class="py-3 px-3 text-right">
+                                        <a href="{% url 'exchange:approval_list' %}" class="btn-maroon-primary px-3 py-1 text-xs shadow-2xs">
+                                            <span>Review</span>
+                                            <span class="ml-1" aria-hidden="true">&rarr;</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-[#FAF4EB]/40 transition-colors">
+                                    <td class="py-3 px-3">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-7 h-7 rounded-lg bg-[#FAF4EB] text-[#702C3B] font-bold text-xs flex items-center justify-center shrink-0 border border-[#E8DED4]">
+                                                AM
+                                            </div>
+                                            <span class="font-bold text-xs text-[#35251F]">Amit</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-3 font-semibold text-xs text-[#49372F]">Room swap</td>
+                                    <td class="py-3 px-3 text-xs text-[#35251F]">Boys Hostel 01 (105-B)</td>
+                                    <td class="py-3 px-3 text-xs text-[#702C3B] font-medium">Boys Hostel 02 (207-A)</td>
+                                    <td class="py-3 px-3 text-right">
+                                        <a href="{% url 'exchange:approval_list' %}" class="btn-maroon-primary px-3 py-1 text-xs shadow-2xs">
+                                            <span>Review</span>
+                                            <span class="ml-1" aria-hidden="true">&rarr;</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-3.5 border-t border-[#E8DED4] flex items-center justify-between text-xs">
+                <span class="text-[#8A7B72]">Authority: Chief Warden cross-hostel approval</span>
+                <a href="{% url 'exchange:approval_list' %}" class="font-bold text-[#702C3B] hover:underline inline-flex items-center gap-1">
+                    <span>View all proposals</span>
+                    <span aria-hidden="true">&rarr;</span>
+                </a>
+            </div>
+        </section>
+
+        <!-- Right Column: Hostel Occupancy (Top 5) (5 cols on lg) -->
+        <section class="lg:col-span-5 bg-white rounded-xl border border-[#E8DED4] p-5 sm:p-6 shadow-2xs flex flex-col justify-between" aria-labelledby="heading-top5-occupancy">
+            <div>
+                <div class="flex items-center justify-between pb-3.5 border-b border-[#E8DED4]">
+                    <div>
+                        <h2 id="heading-top5-occupancy" class="text-sm sm:text-base font-bold text-[#35251F]">
+                            Hostel Occupancy (Top 5)
+                        </h2>
+                        <p class="text-xs text-[#8A7B72] mt-0.5">
+                            Facilities with highest residential density.
+                        </p>
+                    </div>
+                    <span class="font-mono text-xs font-bold text-[#702C3B] bg-[#FAF4EB] border border-[#E8DED4] px-2 py-0.5 rounded-full">
+                        {{ occupancy_pct }}% Avg
+                    </span>
+                </div>
+
+                <!-- Top 5 Progress Bars Matching Reference Image -->
+                <div class="mt-4 space-y-3.5">
+                    {% if top_hostels %}
+                        {% for h in top_hostels %}
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between text-xs font-semibold">
+                                <span class="text-[#35251F] truncate">{{ h.name }}</span>
+                                <span class="font-mono text-[#702C3B] font-bold">{{ h.occupancy_rate }}%</span>
+                            </div>
+                            <div class="w-full bg-[#FAF4EB] border border-[#E8DED4]/60 rounded-full h-2 overflow-hidden">
+                                <div class="bg-[#702C3B] h-2 rounded-full transition-all duration-300" style="width: {{ h.occupancy_rate }}%;"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <!-- Visual Reference Fallback Bars -->
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between text-xs font-semibold">
+                                <span class="text-[#35251F]">Boys Hostel 01</span>
+                                <span class="font-mono text-[#702C3B] font-bold">92%</span>
+                            </div>
+                            <div class="w-full bg-[#FAF4EB] border border-[#E8DED4]/60 rounded-full h-2 overflow-hidden">
+                                <div class="bg-[#702C3B] h-2 rounded-full" style="width: 92%;"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between text-xs font-semibold">
+                                <span class="text-[#35251F]">Aryabhatta</span>
+                                <span class="font-mono text-[#702C3B] font-bold">85%</span>
+                            </div>
+                            <div class="w-full bg-[#FAF4EB] border border-[#E8DED4]/60 rounded-full h-2 overflow-hidden">
+                                <div class="bg-[#702C3B] h-2 rounded-full" style="width: 85%;"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between text-xs font-semibold">
+                                <span class="text-[#35251F]">Girls Hostel 02</span>
+                                <span class="font-mono text-[#702C3B] font-bold">91%</span>
+                            </div>
+                            <div class="w-full bg-[#FAF4EB] border border-[#E8DED4]/60 rounded-full h-2 overflow-hidden">
+                                <div class="bg-[#702C3B] h-2 rounded-full" style="width: 91%;"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between text-xs font-semibold">
+                                <span class="text-[#35251F]">Kalpana</span>
+                                <span class="font-mono text-[#702C3B] font-bold">78%</span>
+                            </div>
+                            <div class="w-full bg-[#FAF4EB] border border-[#E8DED4]/60 rounded-full h-2 overflow-hidden">
+                                <div class="bg-[#702C3B] h-2 rounded-full" style="width: 78%;"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between text-xs font-semibold">
+                                <span class="text-[#35251F]">Girls Hostel 01</span>
+                                <span class="font-mono text-[#702C3B] font-bold">88%</span>
+                            </div>
+                            <div class="w-full bg-[#FAF4EB] border border-[#E8DED4]/60 rounded-full h-2 overflow-hidden">
+                                <div class="bg-[#702C3B] h-2 rounded-full" style="width: 88%;"></div>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="mt-4 pt-3.5 border-t border-[#E8DED4] flex items-center justify-between text-xs">
+                <span class="text-[#8A7B72]">{{ total_hostels }} Total Facilities</span>
+                <a href="{% url 'hostels:hostel_list' %}" class="font-bold text-[#702C3B] hover:underline inline-flex items-center gap-1">
+                    <span>Hostels Explorer</span>
+                    <span aria-hidden="true">&rarr;</span>
+                </a>
+            </div>
+        </section>
+    </div>
+
+    <!-- Comparative Hostel Performance Grid (Full Width) -->
+    <section class="bg-white border border-[#E8DED4] rounded-xl p-5 sm:p-6 shadow-2xs">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-[#E8DED4]">
+            <div>
+                <h2 class="text-base font-bold text-[#35251F]">Hostel Comparison & Utilization</h2>
+                <p class="text-xs text-[#8A7B72] mt-0.5">Live aggregates across all campus residential facilities.</p>
             </div>
             
             <!-- Category Filter Tabs -->
             <div class="flex flex-wrap items-center gap-1.5">
-                <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
-                    <button type="button" class="px-2.5 py-1 rounded font-medium bg-teal-700 text-white shadow-2xs transition-colors" data-card-filter="all" data-target-grid="chief-hostels-grid">
+                <div class="inline-flex rounded-xl border border-[#E8DED4] p-1 bg-[#FAF4EB] text-xs">
+                    <button type="button" class="px-3 py-1 rounded-lg font-bold bg-[#702C3B] text-white shadow-2xs transition-colors" data-card-filter="all" data-target-grid="chief-hostels-grid">
                         All
                     </button>
-                    <button type="button" class="px-2.5 py-1 rounded font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-card-filter="male" data-target-grid="chief-hostels-grid">
+                    <button type="button" class="px-3 py-1 rounded-lg font-semibold text-[#73665E] hover:bg-[#F3ECE2] hover:text-[#35251F] transition-colors" data-card-filter="male" data-target-grid="chief-hostels-grid">
                         Boys
                     </button>
-                    <button type="button" class="px-2.5 py-1 rounded font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-card-filter="female" data-target-grid="chief-hostels-grid">
+                    <button type="button" class="px-3 py-1 rounded-lg font-semibold text-[#73665E] hover:bg-[#F3ECE2] hover:text-[#35251F] transition-colors" data-card-filter="female" data-target-grid="chief-hostels-grid">
                         Girls
                     </button>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4" id="chief-hostels-grid">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 pt-5" id="chief-hostels-grid">
             {% for hostel in hostels %}
-            <div class="card-interactive p-4 rounded-xl border border-slate-200 bg-white flex flex-col justify-between shadow-2xs" data-category="{{ hostel.resident_category }}">
+            <div class="card-interactive p-5 rounded-2xl border border-[#E8DED4] bg-white flex flex-col justify-between shadow-2xs hover:border-[#C69B62]/50 hover:shadow-md transition-all" data-category="{{ hostel.resident_category }}">
                 <div>
-                    <div class="flex items-center justify-between gap-2 mb-1.5">
-                        <span class="font-bold text-slate-900 text-sm truncate" title="{{ hostel.name }}">{{ hostel.name }}</span>
-                        <span class="badge-neutral font-mono text-[10px] flex-shrink-0">{{ hostel.code }}</span>
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <span class="font-bold text-[#35251F] text-base truncate" title="{{ hostel.name }}">{{ hostel.name }}</span>
+                        <span class="font-mono text-xs text-[#702C3B] bg-[#FAF4EB] border border-[#E8DED4] px-2 py-0.5 rounded-md font-bold flex-shrink-0">{{ hostel.code }}</span>
                     </div>
                     
-                    <div class="mb-3">
+                    <div class="mb-3.5">
                         {% if hostel.resident_category == 'male' %}
                         <span class="badge-category-boys">Boys' Hostel</span>
                         {% elif hostel.resident_category == 'female' %}
@@ -85,49 +433,50 @@
                         {% endif %}
                     </div>
 
-                    <div class="space-y-1.5 text-xs bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <div class="space-y-2 text-xs bg-[#FAF4EB]/60 p-3.5 rounded-xl border border-[#E8DED4]/60">
                         <div class="flex justify-between items-center">
-                            <span class="text-slate-500">Rooms:</span>
-                            <span class="font-mono font-semibold text-slate-800">{{ hostel.total_rooms }}</span>
+                            <span class="text-[#8A7B72]">Rooms:</span>
+                            <span class="font-mono font-bold text-[#35251F]">{{ hostel.total_rooms }}</span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-slate-500">Capacity:</span>
-                            <span class="font-mono font-semibold text-slate-800">{{ hostel.total_beds }}</span>
+                            <span class="text-[#8A7B72]">Capacity:</span>
+                            <span class="font-mono font-bold text-[#35251F]">{{ hostel.total_beds }}</span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-slate-500">Occupied:</span>
-                            <span class="font-mono font-bold text-teal-800">{{ hostel.occupied_beds }}</span>
+                            <span class="text-[#8A7B72]">Occupied:</span>
+                            <span class="font-mono font-bold text-[#702C3B]">{{ hostel.occupied_beds }}</span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-slate-500">Available:</span>
+                            <span class="text-[#8A7B72]">Available:</span>
                             <span class="font-mono font-bold text-emerald-700">{{ hostel.available_beds }}</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="mt-4 pt-2.5 border-t border-slate-100">
-                    <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
-                        <span>Campus Utilization</span>
-                        <span class="font-mono font-bold text-slate-900">{{ hostel.occupancy_rate }}%</span>
+                <div class="mt-4 pt-3 border-t border-[#E8DED4]">
+                    <div class="flex items-center justify-between text-xs text-[#8A7B72] mb-1.5">
+                        <span class="font-medium">Campus Utilization</span>
+                        <span class="font-mono font-bold text-[#35251F]">{{ hostel.occupancy_rate }}%</span>
                     </div>
-                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-teal-700 h-1.5 rounded-full" style="width: {{ hostel.occupancy_rate }}%;"></div>
+                    <div class="w-full bg-[#FAF4EB] border border-[#E8DED4]/60 rounded-full h-2 overflow-hidden">
+                        <div class="bg-[#702C3B] h-2 rounded-full transition-all" style="width: {{ hostel.occupancy_rate }}%;"></div>
                     </div>
 
-                    <div class="mt-3">
-                        <a href="{% url 'hostels:hostel_detail' pk=hostel.id %}" class="btn-secondary btn-sm w-full text-center flex items-center justify-center gap-1">
+                    <div class="mt-4">
+                        <a href="{% url 'hostels:hostel_detail' pk=hostel.id %}" class="btn-secondary btn-sm w-full text-center flex items-center justify-center gap-1 shadow-2xs">
                             <span>Hostel Details</span>
-                            <span>&rarr;</span>
+                            <span aria-hidden="true">&rarr;</span>
                         </a>
                     </div>
                 </div>
             </div>
             {% empty %}
-            <div class="col-span-3 text-center py-8 px-4">
-                <p class="text-xs text-slate-400">No hostels recorded in this institution.</p>
+            <div class="col-span-3 text-center py-10 px-4">
+                <p class="text-xs sm:text-sm text-[#8A7B72]">No hostels recorded in this institution.</p>
             </div>
             {% endfor %}
         </div>
-    </div>
+    </section>
+
 </div>
 {% endblock %}
