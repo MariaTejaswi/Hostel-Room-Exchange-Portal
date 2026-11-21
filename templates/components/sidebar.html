@@ -114,6 +114,12 @@
             </span>
             {% endif %}
         </a>
+        <a href="{% url 'exchange:reports' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'exchange_reports' %}active{% endif %}" {% if active_nav == 'exchange_reports' %}aria-current="page"{% endif %}>
+            <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 19V9m5 10V5m5 14v-7m5 7V3M3 21h18"/>
+            </svg>
+            <span class="truncate">Reports &amp; Analytics</span>
+        </a>
         <a href="{% url 'exchange:my_transfers' %}" class="sidebar-nav-item flex items-center gap-3 {% if active_nav == 'my_transfers' %}active{% endif %}" {% if active_nav == 'my_transfers' %}aria-current="page"{% endif %}>
             <svg width="16" height="16" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>

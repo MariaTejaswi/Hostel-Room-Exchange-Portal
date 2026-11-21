@@ -1,0 +1,185 @@
+{% extends 'layouts/dashboard_base.html' %}
+
+{% block title %}Reports &amp; Analytics — RoomLoop{% endblock %}
+{% block breadcrumb_current %}Reports &amp; Analytics{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-7xl mx-auto min-w-0">
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 pb-3 border-b border-[#E3D3C4]">
+        <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#F5EBDD] text-[#702C3B] border border-[#E3D3C4]">P04 M7</span>
+                <span class="text-[11px] font-semibold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">Read-only</span>
+            </div>
+            <h1 class="text-2xl font-bold text-[#3B1720] mt-1.5 tracking-tight">Reports &amp; Analytics</h1>
+            <p class="text-xs sm:text-sm text-slate-600 mt-1">Exchange demand, matching, decisions, completions, and audit events from persisted workflow records.</p>
+        </div>
+        <div class="text-left sm:text-right text-[11px] text-slate-500">
+            <span class="font-semibold text-[#702C3B] block">{{ scope.label }}</span>
+            {% if report %}<span>Generated in {{ report_elapsed_ms|floatformat:1 }} ms</span>{% endif %}
+        </div>
+    </div>
+
+    <section class="card p-4 sm:p-5 border border-[#D5C2B1] bg-white rounded-xl" aria-labelledby="report-filters-heading">
+        <div class="flex flex-col gap-1 mb-4">
+            <h2 id="report-filters-heading" class="text-sm font-bold text-[#3B1720]">Report filters</h2>
+            <p class="text-[11px] text-slate-500">Dates are inclusive local calendar days. Hostel scope is based on each request or movement's source hostel.</p>
+        </div>
+        {% if form.non_field_errors %}
+        <div class="mb-3 p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800" role="alert">{{ form.non_field_errors }}</div>
+        {% endif %}
+        <form method="get" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.4fr_auto] gap-3 items-end">
+            <div>
+                <label for="{{ form.start_date.id_for_label }}" class="block text-[11px] font-bold text-slate-700 mb-1">Start date</label>
+                {{ form.start_date }}
+                {% for error in form.start_date.errors %}<p class="text-[11px] text-rose-700 mt-1">{{ error }}</p>{% endfor %}
+            </div>
+            <div>
+                <label for="{{ form.end_date.id_for_label }}" class="block text-[11px] font-bold text-slate-700 mb-1">End date</label>
+                {{ form.end_date }}
+                {% for error in form.end_date.errors %}<p class="text-[11px] text-rose-700 mt-1">{{ error }}</p>{% endfor %}
+            </div>
+            <div>
+                <label for="{{ form.hostel.id_for_label }}" class="block text-[11px] font-bold text-slate-700 mb-1">Source hostel</label>
+                {{ form.hostel }}
+                {% for error in form.hostel.errors %}<p class="text-[11px] text-rose-700 mt-1">{{ error }}</p>{% endfor %}
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="submit" class="btn-maroon py-2 px-4 text-xs font-semibold rounded-lg whitespace-nowrap" style="background-color:#702C3B !important;color:#fff !important;">Apply filters</button>
+                <a href="{% url 'exchange:reports' %}" class="btn-maroon-secondary py-2 px-3 text-xs rounded-lg whitespace-nowrap">Reset</a>
+            </div>
+        </form>
+        {% if report %}
+        <div class="mt-4 pt-3 border-t border-[#F0E6DD] flex flex-wrap gap-2 text-[11px]" aria-label="Active report filters">
+            <span class="font-bold text-slate-600">Active:</span>
+            <span class="px-2 py-0.5 rounded-full bg-[#FAF4EB] text-[#702C3B] border border-[#E3D3C4]">{{ report.window.start_date|date:"M d, Y" }} – {{ report.window.end_date|date:"M d, Y" }}</span>
+            <span class="px-2 py-0.5 rounded-full bg-slate-50 text-slate-700 border border-slate-200">{% if active_hostel %}{{ active_hostel.name }}{% else %}All authorized hostels{% endif %}</span>
+        </div>
+        {% endif %}
+    </section>
+
+    {% if report %}
+    <section aria-labelledby="summary-heading">
+        <div class="flex items-baseline justify-between gap-3 mb-3">
+            <h2 id="summary-heading" class="text-sm font-bold text-[#3B1720]">Summary</h2>
+            <span class="text-[11px] text-slate-500">Units are intentionally separated</span>
+        </div>
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div class="card p-4 border border-[#D5C2B1] bg-white rounded-xl">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Requests submitted</p>
+                <p class="text-2xl font-bold text-[#702C3B] mt-2">{{ report.request_summary.total }}</p>
+                <p class="text-[10px] text-slate-500 mt-1">Demand records</p>
+            </div>
+            <div class="card p-4 border border-[#D5C2B1] bg-white rounded-xl">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Match rate</p>
+                <p class="text-2xl font-bold text-[#702C3B] mt-2">{% if report.match.rate is not None %}{{ report.match.rate|floatformat:1 }}%{% else %}<span class="text-base">Not available</span>{% endif %}</p>
+                <p class="text-[10px] text-slate-500 mt-1">{{ report.match.matched_requests }} of {{ report.match.eligible_requests }} exchange requests</p>
+            </div>
+            <div class="card p-4 border border-[#D5C2B1] bg-white rounded-xl">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Average completion</p>
+                <p class="text-lg font-bold text-[#702C3B] mt-2">{{ report.completion.average_completion_label|default:"Not available" }}</p>
+                <p class="text-[10px] text-slate-500 mt-1">{{ report.completion.duration_sample_count }} movement samples</p>
+            </div>
+            <div class="card p-4 border border-[#D5C2B1] bg-white rounded-xl">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Completed exchanges</p>
+                <p class="text-2xl font-bold text-emerald-800 mt-2">{{ report.completion.completed_exchanges }}</p>
+                <p class="text-[10px] text-slate-500 mt-1">{{ report.completion.direct_exchanges }} direct · {{ report.completion.multi_party_exchanges }} rotations</p>
+            </div>
+            <div class="card p-4 border border-[#D5C2B1] bg-white rounded-xl col-span-2 lg:col-span-1">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Student movements</p>
+                <p class="text-2xl font-bold text-indigo-800 mt-2">{{ report.completion.student_movements }}</p>
+                <p class="text-[10px] text-slate-500 mt-1">Includes {{ report.completion.completed_vacant_transfers }} vacant transfers</p>
+            </div>
+        </div>
+        {% if report.completion.duration_unavailable_count %}
+        <p class="mt-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{{ report.completion.duration_unavailable_count }} completed movement{{ report.completion.duration_unavailable_count|pluralize }} lack a reliable linked request start and are excluded from the average.</p>
+        {% endif %}
+    </section>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <section class="card p-4 sm:p-5 border border-[#D5C2B1] bg-white rounded-xl min-w-0" aria-labelledby="daily-volume-heading">
+            <div class="mb-4">
+                <h2 id="daily-volume-heading" class="text-sm font-bold text-[#3B1720]">Request volume by day</h2>
+                <p class="text-[11px] text-slate-500 mt-0.5">All submitted states, grouped by submitted date.</p>
+            </div>
+            {% if report.volume_by_day %}
+            <div class="space-y-2" role="img" aria-label="Daily request volume bar chart">
+                {% for row in report.volume_by_day %}
+                <div class="grid grid-cols-[72px_1fr_34px] sm:grid-cols-[84px_1fr_40px] gap-2 items-center text-[11px]">
+                    <span class="text-slate-600">{{ row.report_day|date:"M d" }}</span>
+                    <div class="h-3 rounded-full bg-[#F5EBDD] overflow-hidden"><div class="h-full rounded-full bg-[#702C3B]" style="width:{{ row.bar_percent }}%"></div></div>
+                    <span class="font-bold text-right text-[#3B1720]">{{ row.request_count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <details class="mt-4 border-t border-[#F0E6DD] pt-3">
+                <summary class="text-[11px] font-bold text-[#702C3B] cursor-pointer">Accessible data table</summary>
+                <div class="overflow-x-auto mt-2"><table class="w-full text-xs"><thead><tr class="text-left text-slate-500"><th class="py-2">Date</th><th class="py-2 text-right">Requests</th></tr></thead><tbody>{% for row in report.volume_by_day %}<tr class="border-t border-slate-100"><td class="py-2">{{ row.report_day|date:"M d, Y" }}</td><td class="py-2 text-right font-semibold">{{ row.request_count }}</td></tr>{% endfor %}</tbody></table></div>
+            </details>
+            {% else %}<p class="py-8 text-center text-xs text-slate-500">No requests were submitted in this filter window.</p>{% endif %}
+        </section>
+
+        <section class="card p-4 sm:p-5 border border-[#D5C2B1] bg-white rounded-xl min-w-0" aria-labelledby="hostel-volume-heading">
+            <div class="mb-3">
+                <h2 id="hostel-volume-heading" class="text-sm font-bold text-[#3B1720]">Request volume by source hostel</h2>
+                <p class="text-[11px] text-slate-500 mt-0.5">Occupied-bed exchanges and vacant-bed transfers remain separate.</p>
+            </div>
+            {% if report.volume_by_hostel %}
+            <div class="overflow-x-auto"><table class="w-full min-w-[430px] text-xs text-left"><thead class="text-[10px] uppercase tracking-wider text-[#702C3B] bg-[#F5EBDD]/60"><tr><th class="px-3 py-2.5">Hostel</th><th class="px-3 py-2.5 text-right">Exchange</th><th class="px-3 py-2.5 text-right">Vacant</th><th class="px-3 py-2.5 text-right">Total</th></tr></thead><tbody>{% for row in report.volume_by_hostel %}<tr class="border-t border-[#F0E6DD]"><td class="px-3 py-2.5 font-semibold text-slate-800">{{ row.hostel_name }}</td><td class="px-3 py-2.5 text-right">{{ row.exchange_count }}</td><td class="px-3 py-2.5 text-right">{{ row.vacant_transfer_count }}</td><td class="px-3 py-2.5 text-right font-bold text-[#702C3B]">{{ row.request_count }}</td></tr>{% endfor %}</tbody></table></div>
+            {% else %}<p class="py-8 text-center text-xs text-slate-500">No source-hostel demand is available for this filter.</p>{% endif %}
+        </section>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <section class="card p-4 sm:p-5 border border-[#D5C2B1] bg-white rounded-xl min-w-0" aria-labelledby="workflow-heading">
+            <h2 id="workflow-heading" class="text-sm font-bold text-[#3B1720]">Workflow units</h2>
+            <p class="text-[11px] text-slate-500 mt-0.5 mb-4">Candidates, activated workflows, exchanges, and movements are not interchangeable.</p>
+            <dl class="grid grid-cols-2 gap-3 text-xs">
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3"><dt class="text-[10px] uppercase font-bold text-slate-500">Draft candidates</dt><dd class="text-xl font-bold text-slate-800 mt-1">{{ report.workflow.draft_candidates }}</dd><dd class="text-[10px] text-slate-500">Not successful matches</dd></div>
+                <div class="rounded-lg border border-[#E3D3C4] bg-[#FAF4EB] p-3"><dt class="text-[10px] uppercase font-bold text-[#702C3B]">Activated proposals</dt><dd class="text-xl font-bold text-[#702C3B] mt-1">{{ report.workflow.activated_proposals }}</dd><dd class="text-[10px] text-slate-500">Recorded activation evidence</dd></div>
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3"><dt class="text-[10px] uppercase font-bold text-emerald-800">Completed exchanges</dt><dd class="text-xl font-bold text-emerald-800 mt-1">{{ report.completion.completed_exchanges }}</dd><dd class="text-[10px] text-slate-500">Distinct proposal workflows</dd></div>
+                <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-3"><dt class="text-[10px] uppercase font-bold text-indigo-800">Student movements</dt><dd class="text-xl font-bold text-indigo-800 mt-1">{{ report.completion.student_movements }}</dd><dd class="text-[10px] text-slate-500">Durable transfer records</dd></div>
+            </dl>
+            {% if report.workflow.activation_fallback_count or report.workflow.missing_activation_history_count %}
+            <div class="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-900">
+                {{ report.workflow.activation_fallback_count }} activation{{ report.workflow.activation_fallback_count|pluralize }} use the stored match timestamp because an activation audit event was unavailable.
+                {% if report.workflow.missing_activation_history_count %} {{ report.workflow.missing_activation_history_count }} non-draft proposal{{ report.workflow.missing_activation_history_count|pluralize }} could not be dated reliably and are not shown as activated in this period.{% endif %}
+            </div>
+            {% endif %}
+            {% if report.status_distribution %}
+            <div class="mt-4 pt-3 border-t border-[#F0E6DD] flex flex-wrap gap-2">{% for row in report.status_distribution %}<span class="text-[10px] px-2 py-1 rounded-full border border-slate-200 bg-white text-slate-700">{{ row.status_label }} <strong>{{ row.request_count }}</strong></span>{% endfor %}</div>
+            {% endif %}
+        </section>
+
+        <section class="card p-4 sm:p-5 border border-[#D5C2B1] bg-white rounded-xl min-w-0" aria-labelledby="targets-heading">
+            <h2 id="targets-heading" class="text-sm font-bold text-[#3B1720]">Most-requested rooms</h2>
+            <p class="text-[11px] text-slate-500 mt-0.5">Only explicit bed targets are assigned to a room. Broad preferences stay unassigned.</p>
+            <div class="grid grid-cols-2 gap-3 my-4 text-xs"><div class="p-3 rounded-lg bg-[#FAF4EB] border border-[#E3D3C4]"><span class="text-[10px] uppercase font-bold text-[#702C3B]">Explicit targets</span><strong class="block text-xl text-[#702C3B] mt-1">{{ report.targets.explicit_request_count }}</strong></div><div class="p-3 rounded-lg bg-slate-50 border border-slate-200"><span class="text-[10px] uppercase font-bold text-slate-600">Broad preferences</span><strong class="block text-xl text-slate-800 mt-1">{{ report.targets.broad_request_count }}</strong></div></div>
+            {% if report.targets.explicit_rooms %}
+            <div class="overflow-x-auto"><table class="w-full min-w-[360px] text-xs"><thead><tr class="text-left text-[10px] uppercase tracking-wider text-slate-500"><th class="py-2 pr-3">Destination hostel</th><th class="py-2 pr-3">Room</th><th class="py-2 text-right">Requests</th></tr></thead><tbody>{% for row in report.targets.explicit_rooms %}<tr class="border-t border-[#F0E6DD]"><td class="py-2.5 pr-3">{{ row.hostel_name }}</td><td class="py-2.5 pr-3 font-mono font-semibold">{{ row.room_number|default:"Not available" }}</td><td class="py-2.5 text-right font-bold text-[#702C3B]">{{ row.request_count }}</td></tr>{% endfor %}</tbody></table></div>
+            {% else %}<p class="py-5 text-center text-xs text-slate-500">No explicit room or bed targets were submitted in this window.</p>{% endif %}
+        </section>
+    </div>
+
+    <section class="card border border-[#D5C2B1] bg-white rounded-xl overflow-hidden min-w-0" aria-labelledby="authority-heading">
+        <div class="p-4 sm:p-5 border-b border-[#E3D3C4]"><h2 id="authority-heading" class="text-sm font-bold text-[#3B1720]">Approval and rejection patterns</h2><p class="text-[11px] text-slate-500 mt-0.5">Persisted decisions grouped by the actual deciding user and stored authority role.</p></div>
+        {% if report.authority_patterns %}<div class="overflow-x-auto"><table class="w-full min-w-[600px] text-xs"><thead class="bg-[#F5EBDD]/60 text-[10px] uppercase tracking-wider text-[#702C3B]"><tr><th class="px-4 py-3 text-left">Deciding authority</th><th class="px-4 py-3 text-left">Role at decision</th><th class="px-4 py-3 text-right">Approved</th><th class="px-4 py-3 text-right">Rejected</th><th class="px-4 py-3 text-right">Approval rate</th></tr></thead><tbody>{% for row in report.authority_patterns %}<tr class="border-t border-[#F0E6DD]"><td class="px-4 py-3 font-semibold text-slate-800">{{ row.authority_name }}</td><td class="px-4 py-3">{{ row.authority_role_label }}</td><td class="px-4 py-3 text-right text-emerald-800 font-semibold">{{ row.approved_count }}</td><td class="px-4 py-3 text-right text-rose-800 font-semibold">{{ row.rejected_count }}</td><td class="px-4 py-3 text-right font-bold">{% if row.approval_rate is not None %}{{ row.approval_rate|floatformat:1 }}%{% else %}Not available{% endif %}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="p-8 text-center text-xs text-slate-500">No approval or rejection decisions were recorded in this filter window.</p>{% endif %}
+    </section>
+
+    <section class="card border border-[#D5C2B1] bg-white rounded-xl overflow-hidden min-w-0" aria-labelledby="movement-heading">
+        <div class="p-4 sm:p-5 border-b border-[#E3D3C4]"><h2 id="movement-heading" class="text-sm font-bold text-[#3B1720]">Completed movement detail</h2><p class="text-[11px] text-slate-500 mt-0.5">Privacy-minimal historical routes; no student identifiers or eligibility details.</p></div>
+        {% if movement_page is not None %}<div class="overflow-x-auto"><table class="w-full min-w-[720px] text-xs"><thead class="bg-[#F5EBDD]/60 text-[10px] uppercase tracking-wider text-[#702C3B]"><tr><th class="px-4 py-3 text-left">Completed</th><th class="px-4 py-3 text-left">Workflow</th><th class="px-4 py-3 text-left">Source</th><th class="px-4 py-3 text-left">Destination</th><th class="px-4 py-3 text-left">Authority</th></tr></thead><tbody>{% for movement in movement_page %}<tr class="border-t border-[#F0E6DD] hover:bg-[#FDFBF7]"><td class="px-4 py-3 whitespace-nowrap">{{ movement.transferred_at|date:"M d, Y H:i" }}</td><td class="px-4 py-3">{% if movement.proposal_id %}{% if movement.proposal.cycle_length == 2 %}Direct swap{% else %}{{ movement.proposal.cycle_length }}-party rotation{% endif %}<span class="block font-mono text-[10px] text-slate-500">#{{ movement.proposal_id|stringformat:'.8s' }}</span>{% else %}Vacant transfer<span class="block font-mono text-[10px] text-slate-500">#{{ movement.exchange_request_id|stringformat:'.8s' }}</span>{% endif %}</td><td class="px-4 py-3">{{ movement.source_hostel_name }}<span class="block text-[10px] text-slate-500">Room {{ movement.source_room_number }} · {{ movement.source_bed_label }}</span></td><td class="px-4 py-3">{{ movement.destination_hostel_name }}<span class="block text-[10px] text-slate-500">Room {{ movement.destination_room_number }} · {{ movement.destination_bed_label }}</span></td><td class="px-4 py-3">{% if movement.approval %}{{ movement.approval.get_authority_role_display }}{% else %}Not available{% endif %}</td></tr>{% empty %}<tr><td colspan="5" class="p-8 text-center text-slate-500">No completed movements in this filter window.</td></tr>{% endfor %}</tbody></table></div>
+        {% if movement_page.paginator.num_pages > 1 %}<nav class="p-3 border-t border-[#E3D3C4] flex items-center justify-between text-xs" aria-label="Movement pages"><span>Page {{ movement_page.number }} of {{ movement_page.paginator.num_pages }}</span><div class="flex gap-2">{% if movement_page.has_previous %}<a class="btn-maroon-secondary px-3 py-1.5 rounded-lg" href="?{{ filter_query }}&amp;movement_page={{ movement_page.previous_page_number }}">Previous</a>{% endif %}{% if movement_page.has_next %}<a class="btn-maroon-secondary px-3 py-1.5 rounded-lg" href="?{{ filter_query }}&amp;movement_page={{ movement_page.next_page_number }}">Next</a>{% endif %}</div></nav>{% endif %}{% endif %}
+    </section>
+
+    <section class="card border border-[#D5C2B1] bg-white rounded-xl overflow-hidden min-w-0" aria-labelledby="audit-heading">
+        <div class="p-4 sm:p-5 border-b border-[#E3D3C4]"><h2 id="audit-heading" class="text-sm font-bold text-[#3B1720]">Exchange audit trail</h2><p class="text-[11px] text-slate-500 mt-0.5">Operational event visibility. Raw summaries are withheld because legacy text can contain student or decision details.</p></div>
+        {% if audit_page is not None %}<div class="overflow-x-auto"><table class="w-full min-w-[680px] text-xs"><thead class="bg-[#F5EBDD]/60 text-[10px] uppercase tracking-wider text-[#702C3B]"><tr><th class="px-4 py-3 text-left">Timestamp</th><th class="px-4 py-3 text-left">Event</th><th class="px-4 py-3 text-left">Target</th><th class="px-4 py-3 text-left">Actor</th><th class="px-4 py-3 text-right">Record</th></tr></thead><tbody>{% for event in audit_page %}<tr class="border-t border-[#F0E6DD] hover:bg-[#FDFBF7]"><td class="px-4 py-3 whitespace-nowrap">{{ event.timestamp|date:"M d, Y H:i" }}</td><td class="px-4 py-3 font-semibold text-slate-800">{{ event.action_label }}</td><td class="px-4 py-3 font-mono text-[10px]">{{ event.target_reference }}</td><td class="px-4 py-3">{{ event.actor_label }}</td><td class="px-4 py-3 text-right">{% if event.detail_url %}<a href="{{ event.detail_url }}" class="font-bold text-[#702C3B] hover:underline">View</a>{% else %}<span class="text-slate-400">—</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="5" class="p-8 text-center text-slate-500">No exchange audit events in this filter window.</td></tr>{% endfor %}</tbody></table></div>
+        {% if audit_page.paginator.num_pages > 1 %}<nav class="p-3 border-t border-[#E3D3C4] flex items-center justify-between text-xs" aria-label="Audit pages"><span>Page {{ audit_page.number }} of {{ audit_page.paginator.num_pages }}</span><div class="flex gap-2">{% if audit_page.has_previous %}<a class="btn-maroon-secondary px-3 py-1.5 rounded-lg" href="?{{ filter_query }}&amp;audit_page={{ audit_page.previous_page_number }}">Previous</a>{% endif %}{% if audit_page.has_next %}<a class="btn-maroon-secondary px-3 py-1.5 rounded-lg" href="?{{ filter_query }}&amp;audit_page={{ audit_page.next_page_number }}">Next</a>{% endif %}</div></nav>{% endif %}{% endif %}
+        <div class="px-4 py-3 bg-amber-50 border-t border-amber-200 text-[11px] text-amber-900">Audit rows are preserved and never rewritten by this report. The current application does not yet prove database-enforced append-only immutability or universal before/after snapshots.</div>
+    </section>
+    {% elif form.is_bound %}
+    <div class="card p-8 border border-rose-200 bg-rose-50 rounded-xl text-center" role="alert"><h2 class="text-sm font-bold text-rose-900">The report could not be generated</h2><p class="text-xs text-rose-800 mt-1">Correct the filter errors above and try again. No workflow data was changed.</p></div>
+    {% endif %}
+</div>
+{% endblock %}

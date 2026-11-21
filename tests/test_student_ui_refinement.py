@@ -52,6 +52,11 @@ def test_student_dashboard_accommodation_and_requests(client, student_user, host
     assert "Room" in html
     assert "Bed" in html
     assert "Bed A" in html
+    room_beds = res.context["dashboard_room_beds"]
+    selected_beds = [bed for bed in room_beds if bed.is_current_student_bed]
+    assert [bed.bed_label for bed in selected_beds] == ["Bed A"]
+    assert "2 Beds" in html
+    assert html.index("Bed A") < html.index("Selected (Your Bed)")
 
     # Exchange Centre Card
     assert "Exchange Centre" in html or "Exchange centre" in html

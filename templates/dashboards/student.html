@@ -224,7 +224,7 @@
             <div class="bg-white border border-[#E8DED4] rounded-xl sm:rounded-2xl p-3.5 sm:p-4 shadow-2xs flex items-center justify-between">
                 <div>
                     <span class="text-[10px] font-bold text-[#8A7B72] uppercase tracking-wider block">Available Hostels</span>
-                    <span class="text-2xl font-extrabold text-[#35251F] block mt-0.5 leading-tight">{{ eligible_hostels|length|default:"3" }}</span>
+                    <span data-stat="available_hostels" class="text-2xl font-extrabold text-[#35251F] block mt-0.5 leading-tight">{{ eligible_hostels|length|default:"3" }}</span>
                     <span class="text-[11px] text-[#8A7B72] block mt-0.5">Matching eligibility</span>
                 </div>
                 <div class="w-9 h-9 rounded-xl bg-[#FAF4EB] text-[#702C3B] border border-[#E8DED4] flex items-center justify-center shrink-0 shadow-2xs">
@@ -238,7 +238,7 @@
             <div class="bg-white border border-[#E8DED4] rounded-xl sm:rounded-2xl p-3.5 sm:p-4 shadow-2xs flex items-center justify-between">
                 <div>
                     <span class="text-[10px] font-bold text-[#8A7B72] uppercase tracking-wider block">Eligible Category</span>
-                    <span class="text-base sm:text-lg font-extrabold text-[#702C3B] block mt-0.5 leading-tight capitalize">{{ request.user.claimed_residential_category|default:"Hostel" }}</span>
+                    <span data-stat="eligible_category" class="text-base sm:text-lg font-extrabold text-[#702C3B] block mt-0.5 leading-tight capitalize">{{ request.user.claimed_residential_category|default:"Hostel" }}</span>
                     <span class="text-[11px] text-[#8A7B72] block mt-0.5">Verified profile status</span>
                 </div>
                 <div class="w-9 h-9 rounded-xl bg-[#FAF4EB] text-[#702C3B] border border-[#E8DED4] flex items-center justify-center shrink-0 shadow-2xs">
@@ -252,7 +252,7 @@
             <div class="bg-white border border-[#E8DED4] rounded-xl sm:rounded-2xl p-3.5 sm:p-4 shadow-2xs flex items-center justify-between">
                 <div>
                     <span class="text-[10px] font-bold text-[#8A7B72] uppercase tracking-wider block">Active Requests</span>
-                    <span class="text-2xl font-extrabold text-[#35251F] block mt-0.5 leading-tight">{{ exchange_requests|length }}</span>
+                    <span data-stat="active_requests" class="text-2xl font-extrabold text-[#35251F] block mt-0.5 leading-tight">{{ exchange_requests|length }}</span>
                     <span class="text-[11px] text-[#8A7B72] block mt-0.5">Submitted proposals</span>
                 </div>
                 <div class="w-9 h-9 rounded-xl bg-[#FAF4EB] text-[#702C3B] border border-[#E8DED4] flex items-center justify-center shrink-0 shadow-2xs">
@@ -375,55 +375,41 @@
                         </h2>
                     </div>
                     <span class="font-mono text-xs font-bold text-[#702C3B] bg-[#FAF4EB] border border-[#E8DED4] px-2 py-0.5 rounded-full">
-                        4 Beds
+                        {{ dashboard_room_beds|length }} Bed{{ dashboard_room_beds|length|pluralize }}
                     </span>
                 </div>
 
-                <!-- Visual 4-Bed Layout Grid -->
+                <!-- Visual room layout derived from authoritative bed and occupancy records -->
                 <div class="grid grid-cols-2 gap-3.5 pt-4">
-                    <!-- Bed A -->
-                    <div class="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 flex items-center gap-3 transition-all hover:border-emerald-300">
-                        <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs shrink-0">
-                            🛏️
-                        </div>
-                        <div class="min-w-0">
-                            <span class="text-xs font-bold text-emerald-950 block">Bed A</span>
-                            <span class="text-[10px] font-semibold text-emerald-700 block">Available</span>
-                        </div>
-                    </div>
-
-                    <!-- Bed B (Selected / Your Bed) -->
+                    {% for bed in dashboard_room_beds %}
+                    {% if bed.is_current_student_bed %}
                     <div class="p-3.5 rounded-xl border-2 border-[#702C3B] bg-[#702C3B] text-white flex items-center gap-3 shadow-2xs">
-                        <div class="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                            🛏️
-                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center font-bold text-xs shrink-0">&#128719;</div>
                         <div class="min-w-0">
-                            <span class="text-xs font-extrabold text-white block">Bed B</span>
+                            <span class="text-xs font-extrabold text-white block">{{ bed.bed_label }}</span>
                             <span class="text-[10px] font-bold text-[#F5EBDD] block">Selected (Your Bed)</span>
                         </div>
                     </div>
-
-                    <!-- Bed C (Occupied) -->
+                    {% elif bed.has_active_occupancy %}
                     <div class="p-3.5 rounded-xl border border-[#E8DED4] bg-[#FAF4EB]/60 flex items-center gap-3 opacity-80">
-                        <div class="w-8 h-8 rounded-lg bg-white border border-[#E8DED4] text-[#8A7B72] flex items-center justify-center font-bold text-xs shrink-0">
-                            🛏️
-                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-white border border-[#E8DED4] text-[#8A7B72] flex items-center justify-center font-bold text-xs shrink-0">&#128719;</div>
                         <div class="min-w-0">
-                            <span class="text-xs font-bold text-[#35251F] block">Bed C</span>
+                            <span class="text-xs font-bold text-[#35251F] block">{{ bed.bed_label }}</span>
                             <span class="text-[10px] text-[#8A7B72] block">Occupied</span>
                         </div>
                     </div>
-
-                    <!-- Bed D (Occupied) -->
-                    <div class="p-3.5 rounded-xl border border-[#E8DED4] bg-[#FAF4EB]/60 flex items-center gap-3 opacity-80">
-                        <div class="w-8 h-8 rounded-lg bg-white border border-[#E8DED4] text-[#8A7B72] flex items-center justify-center font-bold text-xs shrink-0">
-                            🛏️
-                        </div>
+                    {% else %}
+                    <div class="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 flex items-center gap-3 transition-all hover:border-emerald-300">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs shrink-0">&#128719;</div>
                         <div class="min-w-0">
-                            <span class="text-xs font-bold text-[#35251F] block">Bed D</span>
-                            <span class="text-[10px] text-[#8A7B72] block">Occupied</span>
+                            <span class="text-xs font-bold text-emerald-950 block">{{ bed.bed_label }}</span>
+                            <span class="text-[10px] font-semibold text-emerald-700 block">Available</span>
                         </div>
                     </div>
+                    {% endif %}
+                    {% empty %}
+                    <div class="col-span-2 p-4 rounded-xl border border-[#E8DED4] bg-[#FAF4EB]/60 text-xs text-[#8A7B72] text-center">No active room allocation is available.</div>
+                    {% endfor %}
                 </div>
             </div>
 

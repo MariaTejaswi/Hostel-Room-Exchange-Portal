@@ -197,6 +197,43 @@ def test_policy_validation_rejects_negative_or_invalid_values(
             value=0,
         )
 
+    for invalid_limit in (1, 6, "invalid"):
+        with pytest.raises(ValidationError, match="Maximum chain length"):
+            update_institution_exchange_policy(
+                acting_user=admin_user,
+                institution=institution,
+                key=PolicyRule.Key.MAX_CYCLE_LENGTH,
+                value=invalid_limit,
+            )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("limit", [2, 3, 4, 5])
+def test_maximum_chain_length_policy_accepts_supported_limits(admin_user, institution, limit):
+    rule = update_institution_exchange_policy(
+        acting_user=admin_user,
+        institution=institution,
+        key=PolicyRule.Key.MAX_CYCLE_LENGTH,
+        value=limit,
+    )
+    assert rule.value == {"value": limit}
+    assert get_institution_exchange_policies(institution)[PolicyRule.Key.MAX_CYCLE_LENGTH] == limit
+
+
+@pytest.mark.django_db
+def test_maximum_chain_length_default_and_institution_isolation(institution, other_institution):
+    assert get_institution_exchange_policies(institution)[PolicyRule.Key.MAX_CYCLE_LENGTH] == 5
+    assert get_institution_exchange_policies(other_institution)[PolicyRule.Key.MAX_CYCLE_LENGTH] == 5
+
+    PolicyRule.objects.create(
+        institution=institution,
+        key=PolicyRule.Key.MAX_CYCLE_LENGTH,
+        value={"value": 2},
+    )
+
+    assert get_institution_exchange_policies(institution)[PolicyRule.Key.MAX_CYCLE_LENGTH] == 2
+    assert get_institution_exchange_policies(other_institution)[PolicyRule.Key.MAX_CYCLE_LENGTH] == 5
+
 
 # =========================================================================
 # 2. Fee & Disciplinary Status Verification
@@ -384,6 +421,7 @@ def test_hostel_admin_can_view_and_update_policies_with_audit(
     post_data = {
         "cooling_off_days": 10,
         "request_validity_days": 45,
+        "maximum_chain_length": 4,
         "require_fee_clearance": True,
         "require_no_disciplinary_hold": True,
     }
@@ -393,12 +431,13 @@ def test_hostel_admin_can_view_and_update_policies_with_audit(
     policies = get_institution_exchange_policies(institution)
     assert policies[PolicyRule.Key.COOLING_OFF_DAYS] == 10
     assert policies[PolicyRule.Key.REQUEST_VALIDITY_DAYS] == 45
+    assert policies[PolicyRule.Key.MAX_CYCLE_LENGTH] == 4
     assert policies[PolicyRule.Key.REQUIRE_FEE_CLEARANCE] is True
     assert policies[PolicyRule.Key.REQUIRE_NO_DISCIPLINARY_HOLD] is True
 
     # AuditLog verified with actor, institution, before/after values
     audits = AuditLog.objects.filter(institution=institution, target_type="PolicyRule")
-    assert audits.count() >= 4
+    assert audits.count() >= 5
     for audit in audits:
         assert audit.acting_user == admin_user
         assert audit.institution == institution

@@ -5,6 +5,7 @@ from time import perf_counter
 from types import SimpleNamespace
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.utils import timezone
 
@@ -31,7 +32,9 @@ from apps.exchange.models import (
     ProposalParticipant,
 )
 from apps.exchange.services import (
+    activate_exchange_proposal,
     create_exchange_request as _orig_create_exchange_request,
+    run_institution_matching,
     run_exchange_matching,
 )
 
@@ -68,6 +71,7 @@ def _configure_policies(institution, **kwargs):
     defaults = {
         PolicyRule.Key.COOLING_OFF_DAYS: 0,
         PolicyRule.Key.REQUEST_VALIDITY_DAYS: 30,
+        PolicyRule.Key.MAX_CYCLE_LENGTH: 5,
         PolicyRule.Key.REQUIRE_FEE_CLEARANCE: False,
         PolicyRule.Key.REQUIRE_NO_DISCIPLINARY_HOLD: False,
     }
@@ -203,6 +207,58 @@ def test_valid_cycles_2_to_5_participants(
         next_p = candidate.participants[(i + 1) % cycle_length]
         assert p.proposed_bed_id == next_p.current_bed_id
         assert "Target bed" in p.preference_match_explanation
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("configured_limit", [2, 3, 4, 5])
+def test_configured_maximum_chain_length_allows_cycle_at_limit(
+    configured_limit,
+    institution,
+    warden_user,
+):
+    _configure_policies(
+        institution,
+        **{PolicyRule.Key.MAX_CYCLE_LENGTH: configured_limit},
+    )
+    setup = _create_cycle_users_and_rooms(
+        count=configured_limit,
+        institution=institution,
+        warden_user=warden_user,
+        prefix=f"limit{configured_limit}",
+    )
+    for i, student in enumerate(setup["users"]):
+        create_exchange_request(
+            student=student,
+            data={"preferred_bed": setup["beds"][(i + 1) % configured_limit], "reason": "policy limit"},
+        )
+    result = find_candidate_matches(institution=institution)
+    assert [candidate.cycle_length for candidate in result.candidates] == [configured_limit]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("configured_limit", [2, 3, 4])
+def test_configured_maximum_chain_length_excludes_longer_cycle(
+    configured_limit,
+    institution,
+    warden_user,
+):
+    _configure_policies(
+        institution,
+        **{PolicyRule.Key.MAX_CYCLE_LENGTH: configured_limit},
+    )
+    cycle_length = configured_limit + 1
+    setup = _create_cycle_users_and_rooms(
+        count=cycle_length,
+        institution=institution,
+        warden_user=warden_user,
+        prefix=f"cap{configured_limit}",
+    )
+    for i, student in enumerate(setup["users"]):
+        create_exchange_request(
+            student=student,
+            data={"preferred_bed": setup["beds"][(i + 1) % cycle_length], "reason": "above policy cap"},
+        )
+    assert find_candidate_matches(institution=institution).candidates == []
 
 
 # =========================================================================
@@ -769,3 +825,56 @@ def test_match_exchanges_management_command(institution, warden_user):
     persist_output = out_persist.getvalue()
     assert "Persisted Draft Proposals            : 1 created" in persist_output
     assert ExchangeProposal.objects.filter(institution=institution, status=ExchangeProposal.Status.DRAFT).count() == 1
+
+    # Institution policy caps an explicit CLI request for a longer cycle.
+    PolicyRule.objects.update_or_create(
+        institution=institution,
+        key=PolicyRule.Key.MAX_CYCLE_LENGTH,
+        defaults={"value": {"value": 3}, "is_active": True},
+    )
+    out_capped = io.StringIO()
+    call_command(
+        "match_exchanges",
+        institution=institution.code,
+        max_length=5,
+        format="json",
+        stdout=out_capped,
+    )
+    assert json.loads(out_capped.getvalue())["metrics"]["total_candidates"] == 0
+
+    # A policy decrease never mutates an existing draft, but blocks stale activation.
+    stale_draft = ExchangeProposal.objects.get(
+        institution=institution,
+        status=ExchangeProposal.Status.DRAFT,
+    )
+    with pytest.raises(ValidationError, match="current maximum chain length of 3"):
+        activate_exchange_proposal(proposal_id=stale_draft.id)
+    stale_draft.refresh_from_db()
+    assert stale_draft.status == ExchangeProposal.Status.DRAFT
+
+
+@pytest.mark.django_db
+def test_background_matching_uses_institution_maximum_chain_length(institution, warden_user):
+    _configure_policies(
+        institution,
+        **{PolicyRule.Key.MAX_CYCLE_LENGTH: 3},
+    )
+    setup = _create_cycle_users_and_rooms(
+        count=4,
+        institution=institution,
+        warden_user=warden_user,
+        prefix="bgcap",
+    )
+    for i, student in enumerate(setup["users"]):
+        create_exchange_request(
+            student=student,
+            data={
+                "preferred_bed": setup["beds"][(i + 1) % 4],
+                "reason": "background policy cap",
+            },
+        )
+
+    job = run_institution_matching(institution.id, trigger_reason="policy_cap_test")
+    assert job.status == job.Status.COMPLETED
+    assert job.candidates_found_count == 0
+    assert job.proposals_activated_count == 0

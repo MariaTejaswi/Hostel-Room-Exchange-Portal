@@ -727,3 +727,37 @@ def test_all_dashboards_shared_design_system_and_warden_consistency(
     assert 'aria-current="page"' in html
 
 
+@pytest.mark.django_db
+def test_dashboard_stats_api_unauthenticated_redirects(client):
+    """Verify unauthenticated requests to dashboard_stats_api are redirected to login."""
+    resp = client.get(reverse("accounts:dashboard_stats_api"))
+    assert resp.status_code == 302
+    assert reverse("accounts:login") in resp.url
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "fixture_name,expected_keys",
+    [
+        ("student_user", ["available_hostels", "eligible_category", "active_requests", "incoming_proposals"]),
+        ("warden_user", ["vacant_beds", "pending_reviews_count", "occupied_beds", "occupancy_pct", "total_beds", "total_rooms"]),
+        ("chief_warden_user", ["total_hostels", "total_beds", "occupied_beds", "available_beds", "occupancy_pct"]),
+        ("admin_user", ["total_hostels", "total_rooms", "total_beds", "occupied_beds", "available_beds", "pending_eligibility_count"]),
+        ("dean_user", ["total_hostels", "total_rooms", "total_beds", "occupied_beds", "available_beds", "occupancy_pct"]),
+        ("sysadmin_user", ["total_users", "active_users", "system_status"]),
+    ],
+)
+def test_dashboard_stats_api_all_roles(client, request, fixture_name, expected_keys, hostel_setup):
+    """Verify live statistics API endpoint returns HTTP 200 and schema for all 6 roles."""
+    user = request.getfixturevalue(fixture_name)
+    client.force_login(user)
+    resp = client.get(reverse("accounts:dashboard_stats_api"))
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "success"
+    assert "stats" in data
+    for key in expected_keys:
+        assert key in data["stats"], f"Missing expected key '{key}' in stats for role {user.primary_role}"
+
+
+

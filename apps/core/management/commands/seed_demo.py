@@ -290,6 +290,24 @@ class Command(BaseCommand):
 
             self.stdout.write("✓ Seeded active student occupants and unallocated testing students.")
 
+            # Seed default exchange policy rules for institution
+            from apps.exchange.models import PolicyRule
+            policy_defaults = {
+                PolicyRule.Key.COOLING_OFF_DAYS: 0,
+                PolicyRule.Key.REQUEST_VALIDITY_DAYS: 30,
+                PolicyRule.Key.REQUIRE_FEE_CLEARANCE: False,
+                PolicyRule.Key.REQUIRE_NO_DISCIPLINARY_HOLD: False,
+                PolicyRule.Key.PROPOSAL_ACCEPTANCE_WINDOW_HOURS: 48,
+                PolicyRule.Key.MAX_CYCLE_LENGTH: 5,
+            }
+            for key, val in policy_defaults.items():
+                PolicyRule.objects.get_or_create(
+                    institution=institution,
+                    key=key,
+                    defaults={"value": {"value": val}, "is_active": True},
+                )
+            self.stdout.write("✓ Seeded default institution exchange policy rules.")
+
         self.stdout.write(self.style.SUCCESS("✓ Demo data successfully seeded for RoomLoop Phase 1!"))
 
     def _get_or_create_user(self, email, full_name, role_name, institution, password, registration_number=None, residential_eligibility=User.ResidentialEligibility.UNVERIFIED, is_staff=False, is_superuser=False):

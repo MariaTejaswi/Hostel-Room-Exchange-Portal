@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}RoomLoop — University Accommodation & Swap Platform{% endblock %}</title>
+    <link rel="preload" href="{% static 'css/dist/styles.css' %}?v=1.0.2" as="style">
     <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}?v=1.0.2">
     <link rel="icon" type="image/svg+xml" href="{% static 'images/logo.svg' %}">
     {% block extra_head %}{% endblock %}
@@ -39,7 +40,7 @@
     </div>
     {% endif %}
 
-    <script src="{% static 'js/main.js' %}"></script>
+    <script src="{% static 'js/main.js' %}" defer></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

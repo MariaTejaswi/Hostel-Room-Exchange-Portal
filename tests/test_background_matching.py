@@ -217,6 +217,60 @@ def test_two_compatible_requests_trigger_and_activate_proposal():
 
 
 @pytest.mark.django_db
+def test_three_way_cycle_uses_default_acceptance_window_when_policy_is_unset():
+    """A valid 3-way cycle must activate even when the optional window policy has no row."""
+    inst = Institution.objects.create(name="Three Way University", code="THREE-WAY")
+    _configure_policies(inst)
+    PolicyRule.objects.filter(
+        institution=inst,
+        key=PolicyRule.Key.PROPOSAL_ACCEPTANCE_WINDOW_HOURS,
+    ).delete()
+    hostel, block, floor, warden = _setup_hostel_env(inst, prefix="rot3-default")
+
+    students = []
+    beds = []
+    requests = []
+    for index in range(3):
+        student, room, bed, occupancy = _create_student_with_bed(
+            inst,
+            hostel,
+            floor,
+            index,
+            prefix="rot3-default",
+        )
+        students.append(student)
+        beds.append(bed)
+
+    for index, student in enumerate(students):
+        requests.append(
+            create_exchange_request(
+                student=student,
+                data={
+                    "preferred_bed": beds[(index + 1) % 3],
+                    "reason": "Three-way rotation using the default acceptance window",
+                },
+            )
+        )
+
+    job = run_institution_matching(
+        institution_id=inst.id,
+        trigger_reason="test_three_way_default_window",
+    )
+
+    assert job.candidates_found_count == 1
+    assert job.proposals_activated_count == 1
+    proposal = ExchangeProposal.objects.get(institution=inst, cycle_length=3)
+    assert proposal.status == ExchangeProposal.Status.PENDING_ACCEPTANCE
+    assert proposal.expires_at is not None
+    assert proposal.participants.count() == 3
+    assert proposal.is_cross_hostel is False
+    for exchange_request in requests:
+        exchange_request.refresh_from_db()
+        assert exchange_request.status == ExchangeRequest.Status.MATCHED
+        assert exchange_request.matching_status == ExchangeRequest.MatchingStatus.PROPOSAL_AVAILABLE
+
+
+@pytest.mark.django_db
 def test_four_person_rotation_cycle_detected_and_activated():
     """2. 4-person rotation cycle detected and activated in background."""
     inst = Institution.objects.create(name="Apex University", code="APEX")

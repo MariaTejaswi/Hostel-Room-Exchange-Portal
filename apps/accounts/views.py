@@ -6,12 +6,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib import messages
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
-from django.db.models import Q
-from django.http import HttpResponse
+from django.db.models import Q, Count
+from django.http import HttpResponse, JsonResponse
 from django.utils.http import urlsafe_base64_decode
 
 from .forms import (
@@ -116,13 +117,17 @@ def login_view(request):
             },
         ]
 
-        existing_emails = set(
-            User.objects.filter(
-                email__in=[d["email"] for d in raw_demo_accounts],
-                is_active=True,
-            ).values_list("email", flat=True)
-        )
-        existing_emails_lower = {e.lower() for e in existing_emails}
+        cache_key = "roomloop_login_demo_active_emails"
+        existing_emails_lower = cache.get(cache_key)
+        if existing_emails_lower is None:
+            existing_emails = set(
+                User.objects.filter(
+                    email__in=[d["email"] for d in raw_demo_accounts],
+                    is_active=True,
+                ).values_list("email", flat=True)
+            )
+            existing_emails_lower = {e.lower() for e in existing_emails}
+            cache.set(cache_key, existing_emails_lower, timeout=300)
         for item in raw_demo_accounts:
             item["is_available"] = item["email"].lower() in existing_emails_lower
             item["password"] = default_demo_password
@@ -360,15 +365,25 @@ def sysadmin_dashboard_view(request):
         .select_related("acting_user", "institution")
         .order_by("-timestamp")[:12]
     )
-    total_users = User.objects.count()
-    active_users = User.objects.filter(is_active=True).count()
+    stats = User.objects.aggregate(
+        total_users=Count("id"),
+        active_users=Count("id", filter=Q(is_active=True)),
+        students=Count("id", filter=Q(groups__name="Student")),
+        wardens=Count("id", filter=Q(groups__name="Warden")),
+        chief_wardens=Count("id", filter=Q(groups__name="Chief Warden")),
+        hostel_admins=Count("id", filter=Q(groups__name="Hostel Administrator")),
+        deans=Count("id", filter=Q(groups__name="Dean of Student Welfare")),
+        sysadmins=Count("id", filter=Q(groups__name="System Administrator")),
+    )
+    total_users = stats["total_users"]
+    active_users = stats["active_users"]
     roles_summary = [
-        {"name": "Students", "count": User.objects.filter(groups__name="Student").count()},
-        {"name": "Wardens", "count": User.objects.filter(groups__name="Warden").count()},
-        {"name": "Chief Wardens", "count": User.objects.filter(groups__name="Chief Warden").count()},
-        {"name": "Hostel Admins", "count": User.objects.filter(groups__name="Hostel Administrator").count()},
-        {"name": "Deans", "count": User.objects.filter(groups__name="Dean of Student Welfare").count()},
-        {"name": "System Admins", "count": User.objects.filter(groups__name="System Administrator").count()},
+        {"name": "Students", "count": stats["students"]},
+        {"name": "Wardens", "count": stats["wardens"]},
+        {"name": "Chief Wardens", "count": stats["chief_wardens"]},
+        {"name": "Hostel Admins", "count": stats["hostel_admins"]},
+        {"name": "Deans", "count": stats["deans"]},
+        {"name": "System Admins", "count": stats["sysadmins"]},
     ]
 
     context = {
@@ -393,6 +408,116 @@ def dean_dashboard_view(request):
     context = get_dean_dashboard_context(request.user)
     context["active_nav"] = "dashboard"
     return render(request, "dashboards/dean.html", context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def dashboard_stats_api_view(request):
+    """Unified AJAX statistics endpoint returning live metrics across all roles."""
+    user = request.user
+    role = getattr(user, "primary_role", None) or ("student" if user.is_student_role else "unknown")
+    stats = {}
+
+    try:
+        if user.is_student_role:
+            from apps.exchange.selectors import get_student_exchange_requests, get_student_proposals
+            from apps.exchange.models import ExchangeProposal, ProposalParticipant
+            from apps.hostels.models import Hostel
+
+            active_reqs = get_student_exchange_requests(user).count()
+            incoming_props = (
+                get_student_proposals(user)
+                .filter(
+                    status=ExchangeProposal.Status.PENDING_ACCEPTANCE,
+                    participants__student=user,
+                    participants__response_status=ProposalParticipant.ResponseStatus.PENDING,
+                )
+                .distinct()
+                .count()
+            )
+            if user.residential_eligibility in [Hostel.ResidentCategory.MALE, Hostel.ResidentCategory.FEMALE]:
+                eligible_hostels_count = Hostel.objects.filter(
+                    institution=user.institution,
+                    status=Hostel.Status.ACTIVE,
+                    resident_category=user.residential_eligibility,
+                ).count()
+            else:
+                eligible_hostels_count = 0
+
+            stats = {
+                "available_hostels": eligible_hostels_count,
+                "eligible_category": user.claimed_residential_category or "Hostel",
+                "active_requests": active_reqs,
+                "incoming_proposals": incoming_props,
+            }
+        elif user.is_warden_role:
+            from apps.hostels.selectors import get_warden_dashboard_context
+            ctx = get_warden_dashboard_context(user)
+            stats = {
+                "vacant_beds": ctx.get("vacant_beds", 0),
+                "pending_reviews_count": ctx.get("pending_reviews_count", 0),
+                "occupied_beds": ctx.get("occupied_beds", 0),
+                "occupancy_pct": ctx.get("occupancy_pct", 0),
+                "total_beds": ctx.get("total_beds", 0),
+                "total_rooms": ctx.get("total_rooms", 0),
+            }
+        elif user.is_chief_warden_role:
+            from apps.hostels.selectors import get_chief_warden_dashboard_context
+            ctx = get_chief_warden_dashboard_context(user)
+            stats = {
+                "total_hostels": ctx.get("total_hostels", 0),
+                "total_beds": ctx.get("total_beds", 0),
+                "occupied_beds": ctx.get("occupied_beds", 0),
+                "available_beds": ctx.get("available_beds", 0),
+                "occupancy_pct": ctx.get("occupancy_pct", 0),
+                "cross_hostel_requests_count": ctx.get("cross_hostel_requests_count", 0),
+            }
+        elif user.is_hostel_admin_role:
+            from apps.hostels.selectors import get_admin_dashboard_context
+            ctx = get_admin_dashboard_context(user)
+            pending_elig = get_pending_eligibility_count(user.institution)
+            stats = {
+                "total_hostels": ctx.get("total_hostels", 0),
+                "total_rooms": ctx.get("total_rooms", 0),
+                "total_beds": ctx.get("total_beds", 0),
+                "occupied_beds": ctx.get("occupied_beds", 0),
+                "available_beds": ctx.get("available_beds", 0),
+                "occupancy_pct": ctx.get("occupancy_pct", 0),
+                "pending_eligibility_count": pending_elig,
+            }
+        elif user.is_dean_role:
+            from apps.hostels.selectors import get_dean_dashboard_context
+            ctx = get_dean_dashboard_context(user)
+            stats = {
+                "total_hostels": ctx.get("total_hostels", 0),
+                "total_rooms": ctx.get("total_rooms", 0),
+                "total_beds": ctx.get("total_beds", 0),
+                "occupied_beds": ctx.get("occupied_beds", 0),
+                "available_beds": ctx.get("available_beds", 0),
+                "occupancy_pct": ctx.get("occupancy_pct", 0),
+            }
+        elif user.is_sysadmin_role or user.is_superuser:
+            user_stats = User.objects.aggregate(
+                total_users=Count("id"),
+                active_users=Count("id", filter=Q(is_active=True)),
+            )
+            stats = {
+                "total_users": user_stats["total_users"],
+                "active_users": user_stats["active_users"],
+                "system_status": "Operational",
+            }
+
+        return JsonResponse({
+            "status": "success",
+            "role": role,
+            "stats": stats,
+            "timestamp": "Just now",
+        })
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "message": str(e),
+        }, status=500)
 
 
 # ==============================================================================
@@ -421,14 +546,19 @@ def student_list_view(request):
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    # Summary metrics
-    total_count = User.objects.filter(institution=institution, groups__name=ROLE_STUDENT).distinct().count()
-    active_count = User.objects.filter(institution=institution, groups__name=ROLE_STUDENT, is_active=True).distinct().count()
-    unverified_count = User.objects.filter(
-        institution=institution,
-        groups__name=ROLE_STUDENT,
-        residential_eligibility=User.ResidentialEligibility.UNVERIFIED,
-    ).distinct().count()
+    # Summary metrics in a single aggregated query
+    stats = User.objects.filter(institution=institution, groups__name=ROLE_STUDENT).aggregate(
+        total_count=Count("id", distinct=True),
+        active_count=Count("id", filter=Q(is_active=True), distinct=True),
+        unverified_count=Count(
+            "id",
+            filter=Q(residential_eligibility=User.ResidentialEligibility.UNVERIFIED),
+            distinct=True,
+        ),
+    )
+    total_count = stats["total_count"]
+    active_count = stats["active_count"]
+    unverified_count = stats["unverified_count"]
 
     is_filtered = bool(search_query or status_filter or eligibility_filter)
 

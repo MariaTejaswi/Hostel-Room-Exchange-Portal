@@ -247,6 +247,7 @@ def test_two_student_direct_swap_execution(institution, warden_user):
 
     assert appr.decision == Approval.Decision.APPROVED
     assert updated_prop.status == ExchangeProposal.Status.COMPLETED
+    assert updated_prop.completed_at is not None
     assert len(records) == 2
 
     # Check that old occupancies are TRANSFERRED

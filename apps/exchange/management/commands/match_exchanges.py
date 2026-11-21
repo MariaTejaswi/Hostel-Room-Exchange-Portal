@@ -29,7 +29,10 @@ class Command(BaseCommand):
             type=int,
             default=5,
             choices=[2, 3, 4, 5],
-            help="Maximum cycle length to discover (default: 5).",
+            help=(
+                "Maximum cycle length requested by this run (default: 5). "
+                "The institution policy remains authoritative."
+            ),
         )
         parser.add_argument(
             "--max-cycles",

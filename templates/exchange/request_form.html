@@ -460,6 +460,17 @@
                 {% endif %}
             </div>
 
+            <!-- Optional Direct Invitation Mode for Occupied Beds -->
+            <div id="direct-invitation-container" class="pt-2 hidden">
+                <label class="flex items-start gap-2.5 text-xs text-slate-700 cursor-pointer p-3 bg-amber-50/70 border border-amber-200 rounded-xl">
+                    <input type="checkbox" name="direct_invitation" id="id_direct_invitation" value="true" class="rounded border-slate-300 text-[#702C3B] focus:ring-[#702C3B]/30 mt-0.5">
+                    <div>
+                        <span class="font-semibold text-slate-900 block">Send as Direct 1-on-1 Invitation</span>
+                        <span class="text-[11px] text-slate-500">Directly invite the current occupant of this bed to exchange with you. Leave unchecked to include this request in the automated multi-party matching pool.</span>
+                    </div>
+                </label>
+            </div>
+
             <!-- Confirmation Checkbox -->
             <div class="pt-2">
                 <label class="flex items-start gap-2.5 text-xs text-slate-600 cursor-pointer">
@@ -654,6 +665,17 @@ document.addEventListener("DOMContentLoaded", function () {
             submitText.textContent = isVacant ? "Submit Transfer Request" : "Submit Exchange Request";
         }
 
+        const directContainer = document.getElementById("direct-invitation-container");
+        if (directContainer) {
+            if (!isVacant) {
+                directContainer.classList.remove("hidden");
+            } else {
+                directContainer.classList.add("hidden");
+                const directCheck = document.getElementById("id_direct_invitation");
+                if (directCheck) directCheck.checked = false;
+            }
+        }
+
         // Update sticky bar
         stickyBedBadge.textContent = "Room " + roomNumber + " · Bed " + bedLabel;
         stickyBedBadge.className = "px-2 py-0.5 rounded font-mono font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300";
@@ -677,6 +699,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 c.classList.remove("bg-emerald-500", "border-emerald-600", "text-white", "ring-2", "ring-emerald-500", "shadow-xs");
                 c.classList.add("bg-white");
             });
+        }
+        const directContainer = document.getElementById("direct-invitation-container");
+        if (directContainer) {
+            directContainer.classList.add("hidden");
+            const directCheck = document.getElementById("id_direct_invitation");
+            if (directCheck) directCheck.checked = false;
         }
         updateStepIndicators();
     }
@@ -986,12 +1014,33 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // Form submission validation & double-submission prevention
+    let isSubmitting = false;
+    const initialSubmitText = submitText ? submitText.textContent : "Submit Exchange Request";
+
+    function resetSubmitButton() {
+        isSubmitting = false;
+        if (submitBtn) submitBtn.disabled = false;
+        if (submitSpinner) submitSpinner.classList.add("hidden");
+        if (submitText) submitText.textContent = initialSubmitText;
+    }
+
+    // Reset submit button if navigated back or restored from bfcache
+    window.addEventListener("pageshow", function () {
+        resetSubmitButton();
+    });
+
     requestForm.addEventListener("submit", function (e) {
+        if (isSubmitting) {
+            e.preventDefault();
+            return;
+        }
+
         const reasonLen = reasonTextarea ? reasonTextarea.value.trim().length : 0;
         if (reasonLen < 10) {
             e.preventDefault();
             alert("Please provide at least 10 characters for your exchange reason.");
             if (reasonTextarea) reasonTextarea.focus();
+            resetSubmitButton();
             return;
         }
 
@@ -999,13 +1048,18 @@ document.addEventListener("DOMContentLoaded", function () {
         if (isSpecific && (!hiddenBed || !hiddenBed.value)) {
             e.preventDefault();
             alert("Please select a specific destination bed from the room layout, or switch to 'Find by Preferences' mode.");
+            resetSubmitButton();
             return;
         }
 
-        // Disable button to prevent double-submit
-        submitBtn.disabled = true;
-        submitSpinner.classList.remove("hidden");
-        submitText.textContent = "Submitting request...";
+        // Prevent double submit and display loading spinner
+        isSubmitting = true;
+        if (submitSpinner) submitSpinner.classList.remove("hidden");
+        if (submitText) submitText.textContent = "Submitting request...";
+        // Defer disabling the button so the native form submit event dispatches smoothly across browsers
+        setTimeout(function () {
+            if (submitBtn) submitBtn.disabled = true;
+        }, 0);
     });
 
     // Restore saved mode if editing

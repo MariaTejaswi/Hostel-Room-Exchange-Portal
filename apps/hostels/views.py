@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.urls import reverse
-from django.db.models import Q
+from django.db.models import Q, Count
 
 from .models import (
     Hostel,
@@ -67,10 +67,19 @@ def hostel_list_view(request):
 
     base_qs = get_hostel_queryset_with_stats(institution=institution, user=user)
 
-    # Counts for category tabs
-    total_count = base_qs.count()
-    boys_count = base_qs.filter(resident_category=Hostel.ResidentCategory.MALE).count()
-    girls_count = base_qs.filter(resident_category=Hostel.ResidentCategory.FEMALE).count()
+    # Counts for category tabs (lightweight count without executing heavy correlated subqueries)
+    counts_qs = Hostel.objects.filter(institution=institution)
+    if user.is_warden_role:
+        from .selectors import get_warden_assigned_hostel_ids
+        counts_qs = counts_qs.filter(id__in=get_warden_assigned_hostel_ids(user))
+    category_counts = counts_qs.aggregate(
+        total=Count("id"),
+        boys=Count("id", filter=Q(resident_category=Hostel.ResidentCategory.MALE)),
+        girls=Count("id", filter=Q(resident_category=Hostel.ResidentCategory.FEMALE)),
+    )
+    total_count = category_counts["total"]
+    boys_count = category_counts["boys"]
+    girls_count = category_counts["girls"]
 
     student_verified_eligibility = None
     is_eligibility_verified = False

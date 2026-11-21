@@ -404,10 +404,14 @@ def get_approvals_queryset(user) -> QuerySet:
 
 
 def get_pending_approvals_count(user) -> int:
-    """Return count of proposals awaiting approval within the user's authority scope."""
+    """Return count of proposals awaiting approval within the user's authority scope with request-level caching."""
     if not user or not user.is_authenticated:
         return 0
-    return get_approvals_queryset(user).filter(status=ExchangeProposal.Status.PENDING_APPROVAL).count()
+    if hasattr(user, "_cached_pending_approvals_count"):
+        return user._cached_pending_approvals_count
+    count = get_approvals_queryset(user).filter(status=ExchangeProposal.Status.PENDING_APPROVAL).count()
+    user._cached_pending_approvals_count = count
+    return count
 
 
 def get_approval_proposal_detail(user, proposal_id) -> ExchangeProposal | None:

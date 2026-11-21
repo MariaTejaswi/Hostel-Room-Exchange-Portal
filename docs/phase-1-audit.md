@@ -26,7 +26,7 @@ All 40 automated test cases in the test suite and live multi-role verification s
 | **Warden Assignment Scoping** | `apps/hostels/forms.py`, `apps/hostels/services.py` | `OccupancyAssignForm` showed all vacant beds across all hostels in the institution regardless of warden's assigned hostel. | **Implemented in Phase 1**: Scoped `OccupancyAssignForm` bed choices and service validation strictly to hostels assigned via `WardenAssignment`. Destination warden authority strictly enforced. |
 | **Hostel Safety: Prevent Deactivating Occupied Hostels** | `apps/hostels/services.py` (`update_hostel`) | Hostels could be marked inactive (`is_active=False`) while students were actively occupying rooms. | **Implemented in Phase 1**: Added validation check in `services.update_hostel` raising `ValidationError` if active occupants exist when deactivating. |
 | **Dynamic Hierarchy & Capacity Aggregations** | `apps/hostels/models.py`, `apps/hostels/selectors.py` | Join operations in aggregate queries risked inflated counts if joins produced duplicate rows. | **Implemented in Phase 1**: Verified `distinct=True` on all `Count("blocks__floors__rooms__beds")` annotations. Explicitly distinguished **Total Bed Capacity**, **Occupied Beds**, **Maintenance Beds**, and **Available Operational Beds** (`max(0, total - occupied - maintenance)`). |
-| **Corrected Approval Workflows** | Documented specifications vs future implementation | Clarified workflow rules vs Phase 1 capabilities. | **Documented for Future Implementation**: New allocations require destination warden; same-hostel transfers require assigned warden; inter-hostel transfers require source and destination wardens; exchanges require student consent + wardens; Chief Warden handles escalations only; Dean handles serious policy appeals without changing occupancy. |
+| **Corrected Approval Workflows** | `apps/exchange/selectors.py`, `apps/exchange/services.py` | This historical Phase 1 document predated the implemented P04 workflow. | **Current rule**: same-hostel exchanges and transfers are decided by the assigned hostel Warden; cross-hostel exchanges and transfers are decided only by the Chief Warden. |
 | **Dynamic Inventory Custom Builder** | Custom irregular floor and bed layouts | Standard static room forms do not allow arbitrary multi-floor variable layouts in one save. | **Deferred to Phase 2**: Foundations and dynamic schema ready for Dean / Hostel Admin visual custom builder. |
 
 ---
@@ -80,16 +80,16 @@ All 40 automated test cases in the test suite and live multi-role verification s
 
 ---
 
-## 5. Documented Approval Workflow Rules (Future Modules)
+## 5. Current Approval Workflow Rules
 
-The operational approval workflow is documented as follows for implementation in subsequent phases:
+The implemented operational approval workflow is:
 
 1. **New Allocation**: Handled directly by the **destination hostel warden** (assigned via `WardenAssignment`).
 2. **Same-Hostel Transfer**: Handled by the **assigned hostel warden**.
-3. **Inter-Hostel Transfer**: Requires two-party approval from both the **source hostel warden** (release approval) AND the **destination hostel warden** (acceptance approval).
-4. **Student Room Exchange**: Requires the **second student’s explicit mutual consent** followed by applicable warden approvals.
-5. **Chief Warden Role**: Dedicated to exceptions, inter-hostel disputes, and authorized escalations—**not mandatory approval for every routine request**.
-6. **Dean of Student Welfare Role**: Retains final institutional authority over serious policy appeals, **without directly mutating room occupancy records**.
+3. **Cross-Hostel Transfer or Exchange**: Handled by the **Chief Warden only**. Source and destination hostel Wardens do not receive an additional approval step.
+4. **Student Consent**: Every affected student must accept before an exchange reaches the responsible authority.
+5. **Chief Warden Role**: Sole operational approval authority for cross-hostel exchanges and transfers, with institution-wide oversight of other workflows.
+6. **Dean of Student Welfare Role**: Institution-wide analytics are read-only; the Dean does not mutate occupancy or decide operational exchanges.
 
 ---
 

@@ -93,6 +93,11 @@ urlpatterns = [
         views.exchange_policy_settings_view,
         name="policy_settings",
     ),
+    path(
+        "exchange/reports/",
+        views.exchange_reports_view,
+        name="reports",
+    ),
     # Lightweight AJAX endpoints for dynamic bed/room explorer
     path(
         "exchange/api/hostels/<str:hostel_id>/blocks/",

@@ -1,10 +1,16 @@
+import logging
+from datetime import timedelta
+from time import perf_counter
+from uuid import UUID
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
@@ -20,7 +26,11 @@ from apps.hostels.models import (
 )
 
 from .eligibility import check_student_exchange_eligibility
-from .forms import ExchangePolicySettingsForm, ExchangeRequestForm
+from .forms import (
+    ExchangePolicySettingsForm,
+    ExchangeReportFilterForm,
+    ExchangeRequestForm,
+)
 from .models import (
     Approval,
     ExchangeProposal,
@@ -63,6 +73,16 @@ from .services import (
     update_institution_exchange_policy,
     withdraw_exchange_request,
 )
+from .reporting import (
+    build_exchange_report,
+    get_exchange_audit_queryset,
+    get_exchange_report_hostels,
+    get_exchange_report_scope,
+    get_report_transfer_queryset,
+    make_report_window,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def _require_student(request):
@@ -331,16 +351,26 @@ def exchange_request_create_view(request):
         form = ExchangeRequestForm(request.POST, student=request.user)
         if form.is_valid():
             try:
+                is_direct = bool(form.cleaned_data.get("direct_invitation")) or (
+                    request.POST.get("direct_invitation") in ("true", "1", "on")
+                )
                 create_exchange_request(
                     student=request.user,
                     data=form.cleaned_data,
                     ip_address=request.META.get("REMOTE_ADDR"),
+                    direct_invitation=is_direct,
                 )
-                messages.success(request, "Your exchange request was created.")
+                if is_direct:
+                    messages.success(request, "Your direct exchange invitation was sent.")
+                else:
+                    messages.success(request, "Your exchange request was created.")
                 return redirect("exchange:request_list")
             except ValidationError as error:
                 for message in _validation_messages(error):
                     form.add_error(None, message)
+            except Exception as error:
+                logger.exception("Unexpected error creating exchange request: %s", error)
+                form.add_error(None, f"An unexpected error occurred while creating your request: {error}")
     else:
         form = ExchangeRequestForm(student=request.user)
     browser_context = _bed_browser_context(request, request.user, form)
@@ -374,12 +404,17 @@ def exchange_request_detail_view(request, pk):
             exchange_request.request_type == ExchangeRequest.RequestType.EXCHANGE
             and exchange_request.status == ExchangeRequest.Status.OPEN
         ):
-            schedule_institution_matching(
+            from .services import run_institution_matching
+            job = run_institution_matching(
                 institution_id=exchange_request.institution_id,
                 trigger_reason="manual_refresh",
                 trigger_request_id=exchange_request.id,
             )
-            messages.info(request, "Matching evaluation queued. Please check back shortly for updated status.")
+            exchange_request.refresh_from_db()
+            if exchange_request.status == ExchangeRequest.Status.MATCHED or job.proposals_activated_count > 0:
+                messages.success(request, "Matching evaluation complete: Compatible exchange proposal discovered!")
+            else:
+                messages.info(request, "Matching evaluation complete. No compatible exchange cycle found at this time.")
         return redirect("exchange:request_detail", pk=pk)
 
     now = timezone.now()
@@ -427,14 +462,15 @@ def exchange_request_detail_view(request, pk):
         ).exists()
 
         if not is_target_bed_vacant:
-            from .services import activate_direct_occupied_bed_request
-            activated, msg, prop = activate_direct_occupied_bed_request(exchange_request=exchange_request, now=now)
-            if activated and prop:
-                exchange_request.refresh_from_db()
-                active_proposal = prop
-            elif not activated:
-                reconfirmation_needed = True
-                reconfirmation_message = msg
+            if request.method == "POST" and request.POST.get("action") == "activate_direct":
+                from .services import activate_direct_occupied_bed_request
+                activated, msg, prop = activate_direct_occupied_bed_request(exchange_request=exchange_request, now=now)
+                if activated and prop:
+                    exchange_request.refresh_from_db()
+                    active_proposal = prop
+                elif not activated:
+                    reconfirmation_needed = True
+                    reconfirmation_message = msg
 
     # Durable transfer record if completed
     transfer_record = None
@@ -448,7 +484,7 @@ def exchange_request_detail_view(request, pk):
         source_h = exchange_request.current_occupancy.bed.room.floor.block.hostel
         dest_h = exchange_request.preferred_bed.room.floor.block.hostel
         if source_h.id != dest_h.id:
-            required_authority_label = "Both Assigned Hostel Wardens (Cross-Hostel)"
+            required_authority_label = "Chief Warden (Cross-Hostel)"
 
     return render(
         request,
@@ -498,6 +534,9 @@ def exchange_request_edit_view(request, pk):
             except ValidationError as error:
                 for message in _validation_messages(error):
                     form.add_error(None, message)
+            except Exception as error:
+                logger.exception("Unexpected error creating exchange request: %s", error)
+                form.add_error(None, f"An unexpected error occurred while creating your request: {error}")
     else:
         form = ExchangeRequestForm(
             instance=exchange_request,
@@ -743,6 +782,13 @@ def exchange_policy_settings_view(request):
                     value=cd["request_validity_days"],
                     ip_address=ip,
                 )
+                update_institution_exchange_policy(
+                    acting_user=request.user,
+                    institution=institution,
+                    key=PolicyRule.Key.MAX_CYCLE_LENGTH,
+                    value=cd["maximum_chain_length"],
+                    ip_address=ip,
+                )
                 if cd.get("proposal_acceptance_window_hours") is not None:
                     update_institution_exchange_policy(
                         acting_user=request.user,
@@ -777,6 +823,7 @@ def exchange_policy_settings_view(request):
             initial_data["cooling_off_days"] = policies[PolicyRule.Key.COOLING_OFF_DAYS]
         if policies.get(PolicyRule.Key.REQUEST_VALIDITY_DAYS) is not None:
             initial_data["request_validity_days"] = policies[PolicyRule.Key.REQUEST_VALIDITY_DAYS]
+        initial_data["maximum_chain_length"] = policies[PolicyRule.Key.MAX_CYCLE_LENGTH]
         if policies.get(PolicyRule.Key.PROPOSAL_ACCEPTANCE_WINDOW_HOURS) is not None:
             initial_data["proposal_acceptance_window_hours"] = policies[PolicyRule.Key.PROPOSAL_ACCEPTANCE_WINDOW_HOURS]
         if policies.get(PolicyRule.Key.REQUIRE_FEE_CLEARANCE) is not None:
@@ -834,16 +881,28 @@ def exchange_approval_list_view(request):
     proposals_base = get_approvals_queryset(user)
     transfers_base = get_vacant_transfers_queryset(user)
 
-    # Metrics calculation
-    prop_pending = proposals_base.filter(status=ExchangeProposal.Status.PENDING_APPROVAL).count()
-    prop_approved = proposals_base.filter(status=ExchangeProposal.Status.APPROVED).count()
-    prop_rejected = proposals_base.filter(status=ExchangeProposal.Status.REJECTED).count()
-    prop_total = proposals_base.count()
+    # Consolidated metrics calculation in 2 queries instead of 8 separate count queries
+    prop_stats = proposals_base.aggregate(
+        pending=Count("id", filter=Q(status=ExchangeProposal.Status.PENDING_APPROVAL)),
+        approved=Count("id", filter=Q(status=ExchangeProposal.Status.APPROVED)),
+        rejected=Count("id", filter=Q(status=ExchangeProposal.Status.REJECTED)),
+        total=Count("id"),
+    )
+    prop_pending = prop_stats["pending"]
+    prop_approved = prop_stats["approved"]
+    prop_rejected = prop_stats["rejected"]
+    prop_total = prop_stats["total"]
 
-    trans_pending = transfers_base.filter(status=ExchangeRequest.Status.PENDING_APPROVAL).count()
-    trans_approved = transfers_base.filter(status=ExchangeRequest.Status.COMPLETED).count()
-    trans_rejected = transfers_base.filter(status=ExchangeRequest.Status.REJECTED).count()
-    trans_total = transfers_base.count()
+    trans_stats = transfers_base.aggregate(
+        pending=Count("id", filter=Q(status=ExchangeRequest.Status.PENDING_APPROVAL)),
+        approved=Count("id", filter=Q(status=ExchangeRequest.Status.COMPLETED)),
+        rejected=Count("id", filter=Q(status=ExchangeRequest.Status.REJECTED)),
+        total=Count("id"),
+    )
+    trans_pending = trans_stats["pending"]
+    trans_approved = trans_stats["approved"]
+    trans_rejected = trans_stats["rejected"]
+    trans_total = trans_stats["total"]
 
     if queue_filter == "transfers":
         pending_count = trans_pending
@@ -1400,3 +1459,170 @@ def exchange_my_transfers_view(request):
         "active_nav": "my_transfers",
     }
     return render(request, "exchange/transfer_list.html", context)
+
+
+_AUDIT_STAFF_ACTIONS = {
+    "EXCHANGE_POLICY_UPDATED",
+    "EXCHANGE_PROPOSAL_APPROVED",
+    "EXCHANGE_PROPOSAL_REJECTED",
+    "EXCHANGE_TRANSFER_EXECUTED",
+    "VACANT_TRANSFER_EXECUTED",
+    "VACANT_TRANSFER_REJECTED",
+}
+
+
+def _uuid_target_ids(entries, target_type):
+    values = set()
+    for entry in entries:
+        if entry.target_type != target_type:
+            continue
+        try:
+            values.add(UUID(entry.target_id))
+        except (TypeError, ValueError, AttributeError):
+            continue
+    return values
+
+
+def _prepare_report_audit_entries(user, entries):
+    """Add privacy-safe labels and only selector-authorized detail links."""
+    proposal_ids = _uuid_target_ids(entries, "ExchangeProposal")
+    request_ids = _uuid_target_ids(entries, "ExchangeRequest")
+    visible_proposal_ids = set()
+    if proposal_ids:
+        visible_proposal_ids = set(
+            get_approvals_queryset(user)
+            .filter(id__in=proposal_ids)
+            .values_list("id", flat=True)
+        )
+    visible_request_ids = set()
+    if request_ids:
+        visible_request_ids = set(
+            get_vacant_transfers_queryset(user)
+            .filter(id__in=request_ids)
+            .values_list("id", flat=True)
+        )
+
+    for entry in entries:
+        entry.action_label = entry.action.replace("_", " ").title()
+        entry.target_reference = f"{entry.target_type} #{entry.target_id[:8]}"
+        if entry.acting_user_id is None:
+            entry.actor_label = "System workflow"
+        elif entry.action in _AUDIT_STAFF_ACTIONS:
+            entry.actor_label = entry.acting_user.full_name
+        else:
+            entry.actor_label = "Workflow participant"
+
+        entry.detail_url = None
+        try:
+            target_id = UUID(entry.target_id)
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if entry.target_type == "ExchangeProposal" and target_id in visible_proposal_ids:
+            entry.detail_url = reverse(
+                "exchange:approval_detail",
+                kwargs={"pk": target_id},
+            )
+        elif entry.target_type == "ExchangeRequest" and target_id in visible_request_ids:
+            entry.detail_url = reverse(
+                "exchange:transfer_approval_detail",
+                kwargs={"pk": target_id},
+            )
+
+
+@login_required
+@require_GET
+def exchange_reports_view(request):
+    """P04 M7 read-only exchange reports and scoped audit visibility."""
+    started_at = perf_counter()
+    user = request.user
+    scope = get_exchange_report_scope(user)
+    allowed_hostels = get_exchange_report_hostels(user)
+    today = timezone.localdate()
+    defaults = {
+        "start_date": today - timedelta(days=29),
+        "end_date": today,
+    }
+
+    if request.GET:
+        form = ExchangeReportFilterForm(
+            request.GET,
+            allowed_hostels=allowed_hostels,
+        )
+    else:
+        form = ExchangeReportFilterForm(
+            initial=defaults,
+            allowed_hostels=allowed_hostels,
+        )
+
+    report = None
+    audit_page = None
+    movement_page = None
+    filter_query = ""
+    active_hostel = None
+
+    form_is_valid = form.is_valid() if form.is_bound else True
+    if form_is_valid:
+        start_date = (
+            form.cleaned_data["start_date"] if form.is_bound else defaults["start_date"]
+        )
+        end_date = (
+            form.cleaned_data["end_date"] if form.is_bound else defaults["end_date"]
+        )
+        active_hostel = form.cleaned_data.get("hostel") if form.is_bound else None
+        window = make_report_window(start_date, end_date)
+        hostel_id = active_hostel.id if active_hostel else None
+        report = build_exchange_report(
+            user=user,
+            window=window,
+            hostel_id=hostel_id,
+        )
+
+        audit_queryset = get_exchange_audit_queryset(
+            user=user,
+            window=window,
+            hostel_id=hostel_id,
+        )
+        audit_page = Paginator(audit_queryset, 12).get_page(
+            request.GET.get("audit_page")
+        )
+        _prepare_report_audit_entries(user, list(audit_page.object_list))
+
+        movement_queryset = get_report_transfer_queryset(
+            user=user,
+            window=window,
+            hostel_id=hostel_id,
+        )
+        movement_page = Paginator(movement_queryset, 10).get_page(
+            request.GET.get("movement_page")
+        )
+
+        filter_parameters = request.GET.copy()
+        filter_parameters["start_date"] = start_date.isoformat()
+        filter_parameters["end_date"] = end_date.isoformat()
+        if active_hostel:
+            filter_parameters["hostel"] = str(active_hostel.id)
+        else:
+            filter_parameters.pop("hostel", None)
+        filter_parameters.pop("audit_page", None)
+        filter_parameters.pop("movement_page", None)
+        filter_query = filter_parameters.urlencode()
+
+    elapsed_ms = (perf_counter() - started_at) * 1000
+    response = render(
+        request,
+        "exchange/reports.html",
+        {
+            "active_nav": "exchange_reports",
+            "page_title": "Reports & Analytics",
+            "scope": scope,
+            "form": form,
+            "report": report,
+            "audit_page": audit_page,
+            "movement_page": movement_page,
+            "active_hostel": active_hostel,
+            "filter_query": filter_query,
+            "report_elapsed_ms": elapsed_ms,
+        },
+    )
+    response["Server-Timing"] = f"exchange-report;dur={elapsed_ms:.2f}"
+    return response

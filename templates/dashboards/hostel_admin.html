@@ -111,7 +111,7 @@
                 </span>
             </div>
             <div class="mt-3">
-                <span class="text-2xl sm:text-3xl font-extrabold text-[#35251F] tracking-tight block">{{ total_hostels|default:"17" }}</span>
+                <span data-stat="total_hostels" class="text-2xl sm:text-3xl font-extrabold text-[#35251F] tracking-tight block">{{ total_hostels|default:"17" }}</span>
                 <span class="text-xs text-[#8A7B72] font-medium block mt-1">{{ total_blocks|default:"34" }} residential blocks across campus</span>
             </div>
         </div>
@@ -128,7 +128,7 @@
             </div>
             <div class="mt-3">
                 <span class="text-2xl sm:text-3xl font-extrabold text-[#35251F] tracking-tight block">{{ boys_hostels_count|default:"10" }}</span>
-                <span class="text-xs text-[#8A7B72] font-medium block mt-1">Male resident facilities · {{ total_rooms }} Inventory Rooms</span>
+                <span class="text-xs text-[#8A7B72] font-medium block mt-1">Male resident facilities · <span data-stat="total_rooms">{{ total_rooms }}</span> Inventory Rooms</span>
             </div>
         </div>
 
@@ -144,7 +144,7 @@
             </div>
             <div class="mt-3">
                 <span class="text-2xl sm:text-3xl font-extrabold text-[#35251F] tracking-tight block">{{ girls_hostels_count|default:"7" }}</span>
-                <span class="text-xs text-[#8A7B72] font-medium block mt-1">{{ occupied_beds }} Occupied Beds · {{ available_beds }} Vacant & Ready</span>
+                <span class="text-xs text-[#8A7B72] font-medium block mt-1"><span data-stat="occupied_beds">{{ occupied_beds }}</span> Occupied Beds · <span data-stat="available_beds">{{ available_beds }}</span> Vacant & Ready</span>
             </div>
         </div>
     </div>

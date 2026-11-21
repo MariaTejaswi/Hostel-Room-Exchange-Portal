@@ -163,4 +163,67 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     });
   });
+
+  // 8. Live Dashboard Statistics Refresh Handler (Fail-safe, no indefinite hang)
+  let isRefreshingStats = false;
+  const refreshStatsButtons = document.querySelectorAll("#btn-refresh-dashboard-stats, .btn-refresh-stats");
+
+  async function performStatsRefresh(btn) {
+    if (isRefreshingStats) return;
+    isRefreshingStats = true;
+
+    const icon = btn.querySelector("svg") || document.getElementById("refresh-stats-icon");
+    if (icon) icon.classList.add("animate-spin", "text-[#702C3B]");
+    btn.setAttribute("aria-busy", "true");
+    btn.disabled = true;
+
+    try {
+      const response = await fetch("/dashboard/api/stats/", {
+        method: "GET",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+          "Accept": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data && data.status === "success" && data.stats) {
+        // Update all DOM elements with matching data-stat attribute
+        for (const [key, value] of Object.entries(data.stats)) {
+          const elements = document.querySelectorAll(`[data-stat="${key}"]`);
+          elements.forEach((el) => {
+            el.textContent = value;
+            el.classList.add("transition-colors", "duration-300", "text-[#702C3B]");
+            setTimeout(() => {
+              el.classList.remove("text-[#702C3B]");
+            }, 1000);
+          });
+        }
+
+        // Update timestamp if present
+        const timestampEls = document.querySelectorAll("[data-stat-timestamp]");
+        timestampEls.forEach((el) => {
+          el.textContent = "Updated just now";
+        });
+      }
+    } catch (err) {
+      console.warn("Dashboard statistics refresh failed:", err);
+    } finally {
+      if (icon) icon.classList.remove("animate-spin", "text-[#702C3B]");
+      btn.removeAttribute("aria-busy");
+      btn.disabled = false;
+      isRefreshingStats = false;
+    }
+  }
+
+  refreshStatsButtons.forEach((btn) => {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      performStatsRefresh(this);
+    });
+  });
 });

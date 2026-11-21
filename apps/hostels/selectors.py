@@ -18,12 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 def get_warden_assigned_hostel_ids(user: User) -> list[int]:
-    """Return list of hostel IDs assigned to the warden."""
+    """Return list of hostel IDs assigned to the warden with per-request caching."""
     if not user or not user.is_authenticated:
         return []
-    return list(
+    if hasattr(user, "_cached_assigned_hostel_ids"):
+        return user._cached_assigned_hostel_ids
+    assigned_ids = list(
         WardenAssignment.objects.filter(warden=user).values_list("hostel_id", flat=True)
     )
+    user._cached_assigned_hostel_ids = assigned_ids
+    return assigned_ids
 
 
 def get_warden_assigned_hostels(user: User):
@@ -508,6 +512,21 @@ def calculate_configuration_metrics(config_data: dict) -> dict:
 # Role-Specific Dashboard Context Selectors
 def get_student_dashboard_context(user: User) -> dict:
     occupancy = get_student_active_occupancy(user)
+    room_beds = []
+    if occupancy:
+        room_beds = list(
+            Bed.objects.filter(room_id=occupancy.bed.room_id, is_active=True)
+            .order_by("bed_label", "id")
+        )
+        occupied_bed_ids = set(
+            StudentOccupancy.objects.filter(
+                bed_id__in=[bed.id for bed in room_beds],
+                status=StudentOccupancy.OccupancyStatus.ACTIVE,
+            ).values_list("bed_id", flat=True)
+        )
+        for bed in room_beds:
+            bed.is_current_student_bed = bed.id == occupancy.bed_id
+            bed.has_active_occupancy = bed.id in occupied_bed_ids
     history = (
         StudentOccupancy.objects.filter(student=user)
         .exclude(status=StudentOccupancy.OccupancyStatus.ACTIVE)
@@ -516,6 +535,7 @@ def get_student_dashboard_context(user: User) -> dict:
     )
     return {
         "current_occupancy": occupancy,
+        "dashboard_room_beds": room_beds,
         "occupancy_history": history,
         "student": user,
     }
@@ -561,10 +581,26 @@ def get_warden_dashboard_context(user: User) -> dict:
     pending_transfers_qs = get_vacant_transfers_queryset(user).filter(
         status=ExchangeRequest.Status.PENDING_APPROVAL
     )
-    pending_reviews_count = pending_proposals_qs.count() + pending_transfers_qs.count()
+    pending_reviews_count = get_pending_approvals_count(user) + pending_transfers_qs.count()
+
+    recent_proposals = list(
+        pending_proposals_qs.select_related("institution")
+        .prefetch_related(
+            "participants__student",
+            "participants__current_occupancy__bed__room__floor__block__hostel",
+            "participants__proposed_bed__room__floor__block__hostel",
+        )[:5]
+    )
+    recent_transfers = list(
+        pending_transfers_qs.select_related(
+            "student",
+            "current_occupancy__bed__room__floor__block__hostel",
+            "preferred_bed__room__floor__block__hostel",
+        )[:5]
+    )
 
     review_items = []
-    for prop in pending_proposals_qs[:5]:
+    for prop in recent_proposals:
         participants = list(prop.participants.all())
         student_name = participants[0].student.full_name if participants else "Student"
         student_reg = participants[0].student.registration_number if participants else ""
@@ -582,7 +618,7 @@ def get_warden_dashboard_context(user: User) -> dict:
             "created_at": prop.created_at,
         })
 
-    for trans in pending_transfers_qs[:5]:
+    for trans in recent_transfers:
         s_name = trans.student.full_name if trans.student else "Student"
         s_reg = trans.student.registration_number if trans.student else ""
         review_items.append({
@@ -621,7 +657,7 @@ def get_warden_dashboard_context(user: User) -> dict:
 
 def get_chief_warden_dashboard_context(user: User) -> dict:
     from django.urls import reverse
-    from apps.exchange.selectors import get_approvals_queryset
+    from apps.exchange.selectors import get_approvals_queryset, get_pending_approvals_count
     from apps.exchange.models import ExchangeProposal
 
     hostels_qs = get_hostel_queryset_with_stats(institution=user.institution)
@@ -642,10 +678,18 @@ def get_chief_warden_dashboard_context(user: User) -> dict:
     cross_proposals_qs = get_approvals_queryset(user).filter(
         status=ExchangeProposal.Status.PENDING_APPROVAL
     )
-    cross_hostel_requests_count = cross_proposals_qs.count()
+    cross_hostel_requests_count = get_pending_approvals_count(user)
 
     cross_hostel_reviews = []
-    for prop in cross_proposals_qs[:5]:
+    recent_cross_proposals = list(
+        cross_proposals_qs.select_related("institution")
+        .prefetch_related(
+            "participants__student",
+            "participants__current_occupancy__bed__room__floor__block__hostel",
+            "participants__proposed_bed__room__floor__block__hostel",
+        )[:5]
+    )
+    for prop in recent_cross_proposals:
         participants = list(prop.participants.all())
         if participants:
             p1 = participants[0]

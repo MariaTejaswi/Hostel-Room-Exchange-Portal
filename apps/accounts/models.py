@@ -177,7 +177,12 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     @property
     def primary_role(self) -> str:
         """Return the primary role name based on group membership or superuser status."""
-        group_names = set(self.groups.values_list("name", flat=True))
+        if hasattr(self, "_cached_primary_role"):
+            return self._cached_primary_role
+        if hasattr(self, "_prefetched_objects_cache") and "groups" in self._prefetched_objects_cache:
+            group_names = {g.name for g in self.groups.all()}
+        else:
+            group_names = set(self.groups.values_list("name", flat=True))
         for role in [
             "Dean of Student Welfare",
             "Hostel Administrator",
@@ -187,10 +192,14 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
             "Student",
         ]:
             if role in group_names:
+                self._cached_primary_role = role
                 return role
         if self.is_superuser:
-            return "System Administrator"
-        return "Student"
+            role = "System Administrator"
+        else:
+            role = "Student"
+        self._cached_primary_role = role
+        return role
 
     @property
     def is_student_role(self) -> bool:
@@ -219,6 +228,11 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     @property
     def current_occupancy(self):
         """Return active StudentOccupancy if any, or None."""
+        if hasattr(self, "_prefetched_objects_cache") and "occupancy_records" in self._prefetched_objects_cache:
+            for occ in self.occupancy_records.all():
+                if occ.status == "active":
+                    return occ
+            return None
         if hasattr(self, "occupancy_records"):
             return self.occupancy_records.filter(status="active").select_related(
                 "bed__room__floor__block__hostel"

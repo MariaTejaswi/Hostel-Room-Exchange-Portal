@@ -9,7 +9,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.core.models import AuditLog, Institution
-from apps.hostels.models import Bed, Hostel, OperationalStatus, StudentOccupancy
+from apps.hostels.models import Bed, Hostel, OperationalStatus, StudentOccupancy, WardenAssignment
 
 from apps.hostels.selectors import get_warden_assigned_hostel_ids
 
@@ -21,8 +21,12 @@ from .eligibility import (
 )
 from .models import (
     Approval,
+    DEFAULT_MAX_EXCHANGE_CYCLE_LENGTH,
+    DEFAULT_PROPOSAL_ACCEPTANCE_WINDOW_HOURS,
     ExchangeProposal,
     ExchangeRequest,
+    MAX_EXCHANGE_CYCLE_LENGTH,
+    MIN_EXCHANGE_CYCLE_LENGTH,
     MatchingJob,
     MatchingOutbox,
     Notification,
@@ -34,6 +38,47 @@ from .models import (
 from .notifications import dispatch_proposal_notification
 
 logger = logging.getLogger(__name__)
+
+
+def _notify_proposal_approval_authorities(*, proposal, now=None):
+    """Notify only the users who may decide the proposal under its authority scope."""
+    now = now or timezone.now()
+    hostel_ids = set(
+        proposal.participants.values_list(
+            "current_occupancy__bed__room__floor__block__hostel_id",
+            flat=True,
+        )
+    )
+    User = get_user_model()
+    if len(hostel_ids) > 1:
+        recipients = User.objects.filter(
+            institution=proposal.institution,
+            groups__name="Chief Warden",
+            is_active=True,
+        ).distinct()
+        scope_label = "cross-hostel"
+    else:
+        hostel_id = next(iter(hostel_ids), None)
+        warden_ids = WardenAssignment.objects.filter(
+            hostel_id=hostel_id,
+            warden__institution=proposal.institution,
+            warden__groups__name="Warden",
+            warden__is_active=True,
+        ).values_list("warden_id", flat=True)
+        recipients = User.objects.filter(id__in=warden_ids).distinct()
+        scope_label = "same-hostel"
+
+    for recipient in recipients:
+        dispatch_proposal_notification(
+            recipient=recipient,
+            notification_type=Notification.NotificationType.APPROVAL_UPDATED,
+            message=(
+                f"A {scope_label} {proposal.cycle_length}-student exchange proposal "
+                "is awaiting your approval."
+            ),
+            proposal=proposal,
+            now=now,
+        )
 
 
 def _assert_student(student):
@@ -121,6 +166,8 @@ def create_exchange_request(
         raise ValidationError("You are currently part of an active exchange proposal.")
 
     values = _request_data(data)
+    if "direct_invitation" in data:
+        direct_invitation = bool(data["direct_invitation"])
     preferred_bed = values.get("preferred_bed")
     request_type = ExchangeRequest.RequestType.EXCHANGE
     initial_status = ExchangeRequest.Status.OPEN
@@ -681,6 +728,7 @@ def get_institution_exchange_policies(institution) -> dict:
     for key in (
         PolicyRule.Key.COOLING_OFF_DAYS,
         PolicyRule.Key.REQUEST_VALIDITY_DAYS,
+        PolicyRule.Key.MAX_CYCLE_LENGTH,
         PolicyRule.Key.REQUIRE_FEE_CLEARANCE,
         PolicyRule.Key.REQUIRE_NO_DISCIPLINARY_HOLD,
         PolicyRule.Key.PROPOSAL_ACCEPTANCE_WINDOW_HOURS,
@@ -691,7 +739,12 @@ def get_institution_exchange_policies(institution) -> dict:
                 val = val["value"]
             result[key] = val
         else:
-            result[key] = None
+            if key == PolicyRule.Key.MAX_CYCLE_LENGTH:
+                result[key] = DEFAULT_MAX_EXCHANGE_CYCLE_LENGTH
+            elif key == PolicyRule.Key.PROPOSAL_ACCEPTANCE_WINDOW_HOURS:
+                result[key] = DEFAULT_PROPOSAL_ACCEPTANCE_WINDOW_HOURS
+            else:
+                result[key] = None
     return result
 
 
@@ -715,19 +768,30 @@ def update_institution_exchange_policy(
     if getattr(acting_user, "institution_id", None) != getattr(institution, "id", None):
         raise PermissionDenied("You cannot configure policies for another institution.")
 
-    if key in (PolicyRule.Key.COOLING_OFF_DAYS, PolicyRule.Key.REQUEST_VALIDITY_DAYS, PolicyRule.Key.PROPOSAL_ACCEPTANCE_WINDOW_HOURS):
+    if key in (
+        PolicyRule.Key.COOLING_OFF_DAYS,
+        PolicyRule.Key.REQUEST_VALIDITY_DAYS,
+        PolicyRule.Key.MAX_CYCLE_LENGTH,
+        PolicyRule.Key.PROPOSAL_ACCEPTANCE_WINDOW_HOURS,
+    ):
         try:
             int_val = int(value)
             if key == PolicyRule.Key.REQUEST_VALIDITY_DAYS and int_val < 1:
                 raise ValidationError("Request validity must be at least 1 day.")
             if key == PolicyRule.Key.PROPOSAL_ACCEPTANCE_WINDOW_HOURS and int_val < 1:
                 raise ValidationError("Proposal acceptance window must be at least 1 hour.")
+            if key == PolicyRule.Key.MAX_CYCLE_LENGTH and not (
+                MIN_EXCHANGE_CYCLE_LENGTH <= int_val <= MAX_EXCHANGE_CYCLE_LENGTH
+            ):
+                raise ValidationError("Maximum chain length must be between 2 and 5.")
             if int_val < 0:
                 raise ValidationError(f"{key} must be a non-negative whole number.")
             cleaned_value = {"value": int_val}
         except (ValueError, TypeError) as e:
             if isinstance(e, ValidationError):
                 raise
+            if key == PolicyRule.Key.MAX_CYCLE_LENGTH:
+                raise ValidationError("Maximum chain length must be a whole number between 2 and 5.")
             raise ValidationError(f"{key} must be a valid whole number.")
     elif key in (PolicyRule.Key.REQUIRE_FEE_CLEARANCE, PolicyRule.Key.REQUIRE_NO_DISCIPLINARY_HOLD):
         if isinstance(value, str):
@@ -771,14 +835,14 @@ def run_exchange_matching(
     now=None,
     status_adapter=None,
     min_length: int = 2,
-    max_length: int = 5,
+    max_length: int | None = None,
     max_cycles: int | None = 10_000,
     persist_candidates: bool = False,
 ):
     """
     Exposed documented service entry point for P04 Module M3: Matching Engine.
-    Discovers candidate direct swaps (2-way) and rotation cycles (3-5 way)
-    for eligible open requests within the given institution.
+    Discovers candidate direct swaps and rotation cycles for eligible open requests.
+    The institution policy is authoritative; max_length may only request a stricter cap.
     """
     from .matching import find_candidate_matches
 
@@ -829,6 +893,15 @@ def activate_exchange_proposal(
         if proposal.status != ExchangeProposal.Status.DRAFT:
             raise ValidationError(
                 f"Only draft exchange proposals can be activated (current status: {proposal.get_status_display()})."
+            )
+
+        from .matching import get_institution_max_cycle_length
+
+        configured_max_length = get_institution_max_cycle_length(proposal.institution)
+        if proposal.cycle_length > configured_max_length:
+            raise ValidationError(
+                f"Proposal cycle length {proposal.cycle_length} exceeds the institution's current "
+                f"maximum chain length of {configured_max_length}. The draft remains unchanged."
             )
 
         participants = list(
@@ -925,12 +998,10 @@ def activate_exchange_proposal(
 
         # 6. Proposal acceptance window policy
         policies = get_institution_exchange_policies(proposal.institution)
-        window_hours = policies.get(PolicyRule.Key.PROPOSAL_ACCEPTANCE_WINDOW_HOURS)
-        if window_hours is None:
-            raise ValidationError(
-                "Proposal acceptance window is not configured for this institution. "
-                "A Hostel Administrator must configure this policy before proposals can be activated."
-            )
+        window_hours = policies.get(
+            PolicyRule.Key.PROPOSAL_ACCEPTANCE_WINDOW_HOURS,
+            DEFAULT_PROPOSAL_ACCEPTANCE_WINDOW_HOURS,
+        )
         try:
             window_hours = int(window_hours)
             if window_hours < 1:
@@ -1200,6 +1271,7 @@ def respond_to_proposal(
                         exchange_request=p.exchange_request,
                         now=now,
                     )
+                _notify_proposal_approval_authorities(proposal=proposal, now=now)
 
             return participant, proposal
 
@@ -1661,12 +1733,16 @@ def execute_exchange_transfer(
     Completes direct swaps (2 students) and multi-party rotation cycles (3-5 students).
     All occupancy updates occur atomically in a single PostgreSQL transaction or not at all.
 
-    Canonical Lock Order:
-    1. Lock all Beds involved (sorted by ID) without outer joins to prevent PostgreSQL FOR UPDATE errors.
-    2. Lock all Student Users involved (sorted by ID).
-    3. Lock ExchangeProposal row.
+    Standalone execution lock order:
+    1. Lock the ExchangeProposal row.
+    2. Lock all Beds involved (sorted by ID) without outer joins.
+    3. Lock all Student Users involved (sorted by ID).
     4. Lock all ExchangeRequests involved (sorted by ID).
     5. Lock all current active StudentOccupancies (sorted by ID).
+
+    Approval with ``auto_execute=True`` already holds the proposal, student,
+    request, and bed locks in the outer approval transaction before entering this
+    nested atomic block. See ``docs/P04_LOCKING_STRATEGY.md`` for the two phases.
     """
     now = now or timezone.now()
 
@@ -1970,7 +2046,8 @@ def execute_exchange_transfer(
 
         # Step D: Update Proposal and Requests status
         proposal.status = ExchangeProposal.Status.COMPLETED
-        proposal.save(update_fields=["status", "updated_at"])
+        proposal.completed_at = now
+        proposal.save(update_fields=["status", "completed_at", "updated_at"])
 
         for req in locked_requests.values():
             req.status = ExchangeRequest.Status.COMPLETED
@@ -2646,20 +2723,49 @@ def schedule_institution_matching(
 
     def _dispatch_celery():
         try:
+            from config.celery import app
             from .tasks import run_institution_matching_task
-            run_institution_matching_task.delay(
-                institution_id=institution_id,
-                trigger_reason=trigger_reason,
-                trigger_request_id=str(trigger_request_id) if trigger_request_id else None,
-            )
+
+            if getattr(app.conf, "task_always_eager", False):
+                run_institution_matching_task.apply_async(
+                    kwargs={
+                        "institution_id": institution_id,
+                        "trigger_reason": trigger_reason,
+                        "trigger_request_id": str(trigger_request_id) if trigger_request_id else None,
+                    },
+                )
+                return
+
+            with app.connection_for_write() as conn:
+                conn.ensure_connection(max_retries=0, timeout=0.2)
+                run_institution_matching_task.apply_async(
+                    kwargs={
+                        "institution_id": institution_id,
+                        "trigger_reason": trigger_reason,
+                        "trigger_request_id": str(trigger_request_id) if trigger_request_id else None,
+                    },
+                    connection=conn,
+                    retry=False,
+                )
         except Exception as exc:
-            logger.warning(
-                "Celery dispatch failed for institution %s (event %s): %s. "
-                "Event preserved in MatchingOutbox for periodic reconciliation.",
+            logger.info(
+                "Celery broker unavailable for institution %s (%s). "
+                "Executing immediate synchronous fallback matching.",
                 institution_id,
-                outbox.id,
                 exc,
             )
+            try:
+                run_institution_matching(
+                    institution_id=institution_id,
+                    trigger_reason=trigger_reason,
+                    trigger_request_id=trigger_request_id,
+                )
+            except Exception as sync_exc:
+                logger.warning(
+                    "Synchronous fallback matching evaluation also failed: %s. "
+                    "Event preserved in MatchingOutbox for periodic reconciliation.",
+                    sync_exc,
+                )
 
     transaction.on_commit(_dispatch_celery)
     return outbox
@@ -2865,5 +2971,3 @@ def reconcile_all_institutions_matching(now=None) -> list[int]:
         )
 
     return list(institutions_to_run)
-
-

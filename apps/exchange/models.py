@@ -16,6 +16,12 @@ from apps.hostels.models import (
 )
 
 
+MIN_EXCHANGE_CYCLE_LENGTH = 2
+MAX_EXCHANGE_CYCLE_LENGTH = 5
+DEFAULT_MAX_EXCHANGE_CYCLE_LENGTH = 5
+DEFAULT_PROPOSAL_ACCEPTANCE_WINDOW_HOURS = 48
+
+
 class ExchangeRequest(TimeStampedModel):
     """A student's request to exchange their current accommodation."""
 
@@ -266,7 +272,10 @@ class ExchangeProposal(TimeStampedModel):
                 name="unique_active_exchange_cycle_signature",
             ),
             models.CheckConstraint(
-                condition=Q(cycle_length__gte=2) & Q(cycle_length__lte=5),
+                condition=(
+                    Q(cycle_length__gte=MIN_EXCHANGE_CYCLE_LENGTH)
+                    & Q(cycle_length__lte=MAX_EXCHANGE_CYCLE_LENGTH)
+                ),
                 name="exchange_proposal_cycle_length_2_to_5",
             ),
             models.CheckConstraint(
@@ -288,18 +297,26 @@ class ExchangeProposal(TimeStampedModel):
     @property
     def hostel_ids(self) -> set:
         """Set of hostel IDs involved in this proposal."""
+        if hasattr(self, "_cached_hostel_ids"):
+            return self._cached_hostel_ids
         if hasattr(self, "_prefetched_objects_cache") and "participants" in self._prefetched_objects_cache:
-            return {
-                p.current_occupancy.bed.room.floor.block.hostel_id
-                for p in self.participants.all()
-                if p.current_occupancy_id and p.current_occupancy.bed_id
-            }
-        return set(
+            ids = set()
+            for p in self.participants.all():
+                if p.current_occupancy_id and getattr(p.current_occupancy, "bed_id", None):
+                    try:
+                        ids.add(p.current_occupancy.bed.room.floor.block.hostel_id)
+                    except AttributeError:
+                        pass
+            self._cached_hostel_ids = ids
+            return ids
+        ids = set(
             self.participants.values_list(
                 "current_occupancy__bed__room__floor__block__hostel_id",
                 flat=True,
             )
         )
+        self._cached_hostel_ids = ids
+        return ids
 
     @property
     def is_cross_hostel(self) -> bool:
@@ -314,17 +331,26 @@ class ExchangeProposal(TimeStampedModel):
     @property
     def scope_hostel(self):
         """For same-hostel proposals, returns the single Hostel object; otherwise None."""
+        if hasattr(self, "_cached_scope_hostel"):
+            return self._cached_scope_hostel
+        hostel = None
         if not self.is_cross_hostel:
             if hasattr(self, "_prefetched_objects_cache") and "participants" in self._prefetched_objects_cache:
                 for p in self.participants.all():
-                    if p.current_occupancy_id and p.current_occupancy.bed_id:
-                        return p.current_occupancy.bed.room.floor.block.hostel
-            part = self.participants.select_related(
-                "current_occupancy__bed__room__floor__block__hostel"
-            ).first()
-            if part and part.current_occupancy and part.current_occupancy.bed:
-                return part.current_occupancy.bed.room.floor.block.hostel
-        return None
+                    if p.current_occupancy_id and getattr(p.current_occupancy, "bed_id", None):
+                        try:
+                            hostel = p.current_occupancy.bed.room.floor.block.hostel
+                            break
+                        except AttributeError:
+                            pass
+            if hostel is None:
+                part = self.participants.select_related(
+                    "current_occupancy__bed__room__floor__block__hostel"
+                ).first()
+                if part and part.current_occupancy and part.current_occupancy.bed:
+                    hostel = part.current_occupancy.bed.room.floor.block.hostel
+        self._cached_scope_hostel = hostel
+        return hostel
 
     @property
     def current_approval(self):

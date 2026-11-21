@@ -266,7 +266,8 @@ def test_two_person_proposal_activation_lifecycle(institution, warden_user):
         proposal=prop,
         notification_type=Notification.NotificationType.APPROVAL_UPDATED,
     )
-    assert approval_notifs.count() == 2
+    assert approval_notifs.count() == 3
+    assert approval_notifs.filter(recipient=warden_user, read_at__isnull=True).exists()
 
     # Physical occupancy still 100% UNTOUCHED
     for occ in fix["occupancies"]:
@@ -491,10 +492,9 @@ def test_expire_exchange_proposals_batch_sweep_and_celery_task(institution, ward
 # =========================================================================
 
 @pytest.mark.django_db
-def test_activation_fails_if_policy_unconfigured(institution, warden_user):
+def test_activation_uses_default_if_acceptance_window_policy_unconfigured(institution, warden_user):
     """
-    If PROPOSAL_ACCEPTANCE_WINDOW_HOURS is not configured for the institution,
-    activation must fail with an actionable error.
+    If PROPOSAL_ACCEPTANCE_WINDOW_HOURS is not configured, activation uses the safe default.
     """
     # Configure cooling-off and validity, but omit PROPOSAL_ACCEPTANCE_WINDOW_HOURS
     PolicyRule.objects.filter(institution=institution, key=PolicyRule.Key.PROPOSAL_ACCEPTANCE_WINDOW_HOURS).delete()
@@ -506,8 +506,9 @@ def test_activation_fails_if_policy_unconfigured(institution, warden_user):
     find_candidate_matches(institution=institution, persist_candidates=True)
     prop = ExchangeProposal.objects.filter(institution=institution, status=ExchangeProposal.Status.DRAFT).first()
 
-    with pytest.raises(ValidationError, match="Proposal acceptance window is not configured"):
-        activate_exchange_proposal(proposal_id=prop.id)
+    activated = activate_exchange_proposal(proposal_id=prop.id)
+    assert activated.status == ExchangeProposal.Status.PENDING_ACCEPTANCE
+    assert activated.expires_at is not None
 
 
 @pytest.mark.django_db

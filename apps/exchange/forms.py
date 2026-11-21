@@ -12,7 +12,60 @@ from apps.hostels.models import (
 from .models import ExchangeRequest
 
 
+class ExchangeReportFilterForm(forms.Form):
+    """Validated, role-scoped filters shared by every M7 report section."""
+
+    start_date = forms.DateField(
+        label="Start date",
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-input w-full text-xs rounded-lg border border-slate-300",
+            }
+        ),
+    )
+    end_date = forms.DateField(
+        label="End date",
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-input w-full text-xs rounded-lg border border-slate-300",
+            }
+        ),
+    )
+    hostel = forms.ModelChoiceField(
+        label="Source hostel",
+        queryset=Hostel.objects.none(),
+        required=False,
+        empty_label="All authorized hostels",
+        widget=forms.Select(
+            attrs={
+                "class": "form-select w-full text-xs rounded-lg border border-slate-300",
+            }
+        ),
+    )
+
+    def __init__(self, *args, allowed_hostels=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["hostel"].queryset = (
+            allowed_hostels if allowed_hostels is not None else Hostel.objects.none()
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        if start_date and end_date and end_date < start_date:
+            self.add_error("end_date", "End date must be on or after the start date.")
+        return cleaned_data
+
+
 class ExchangeRequestForm(forms.ModelForm):
+    direct_invitation = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-checkbox"}),
+    )
+
     class Meta:
         model = ExchangeRequest
         fields = [
@@ -161,6 +214,16 @@ class ExchangePolicySettingsForm(forms.Form):
         label="Request Validity Window (Days)",
         help_text="Number of days before an open exchange request expires automatically.",
         widget=forms.NumberInput(attrs={"class": "form-input", "min": "1"}),
+    )
+    maximum_chain_length = forms.IntegerField(
+        min_value=2,
+        max_value=5,
+        label="Maximum Chain Length",
+        help_text=(
+            "Largest exchange cycle the matcher may create (2-5 students). "
+            "Direct two-person swaps remain supported at every allowed setting."
+        ),
+        widget=forms.NumberInput(attrs={"class": "form-input", "min": "2", "max": "5"}),
     )
     proposal_acceptance_window_hours = forms.IntegerField(
         min_value=1,

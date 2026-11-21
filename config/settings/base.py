@@ -139,6 +139,15 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+WHITENOISE_MAX_AGE = 31536000
+
+# Cache configuration (In-memory default with Redis fallback support)
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "roomloop-default-cache",
+    }
+}
 
 # Media files
 MEDIA_URL = "/media/"
@@ -174,12 +183,16 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 # Celery Configuration
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/0")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = False
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 1
+CELERY_BROKER_CONNECTION_TIMEOUT = 1.0
+CELERY_TASK_PUBLISH_RETRY = False
 CELERY_BEAT_SCHEDULE = {
     "expire-exchange-requests-every-hour": {
         "task": "apps.exchange.tasks.expire_exchange_requests_task",

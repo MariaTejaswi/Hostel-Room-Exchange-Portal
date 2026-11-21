@@ -116,8 +116,8 @@
                 </span>
             </div>
             <div class="mt-3">
-                <span class="text-2xl sm:text-3xl font-extrabold text-[#35251F] tracking-tight block">{{ total_hostels }}</span>
-                <span class="text-xs text-[#8A7B72] font-medium block mt-1">{{ total_rooms }} configured rooms</span>
+                <span data-stat="total_hostels" class="text-2xl sm:text-3xl font-extrabold text-[#35251F] tracking-tight block">{{ total_hostels }}</span>
+                <span class="text-xs text-[#8A7B72] font-medium block mt-1"><span data-stat="total_rooms">{{ total_rooms }}</span> configured rooms</span>
             </div>
         </div>
 
@@ -132,7 +132,7 @@
                 </span>
             </div>
             <div class="mt-3">
-                <span class="text-2xl sm:text-3xl font-extrabold text-[#35251F] tracking-tight block">{{ total_beds }}</span>
+                <span data-stat="total_beds" class="text-2xl sm:text-3xl font-extrabold text-[#35251F] tracking-tight block">{{ total_beds }}</span>
                 <span class="text-xs text-[#8A7B72] font-medium block mt-1">Total bed accommodations</span>
             </div>
         </div>
@@ -149,8 +149,8 @@
             </div>
             <div class="mt-3">
                 <div class="flex items-baseline justify-between">
-                    <span class="text-2xl sm:text-3xl font-extrabold text-[#702C3B] tracking-tight">{{ occupied_beds }}</span>
-                    <span class="text-xs font-bold text-[#702C3B] font-mono">{{ occupancy_pct }}% Occupancy</span>
+                    <span data-stat="occupied_beds" class="text-2xl sm:text-3xl font-extrabold text-[#702C3B] tracking-tight">{{ occupied_beds }}</span>
+                    <span class="text-xs font-bold text-[#702C3B] font-mono"><span data-stat="occupancy_pct">{{ occupancy_pct }}</span>% Occupancy</span>
                 </div>
                 <div class="w-full bg-[#FAF4EB] rounded-full h-1.5 overflow-hidden mt-2 border border-[#E8DED4]/60">
                     <div class="bg-[#702C3B] h-1.5 rounded-full" style="width: {{ occupancy_pct }}%;"></div>
@@ -169,7 +169,7 @@
                 </span>
             </div>
             <div class="mt-3">
-                <span class="text-2xl sm:text-3xl font-extrabold text-emerald-800 tracking-tight block">{{ available_beds }}</span>
+                <span data-stat="available_beds" class="text-2xl sm:text-3xl font-extrabold text-emerald-800 tracking-tight block">{{ available_beds }}</span>
                 <span class="text-xs text-[#8A7B72] font-medium block mt-1">Unallocated bed slots</span>
             </div>
         </div>

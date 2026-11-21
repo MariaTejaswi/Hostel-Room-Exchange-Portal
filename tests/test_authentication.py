@@ -89,9 +89,15 @@ def test_login_page_renders_redesigned_theme_and_campus_image(client):
     assert "#35251F" in content
     assert "#E6D9CC" in content
 
-    # Campus architectural image references (WebP + JPG fallback)
+    # Campus architectural image references (WebP + JPG fallback + responsive mobile/tablet variants)
     assert "roomloop-campus.webp" in content
     assert "roomloop-campus.jpg" in content
+    assert "roomloop-campus-mobile.webp" in content
+    assert "roomloop-campus-tablet.webp" in content
+    assert 'fetchpriority="high"' in content
+    assert 'width="896"' in content
+    assert 'height="1200"' in content
+    assert 'rel="preload"' in content
 
     # HTML overlay text and badges
     assert "Your campus. Your space." in content
@@ -261,3 +267,25 @@ def test_all_six_roles_login_redirect_correctly(client, institution):
         # Check redirection URL or path
         assert expected_dashboard in login_resp.redirect_chain[0][0]
         client.logout()
+
+
+@pytest.mark.django_db
+def test_login_demo_accounts_query_caching(client):
+    """
+    Verify that demo accounts query caching reduces database load on consecutive requests.
+    """
+    from django.core.cache import cache
+    cache.clear()
+
+    url = reverse("accounts:login")
+    # First request populates cache
+    resp1 = client.get(url)
+    assert resp1.status_code == 200
+    cached = cache.get("roomloop_login_demo_active_emails")
+    assert cached is not None
+
+    # Second request hits cache successfully
+    resp2 = client.get(url)
+    assert resp2.status_code == 200
+    assert cache.get("roomloop_login_demo_active_emails") == cached
+

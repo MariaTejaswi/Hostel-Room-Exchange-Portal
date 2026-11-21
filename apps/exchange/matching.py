@@ -1,17 +1,27 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from time import perf_counter
-from typing import Iterable
 
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, models, transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from apps.hostels.models import Hostel, OperationalStatus, StudentOccupancy
+from apps.hostels.models import Hostel, OperationalStatus, Room, StudentOccupancy
 
-from .eligibility import ExternalEligibilityAdapter, validate_exchange_request_eligibility
-from .models import ExchangeProposal, ExchangeRequest, PolicyRule, ProposalParticipant
-
+from .eligibility import (
+    ExternalEligibilityAdapter,
+    validate_exchange_request_eligibility,
+)
+from .models import (
+    DEFAULT_MAX_EXCHANGE_CYCLE_LENGTH,
+    MAX_EXCHANGE_CYCLE_LENGTH,
+    MIN_EXCHANGE_CYCLE_LENGTH,
+    ExchangeProposal,
+    ExchangeRequest,
+    PolicyRule,
+    ProposalParticipant,
+)
 
 ACTIVE_PROPOSAL_STATUSES = (
     ExchangeProposal.Status.DRAFT,
@@ -20,6 +30,79 @@ ACTIVE_PROPOSAL_STATUSES = (
     ExchangeProposal.Status.PENDING_APPROVAL,
     ExchangeProposal.Status.APPROVED,
 )
+ROOM_TYPE_LABELS = dict(Room.RoomType.choices)
+
+
+def get_institution_max_cycle_length(institution) -> int:
+    """Return the institution's validated cycle cap, defaulting to five."""
+    if institution is None:
+        return DEFAULT_MAX_EXCHANGE_CYCLE_LENGTH
+    rule = PolicyRule.objects.filter(
+        institution=institution,
+        key=PolicyRule.Key.MAX_CYCLE_LENGTH,
+        is_active=True,
+    ).first()
+    if rule is None:
+        return DEFAULT_MAX_EXCHANGE_CYCLE_LENGTH
+    value = rule.value.get("value") if isinstance(rule.value, dict) else rule.value
+    try:
+        value = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("Configured maximum chain length must be a whole number between 2 and 5.") from exc
+    if not MIN_EXCHANGE_CYCLE_LENGTH <= value <= MAX_EXCHANGE_CYCLE_LENGTH:
+        raise ValidationError("Configured maximum chain length must be between 2 and 5.")
+    return value
+
+
+def get_effective_max_cycle_length(institution, requested_max_length: int | None = None) -> int:
+    """Apply the institutional cap while permitting a caller to request a stricter bound."""
+    configured = get_institution_max_cycle_length(institution)
+    if requested_max_length is None:
+        return configured
+    if not MIN_EXCHANGE_CYCLE_LENGTH <= requested_max_length <= MAX_EXCHANGE_CYCLE_LENGTH:
+        raise ValidationError("Requested maximum chain length must be between 2 and 5.")
+    return min(configured, requested_max_length)
+
+
+@dataclass(frozen=True, slots=True)
+class _BedSnapshot:
+    bed_id: int
+    bed_label: str
+    room_number: str
+    room_type: str
+    occupancy_category: str
+    occupancy_category_normalised: str
+    accessibility_normalised: str
+    floor_id: int
+    floor_label: str
+    block_id: int
+    block_name: str
+    hostel_id: int
+    hostel_name: str
+    hostel_institution_id: int
+    hostel_resident_category: str
+    is_matchable: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _RequestSnapshot:
+    request_id: str
+    institution_id: int
+    student_id: int
+    student_name: str
+    student_registration: str
+    student_residential_eligibility: str
+    current_occupancy_id: int
+    current_bed: _BedSnapshot
+    preferred_hostel_id: int | None
+    preferred_bed_id: int | None
+    preferred_block_id: int | None
+    preferred_floor_id: int | None
+    preferred_room_type: str
+    preferred_occupancy_category: str
+    preferred_occupancy_category_normalised: str
+    preferred_accessibility_attributes: str
+    preferred_accessibility_tokens: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -28,6 +111,7 @@ class ExchangeGraph:
 
     vertices: dict[str, ExchangeRequest]
     edges: dict[str, tuple[str, ...]]
+    snapshots: dict[str, _RequestSnapshot] | None = None
 
 
 @dataclass(frozen=True)
@@ -100,10 +184,16 @@ class MatchingMetrics:
     candidates_by_length: dict[int, int]
     same_hostel_count: int
     cross_hostel_count: int
+    policy_resolution_time_seconds: float
     data_loading_time_seconds: float
+    eligibility_evaluation_time_seconds: float
     graph_building_time_seconds: float
     cycle_detection_time_seconds: float
+    candidate_materialization_time_seconds: float
+    explanation_generation_time_seconds: float
+    persistence_time_seconds: float
     total_time_seconds: float
+    total_with_persistence_time_seconds: float
     limit_reached: bool
 
 
@@ -219,6 +309,131 @@ def explain_preference_match(request: ExchangeRequest, bed) -> str:
     if not reasons:
         reasons.append(f"Compatible accommodation in {hostel.name} (Room {room.room_number}, Bed {bed.bed_label})")
 
+    return "; ".join(reasons)
+
+
+def _bed_snapshot(bed) -> _BedSnapshot:
+    room = bed.room
+    floor = room.floor
+    block = floor.block
+    hostel = block.hostel
+    return _BedSnapshot(
+        bed_id=bed.id,
+        bed_label=getattr(bed, "bed_label", "") or "",
+        room_number=getattr(room, "room_number", "") or "",
+        room_type=room.room_type,
+        occupancy_category=room.occupancy_category,
+        occupancy_category_normalised=_normalise_text(room.occupancy_category),
+        accessibility_normalised=_normalise_text(room.accessibility_attributes),
+        floor_id=floor.id,
+        floor_label=getattr(floor, "floor_label", "") or "",
+        block_id=block.id,
+        block_name=getattr(block, "name", "") or "",
+        hostel_id=hostel.id,
+        hostel_name=getattr(hostel, "name", "") or "",
+        hostel_institution_id=hostel.institution_id,
+        hostel_resident_category=hostel.resident_category,
+        is_matchable=(
+            hostel.status == Hostel.Status.ACTIVE
+            and block.is_active
+            and floor.is_active
+            and room.is_active
+            and room.operational_status == OperationalStatus.IN_SERVICE
+            and bed.is_active
+            and bed.operational_status == OperationalStatus.IN_SERVICE
+        ),
+    )
+
+
+def _request_snapshot(request: ExchangeRequest) -> _RequestSnapshot:
+    return _RequestSnapshot(
+        request_id=str(request.id),
+        institution_id=request.institution_id,
+        student_id=request.student_id,
+        student_name=getattr(request.student, "full_name", "") or "",
+        student_registration=getattr(request.student, "registration_number", "") or "",
+        student_residential_eligibility=request.student.residential_eligibility,
+        current_occupancy_id=getattr(request.current_occupancy, "id", 0) or 0,
+        current_bed=_bed_snapshot(request.current_occupancy.bed),
+        preferred_hostel_id=request.preferred_hostel_id,
+        preferred_bed_id=request.preferred_bed_id,
+        preferred_block_id=request.preferred_block_id,
+        preferred_floor_id=request.preferred_floor_id,
+        preferred_room_type=request.preferred_room_type,
+        preferred_occupancy_category=request.preferred_occupancy_category,
+        preferred_occupancy_category_normalised=_normalise_text(
+            request.preferred_occupancy_category
+        ),
+        preferred_accessibility_attributes=request.preferred_accessibility_attributes,
+        preferred_accessibility_tokens=tuple(
+            _accessibility_tokens(request.preferred_accessibility_attributes)
+        ),
+    )
+
+
+def _snapshot_satisfies_request(
+    request: _RequestSnapshot,
+    available: _BedSnapshot,
+) -> bool:
+    """Apply the full room compatibility policy using pre-normalised values."""
+    if request.institution_id != available.hostel_institution_id:
+        return False
+    if not available.is_matchable:
+        return False
+    if request.student_residential_eligibility != available.hostel_resident_category:
+        return False
+    if request.preferred_hostel_id and request.preferred_hostel_id != available.hostel_id:
+        return False
+    if request.preferred_bed_id and request.preferred_bed_id != available.bed_id:
+        return False
+    if request.preferred_block_id and request.preferred_block_id != available.block_id:
+        return False
+    if request.preferred_floor_id and request.preferred_floor_id != available.floor_id:
+        return False
+    if request.preferred_room_type and request.preferred_room_type != available.room_type:
+        return False
+    if (
+        request.preferred_occupancy_category_normalised
+        and request.preferred_occupancy_category_normalised
+        != available.occupancy_category_normalised
+    ):
+        return False
+    return all(
+        token in available.accessibility_normalised
+        for token in request.preferred_accessibility_tokens
+    )
+
+
+def _explain_preference_snapshot(
+    request: _RequestSnapshot,
+    available: _BedSnapshot,
+) -> str:
+    reasons = []
+    if request.preferred_bed_id and request.preferred_bed_id == available.bed_id:
+        reasons.append(
+            f"Target bed {available.bed_label} in Room {available.room_number}"
+        )
+    if request.preferred_hostel_id and request.preferred_hostel_id == available.hostel_id:
+        reasons.append(f"Hostel matches preference ({available.hostel_name})")
+    if request.preferred_block_id and request.preferred_block_id == available.block_id:
+        reasons.append(f"Block matches preference ({available.block_name})")
+    if request.preferred_floor_id and request.preferred_floor_id == available.floor_id:
+        reasons.append(f"Floor matches preference ({available.floor_label})")
+    if request.preferred_room_type and request.preferred_room_type == available.room_type:
+        room_type_label = ROOM_TYPE_LABELS.get(available.room_type, available.room_type)
+        reasons.append(f"Room type matches preference ({room_type_label})")
+    if request.preferred_occupancy_category:
+        reasons.append(
+            f"Occupancy category matches preference ({available.occupancy_category})"
+        )
+    if request.preferred_accessibility_attributes:
+        reasons.append("Accessibility requirements satisfied")
+    if not reasons:
+        reasons.append(
+            "Compatible accommodation in "
+            f"{available.hostel_name} (Room {available.room_number}, "
+            f"Bed {available.bed_label})"
+        )
     return "; ".join(reasons)
 
 
@@ -357,13 +572,37 @@ def build_exchange_graph(
 ) -> ExchangeGraph:
     """Load eligible open requests and create preference-compatible directed edges without DB queries inside traversal."""
     now = now or timezone.now()
+    supplied_requests = requests is not None
+    if requests is None:
+        requests = _request_queryset(institution=institution, now=now)
+    requests_list = list(requests)
+    eligible = _filter_graph_eligible_requests(
+        institution=institution,
+        requests=requests_list,
+        infer_institution=supplied_requests,
+        now=now,
+        status_adapter=status_adapter,
+    )
+    return _build_exchange_graph_from_eligible(eligible)
+
+
+def _filter_graph_eligible_requests(
+    *,
+    institution,
+    requests: Iterable[ExchangeRequest],
+    infer_institution: bool = True,
+    now,
+    status_adapter: ExternalEligibilityAdapter | None = None,
+) -> list[ExchangeRequest]:
+    """Resolve policies/reservations and retain only eligible graph vertices."""
+    requests_list = list(requests)
 
     reserved_request_ids = set()
     configured_policies = {}
 
     target_institution = institution
-    if target_institution is None and requests is not None:
-        first_req = next(iter(requests), None)
+    if target_institution is None and infer_institution:
+        first_req = next(iter(requests_list), None)
         if first_req and getattr(first_req, "institution", None):
             target_institution = first_req.institution
 
@@ -378,12 +617,9 @@ def build_exchange_graph(
             ).values_list("exchange_request_id", flat=True)
         )
 
-    if requests is None:
-        requests = _request_queryset(institution=institution, now=now)
-
-    eligible = [
+    return [
         request
-        for request in requests
+        for request in requests_list
         if _request_is_graph_eligible(
             request,
             now=now,
@@ -392,12 +628,24 @@ def build_exchange_graph(
             status_adapter=status_adapter,
         )
     ]
+
+
+def _build_exchange_graph_from_eligible(
+    eligible: Iterable[ExchangeRequest],
+) -> ExchangeGraph:
+    """Create indexed graph edges from requests whose eligibility is established."""
+    eligible = list(eligible)
     vertices = {str(request.id): request for request in eligible}
     edges = {request_id: [] for request_id in vertices}
     eligible_items = list(vertices.items())
     all_candidate_ids = set(vertices)
+    snapshots = {
+        request_id: _request_snapshot(request)
+        for request_id, request in eligible_items
+    }
 
     indexes = {
+        "resident_category": {},
         "hostel": {},
         "bed": {},
         "block": {},
@@ -412,26 +660,25 @@ def build_exchange_graph(
             return
         indexes[index_name].setdefault(key, set()).add(candidate_id)
 
-    for candidate_id, candidate in eligible_items:
-        room = candidate.current_occupancy.bed.room
-        floor = room.floor
-        block = floor.block
-        hostel = block.hostel
-        add_index("hostel", hostel.id, candidate_id)
-        add_index("bed", candidate.current_occupancy.bed_id, candidate_id)
-        add_index("block", block.id, candidate_id)
-        add_index("floor", floor.id, candidate_id)
-        add_index("room_type", room.room_type, candidate_id)
+    for candidate_id, candidate in snapshots.items():
+        bed = candidate.current_bed
+        add_index("resident_category", bed.hostel_resident_category, candidate_id)
+        add_index("hostel", bed.hostel_id, candidate_id)
+        add_index("bed", bed.bed_id, candidate_id)
+        add_index("block", bed.block_id, candidate_id)
+        add_index("floor", bed.floor_id, candidate_id)
+        add_index("room_type", bed.room_type, candidate_id)
         add_index(
             "occupancy_category",
-            _normalise_text(room.occupancy_category),
+            bed.occupancy_category_normalised,
             candidate_id,
         )
-        for ngram in _accessibility_ngrams(room.accessibility_attributes):
+        for ngram in _accessibility_ngrams(bed.accessibility_normalised):
             add_index("accessibility", ngram, candidate_id)
 
     def candidate_ids_for(request):
         room_preferences = [
+            ("resident_category", request.student_residential_eligibility),
             ("bed", request.preferred_bed_id),
             ("hostel", request.preferred_hostel_id),
             ("block", request.preferred_block_id),
@@ -439,7 +686,7 @@ def build_exchange_graph(
             ("room_type", request.preferred_room_type),
             (
                 "occupancy_category",
-                _normalise_text(request.preferred_occupancy_category),
+                request.preferred_occupancy_category_normalised,
             ),
         ]
         candidate_sets = [
@@ -447,9 +694,7 @@ def build_exchange_graph(
             for index_name, value in room_preferences
             if value not in (None, "")
         ]
-        for token in _accessibility_tokens(
-            request.preferred_accessibility_attributes
-        ):
+        for token in request.preferred_accessibility_tokens:
             if len(token) < 3:
                 candidate_sets.append(all_candidate_ids)
             else:
@@ -462,28 +707,26 @@ def build_exchange_graph(
             return tuple(sorted(all_candidate_ids))
         return tuple(sorted(set.intersection(*candidate_sets)))
 
-    for request_id, request in eligible_items:
+    for request_id, request in snapshots.items():
         request_edges = edges[request_id]
         for candidate_id in candidate_ids_for(request):
             if request_id == candidate_id:
                 continue
-            candidate = vertices[candidate_id]
+            candidate = snapshots[candidate_id]
             # Exclude self-matches and same-bed targets
             if request.student_id == candidate.student_id:
                 continue
-            if request.current_occupancy.bed_id == candidate.current_occupancy.bed_id:
+            if request.current_bed.bed_id == candidate.current_bed.bed_id:
                 continue
 
-            if room_satisfies_request(
-                request=request,
-                bed=candidate.current_occupancy.bed,
-            ):
+            if _snapshot_satisfies_request(request, candidate.current_bed):
                 request_edges.append(candidate_id)
         request_edges.sort()
 
     return ExchangeGraph(
         vertices=vertices,
         edges={request_id: tuple(request_edges) for request_id, request_edges in edges.items()},
+        snapshots=snapshots,
     )
 
 
@@ -564,15 +807,17 @@ def find_exchange_cycles(
 
 
 
-def build_candidate_matches(
+def _build_candidate_matches_with_timing(
     graph: ExchangeGraph,
     cycles: list[ExchangeCycle],
     *,
     now: datetime | None = None,
-) -> list[CandidateMatch]:
+) -> tuple[list[CandidateMatch], float]:
     """Transform detected ExchangeCycles into structured, explanatory CandidateMatch objects."""
     now = now or timezone.now()
     results = []
+    explanation_seconds = 0.0
+    snapshots = graph.snapshots or {}
 
     for cycle in cycles:
         k = len(cycle.request_ids)
@@ -582,38 +827,52 @@ def build_candidate_matches(
         for idx, request_id in enumerate(cycle.request_ids):
             req = graph.vertices[request_id]
             next_req = graph.vertices[cycle.request_ids[(idx + 1) % k]]
+            request_snapshot = snapshots.get(request_id)
+            next_snapshot = snapshots.get(cycle.request_ids[(idx + 1) % k])
 
-            curr_occ = req.current_occupancy
-            curr_bed = curr_occ.bed
-            curr_room = curr_bed.room
-            curr_hostel = curr_room.floor.block.hostel
+            explanation_start = perf_counter()
+            if request_snapshot is not None and next_snapshot is not None:
+                current_bed = request_snapshot.current_bed
+                proposed_bed = next_snapshot.current_bed
+                explanation = _explain_preference_snapshot(
+                    request_snapshot,
+                    proposed_bed,
+                )
+                student_name = request_snapshot.student_name
+                student_registration = request_snapshot.student_registration
+                current_occupancy_id = request_snapshot.current_occupancy_id
+            else:
+                curr_occ = req.current_occupancy
+                current_bed_model = curr_occ.bed
+                current_bed = _bed_snapshot(current_bed_model)
+                proposed_bed_model = next_req.current_occupancy.bed
+                proposed_bed = _bed_snapshot(proposed_bed_model)
+                explanation = explain_preference_match(req, proposed_bed_model)
+                student_name = req.student.full_name
+                student_registration = getattr(req.student, "registration_number", "") or ""
+                current_occupancy_id = curr_occ.id
+            explanation_seconds += perf_counter() - explanation_start
 
-            prop_bed = next_req.current_occupancy.bed
-            prop_room = prop_bed.room
-            prop_hostel = prop_room.floor.block.hostel
-
-            hostel_ids.add(curr_hostel.id)
-            hostel_ids.add(prop_hostel.id)
-
-            explanation = explain_preference_match(req, prop_bed)
+            hostel_ids.add(current_bed.hostel_id)
+            hostel_ids.add(proposed_bed.hostel_id)
 
             participants.append(
                 CandidateParticipant(
                     request_id=str(req.id),
                     student_id=req.student_id,
-                    student_name=req.student.full_name,
-                    student_registration=getattr(req.student, "registration_number", "") or "",
-                    current_occupancy_id=curr_occ.id,
-                    current_bed_id=curr_bed.id,
-                    current_bed_label=curr_bed.bed_label,
-                    current_room_number=curr_room.room_number,
-                    current_hostel_id=curr_hostel.id,
-                    current_hostel_name=curr_hostel.name,
-                    proposed_bed_id=prop_bed.id,
-                    proposed_bed_label=prop_bed.bed_label,
-                    proposed_room_number=prop_room.room_number,
-                    proposed_hostel_id=prop_hostel.id,
-                    proposed_hostel_name=prop_hostel.name,
+                    student_name=student_name,
+                    student_registration=student_registration,
+                    current_occupancy_id=current_occupancy_id,
+                    current_bed_id=current_bed.bed_id,
+                    current_bed_label=current_bed.bed_label,
+                    current_room_number=current_bed.room_number,
+                    current_hostel_id=current_bed.hostel_id,
+                    current_hostel_name=current_bed.hostel_name,
+                    proposed_bed_id=proposed_bed.bed_id,
+                    proposed_bed_label=proposed_bed.bed_label,
+                    proposed_room_number=proposed_bed.room_number,
+                    proposed_hostel_id=proposed_bed.hostel_id,
+                    proposed_hostel_name=proposed_bed.hostel_name,
                     preference_match_explanation=explanation,
                 )
             )
@@ -631,7 +890,18 @@ def build_candidate_matches(
             )
         )
 
-    return results
+    return results, explanation_seconds
+
+
+def build_candidate_matches(
+    graph: ExchangeGraph,
+    cycles: list[ExchangeCycle],
+    *,
+    now: datetime | None = None,
+) -> list[CandidateMatch]:
+    """Transform cycles into candidate matches while retaining the public API."""
+    candidates, _ = _build_candidate_matches_with_timing(graph, cycles, now=now)
+    return candidates
 
 
 @transaction.atomic
@@ -732,7 +1002,7 @@ def find_candidate_matches(
     now: datetime | None = None,
     status_adapter: ExternalEligibilityAdapter | None = None,
     min_length: int = 2,
-    max_length: int = 5,
+    max_length: int | None = None,
     max_cycles: int | None = 10_000,
     persist_candidates: bool = False,
 ) -> MatchingEngineResult:
@@ -740,8 +1010,12 @@ def find_candidate_matches(
     Core matching engine service.
     Exposes candidate detection for direct swaps and 3-5 person rotation cycles.
     """
-    now = now or timezone.now()
     t_start = perf_counter()
+    now = now or timezone.now()
+
+    t_policy_start = perf_counter()
+    max_length = get_effective_max_cycle_length(institution, max_length)
+    policy_resolution_time = perf_counter() - t_policy_start
 
     t_load_start = perf_counter()
     requests_qs = _request_queryset(institution=institution, now=now)
@@ -749,15 +1023,19 @@ def find_candidate_matches(
     t_load_end = perf_counter()
     data_loading_time = t_load_end - t_load_start
 
-    t_build_start = perf_counter()
-    graph = build_exchange_graph(
+    t_eligibility_start = perf_counter()
+    eligible_requests = _filter_graph_eligible_requests(
         institution=institution,
         requests=requests_list,
+        infer_institution=True,
         now=now,
         status_adapter=status_adapter,
     )
-    t_build_end = perf_counter()
-    graph_building_time = t_build_end - t_build_start
+    eligibility_evaluation_time = perf_counter() - t_eligibility_start
+
+    t_build_start = perf_counter()
+    graph = _build_exchange_graph_from_eligible(eligible_requests)
+    graph_building_time = perf_counter() - t_build_start
 
     t_cycle_start = perf_counter()
     cycles = find_exchange_cycles(
@@ -770,7 +1048,13 @@ def find_candidate_matches(
     t_cycle_end = perf_counter()
     cycle_detection_time = t_cycle_end - t_cycle_start
 
-    candidates = build_candidate_matches(graph, cycles, now=now)
+    t_candidate_start = perf_counter()
+    candidates, explanation_generation_time = _build_candidate_matches_with_timing(
+        graph,
+        cycles,
+        now=now,
+    )
+    candidate_materialization_time = perf_counter() - t_candidate_start
     total_time = perf_counter() - t_start
 
     candidates_by_len = {}
@@ -784,6 +1068,19 @@ def find_candidate_matches(
             same_hostel_cnt += 1
 
     total_edges = sum(len(e) for e in graph.edges.values())
+    created_proposals = []
+    persistence_time = 0.0
+    if persist_candidates and candidates and institution:
+        persistence_start = perf_counter()
+        created_proposals = persist_candidate_matches(
+            candidates,
+            institution=institution,
+            graph=graph,
+            now=now,
+        )
+        persistence_time = perf_counter() - persistence_start
+    total_with_persistence_time = perf_counter() - t_start
+
     metrics = MatchingMetrics(
         graph_nodes=len(graph.vertices),
         graph_edges=total_edges,
@@ -791,21 +1088,18 @@ def find_candidate_matches(
         candidates_by_length=candidates_by_len,
         same_hostel_count=same_hostel_cnt,
         cross_hostel_count=cross_hostel_cnt,
+        policy_resolution_time_seconds=policy_resolution_time,
         data_loading_time_seconds=data_loading_time,
+        eligibility_evaluation_time_seconds=eligibility_evaluation_time,
         graph_building_time_seconds=graph_building_time,
         cycle_detection_time_seconds=cycle_detection_time,
+        candidate_materialization_time_seconds=candidate_materialization_time,
+        explanation_generation_time_seconds=explanation_generation_time,
+        persistence_time_seconds=persistence_time,
         total_time_seconds=total_time,
+        total_with_persistence_time_seconds=total_with_persistence_time,
         limit_reached=limit_reached,
     )
-
-    created_proposals = []
-    if persist_candidates and candidates and institution:
-        created_proposals = persist_candidate_matches(
-            candidates,
-            institution=institution,
-            graph=graph,
-            now=now,
-        )
 
     inst_id = institution.id if institution else 0
     inst_name = institution.name if institution else "All Institutions"

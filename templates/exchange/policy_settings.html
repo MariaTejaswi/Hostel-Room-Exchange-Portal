@@ -93,6 +93,25 @@
                         {% endif %}
                     </div>
 
+                    <!-- Maximum Chain Length -->
+                    <div class="space-y-1.5 pt-4 border-t border-slate-100">
+                        <label for="{{ form.maximum_chain_length.id_for_label }}" class="block text-xs font-bold text-slate-800">
+                            {{ form.maximum_chain_length.label }}
+                        </label>
+                        <div class="max-w-xs">
+                            {{ form.maximum_chain_length }}
+                        </div>
+                        <p class="text-[11px] text-slate-500 leading-relaxed">
+                            {{ form.maximum_chain_length.help_text }}
+                        </p>
+                        <p class="text-[10px] text-amber-700 font-medium">
+                            Lowering this value affects future matching and draft activation. Already-active proposals continue unchanged.
+                        </p>
+                        {% if form.maximum_chain_length.errors %}
+                        <p class="text-xs text-red-600 font-medium">{{ form.maximum_chain_length.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
                     <!-- Proposal Acceptance Window Hours -->
                     <div class="space-y-1.5 pt-4 border-t border-slate-100">
                         <label for="{{ form.proposal_acceptance_window_hours.id_for_label }}" class="block text-xs font-bold text-slate-800">
@@ -170,7 +189,7 @@
                 </div>
                 <ul class="text-[11px] text-slate-600 space-y-2 list-disc list-inside leading-relaxed">
                     <li>Only <strong>Hostel Administrators</strong> have operational authority to modify exchange policies.</li>
-                    <li>Changes take effect immediately on all subsequent submissions and edits.</li>
+                    <li>Changes take effect immediately for future matching and draft activation; active proposal workflows are preserved.</li>
                     <li>System Administrators do not hold operational policy or approval authority.</li>
                     <li>Open requests reaching validity expiry are transitioned to <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-800">expired</code> via hourly scheduled job and proactive enforcement.</li>
                 </ul>

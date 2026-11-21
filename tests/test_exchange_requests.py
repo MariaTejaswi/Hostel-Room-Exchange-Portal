@@ -286,3 +286,87 @@ def test_request_access_is_owner_scoped_and_staff_cannot_manage(
 
     client.force_login(warden_user)
     assert client.get(reverse("exchange:request_list")).status_code == 403
+
+
+@pytest.mark.django_db
+def test_exchange_request_submission_redirects_and_displays_success_message(
+    client, student_user, hostel_setup, warden_user
+):
+    """
+    Submitting an exchange request must validate, save to DB, set a success message,
+    and redirect immediately to 'My Exchange Requests' without hanging.
+    """
+    _occupy(student_user, hostel_setup, warden_user)
+    client.force_login(student_user)
+
+    post_data = _request_data(
+        preferred_hostel=str(hostel_setup["hostel"].pk),
+        reason="Requesting room closer to campus center for morning laboratory classes.",
+    )
+    post_data.pop("preferred_block")
+    post_data.pop("preferred_floor")
+
+    response = client.post(
+        reverse("exchange:request_create"),
+        post_data,
+        follow=True,
+    )
+
+    # 1. Successful redirect occurred
+    assert response.status_code == 200
+    assert response.redirect_chain == [(reverse("exchange:request_list"), 302)]
+
+    # 2. Success message is delivered
+    messages = list(response.context["messages"])
+    assert any("Your exchange request was created." in str(m) for m in messages)
+
+    # 3. Newly created request is present in DB and page context
+    created_request = ExchangeRequest.objects.get(student=student_user)
+    assert created_request.status == ExchangeRequest.Status.OPEN
+    assert created_request.reason.startswith("Requesting room closer")
+
+
+@pytest.mark.django_db
+def test_exchange_request_broker_failure_resilience_and_fail_fast(
+    client, student_user, hostel_setup, warden_user
+):
+    """
+    When the Celery broker is unreachable (e.g. local dev without Redis),
+    schedule_institution_matching must fail-fast without blocking the HTTP request thread,
+    persist the MatchingOutbox record, and return the 302 redirect seamlessly.
+    """
+    import time
+    from unittest.mock import patch
+    from kombu.exceptions import OperationalError
+    from apps.exchange.models import MatchingOutbox
+
+    _occupy(student_user, hostel_setup, warden_user)
+    client.force_login(student_user)
+
+    post_data = _request_data(
+        preferred_hostel=str(hostel_setup["hostel"].pk),
+        reason="Testing fail-fast broker resilience under simulated broker outage.",
+    )
+    post_data.pop("preferred_block")
+    post_data.pop("preferred_floor")
+
+    # Simulate Celery broker being completely unavailable / connection refused
+    with patch("config.celery.app.connection_for_write", side_effect=OperationalError("Connection refused")):
+        t_start = time.time()
+        response = client.post(
+            reverse("exchange:request_create"),
+            post_data,
+        )
+        elapsed = time.time() - t_start
+
+    # Must complete almost instantaneously (under 1 second) and redirect
+    assert elapsed < 1.0, f"Request took too long ({elapsed}s) during broker outage"
+    assert response.status_code == 302
+    assert response["Location"] == reverse("exchange:request_list")
+
+    # Request and durable outbox record must both exist
+    assert ExchangeRequest.objects.filter(student=student_user).exists()
+    assert MatchingOutbox.objects.filter(
+        institution=student_user.institution,
+        event_type="request_created",
+    ).exists()
