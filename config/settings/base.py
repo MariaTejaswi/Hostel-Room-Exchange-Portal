@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
-from urllib.parse import urlparse, unquote
 from dotenv import load_dotenv
+
+from .database import parse_postgresql_database_url
 
 # Base directory: points to repository root
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -87,27 +88,11 @@ db_password = os.getenv("DB_PASSWORD")
 prefer_db_url = os.getenv("PREFER_DATABASE_URL", "False").lower() in ("true", "1")
 
 if database_url and (prefer_db_url or db_password is None):
-    parsed = urlparse(database_url)
     DATABASES = {
-        "default": {
-            "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
-            "NAME": unquote(parsed.path.lstrip("/")) if parsed.path else os.getenv("DB_NAME", "roomloop_db"),
-            "USER": unquote(parsed.username) if parsed.username else os.getenv("DB_USER", "postgres"),
-            "PASSWORD": unquote(parsed.password) if parsed.password else "",
-            "HOST": parsed.hostname or os.getenv("DB_HOST", "localhost"),
-            "PORT": parsed.port or int(os.getenv("DB_PORT", 5432)),
-            "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", 60)),
-            # pytest-django may assign TEST.NAME before Django normalizes this
-            # mapping. Keep the complete shape so Django's PostgreSQL test
-            # database setup can safely read MIRROR and the other defaults.
-            "TEST": {
-                "CHARSET": None,
-                "COLLATION": None,
-                "MIGRATE": True,
-                "MIRROR": None,
-                "NAME": None,
-            },
-        }
+        "default": parse_postgresql_database_url(
+            database_url,
+            conn_max_age=int(os.getenv("DB_CONN_MAX_AGE", 60)),
+        )
     }
 else:
     DATABASES = {
