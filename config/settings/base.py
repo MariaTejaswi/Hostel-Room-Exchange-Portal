@@ -97,6 +97,16 @@ if database_url and (prefer_db_url or db_password is None):
             "HOST": parsed.hostname or os.getenv("DB_HOST", "localhost"),
             "PORT": parsed.port or int(os.getenv("DB_PORT", 5432)),
             "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", 60)),
+            # pytest-django may assign TEST.NAME before Django normalizes this
+            # mapping. Keep the complete shape so Django's PostgreSQL test
+            # database setup can safely read MIRROR and the other defaults.
+            "TEST": {
+                "CHARSET": None,
+                "COLLATION": None,
+                "MIGRATE": True,
+                "MIRROR": None,
+                "NAME": None,
+            },
         }
     }
 else:
@@ -109,6 +119,13 @@ else:
             "HOST": os.getenv("DB_HOST", "localhost"),
             "PORT": int(os.getenv("DB_PORT", 5432)),
             "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", 60)),
+            "TEST": {
+                "CHARSET": None,
+                "COLLATION": None,
+                "MIGRATE": True,
+                "MIRROR": None,
+                "NAME": None,
+            },
         }
     }
 

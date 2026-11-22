@@ -80,8 +80,9 @@ jobs:
 
       - name: Run Test Suite (pytest)
         env:
-          DJANGO_SETTINGS_MODULE: config.settings.development
+          DJANGO_SETTINGS_MODULE: config.settings.test_postgresql
           DJANGO_SECRET_KEY: test-secret-key-for-ci
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/roomloop_test_db
+          ROOMLOOP_POSTGRES_TEST_DB: test_roomloop_ci
         run: |
           pytest -v

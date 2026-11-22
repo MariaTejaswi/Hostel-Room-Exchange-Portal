@@ -44,4 +44,4 @@ if (
     )
 
 database["CONN_MAX_AGE"] = 0
-database["TEST"] = {"NAME": isolated_test_database_name}
+database.setdefault("TEST", {})["NAME"] = isolated_test_database_name
