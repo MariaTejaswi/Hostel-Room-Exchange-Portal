@@ -1,5 +1,6 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from time import perf_counter
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.core.exceptions import PermissionDenied
@@ -42,8 +43,11 @@ from apps.hostels.models import (
 )
 
 
+KOLKATA = ZoneInfo("Asia/Kolkata")
+
+
 def _at(day, hour=12, minute=0):
-    return datetime(2026, 1, day, hour, minute, tzinfo=UTC)
+    return datetime(2026, 1, day, hour, minute, tzinfo=KOLKATA)
 
 
 def _make_user(*, institution, email, name, role, registration_number=None):

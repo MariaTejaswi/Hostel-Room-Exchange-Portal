@@ -11,13 +11,16 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="h-full flex flex-col font-sans antialiased" style="background-color: #F5F7FA; color: #172B3A;">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:font-bold focus:text-[#702C3B] focus:shadow-lg">
+        Skip to main content
+    </a>
     {% block body %}{% endblock %}
 
     <!-- Global Toast Notifications -->
     {% if messages %}
-    <div class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+    <div class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none" aria-live="polite" aria-atomic="false">
         {% for message in messages %}
-        <div data-toast class="pointer-events-auto flex items-start gap-3 p-4 rounded-xl shadow-md border {% if message.tags == 'success' %}bg-white border-emerald-200 text-emerald-900{% elif message.tags == 'error' %}bg-white border-red-200 text-red-900{% elif message.tags == 'warning' %}bg-white border-amber-200 text-amber-900{% else %}bg-white border-slate-200 text-slate-800{% endif %}">
+        <div data-toast role="status" class="pointer-events-auto flex items-start gap-3 p-4 rounded-xl shadow-md border {% if message.tags == 'success' %}bg-white border-emerald-200 text-emerald-900{% elif message.tags == 'error' %}bg-white border-red-200 text-red-900{% elif message.tags == 'warning' %}bg-white border-amber-200 text-amber-900{% else %}bg-white border-slate-200 text-slate-800{% endif %}">
             <div class="flex-shrink-0 mt-0.5">
                 {% if message.tags == 'success' %}
                 <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -32,7 +35,7 @@
             <div class="flex-1 text-xs font-medium leading-5">
                 {{ message }}
             </div>
-            <button data-close-toast type="button" class="text-slate-400 hover:text-slate-600">
+            <button data-close-toast type="button" class="text-slate-400 hover:text-slate-600" aria-label="Dismiss notification">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>

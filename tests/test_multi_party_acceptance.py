@@ -248,6 +248,20 @@ def test_two_person_proposal_activation_lifecycle(institution, warden_user):
     )
     assert p0.response_status == ProposalParticipant.ResponseStatus.ACCEPTED
     assert updated_prop.status == ExchangeProposal.Status.PENDING_ACCEPTANCE  # Still pending student 1
+    acceptance_updates = Notification.objects.filter(
+        proposal=prop,
+        notification_type=Notification.NotificationType.ACCEPTANCE_UPDATED,
+    )
+    assert acceptance_updates.count() == 2
+    assert set(acceptance_updates.values_list("recipient_id", flat=True)) == {
+        user.id for user in fix["users"]
+    }
+    assert acceptance_updates.get(recipient=fix["users"][0]).message.startswith(
+        "Your acceptance has been recorded"
+    )
+    assert acceptance_updates.get(recipient=fix["users"][1]).message.startswith(
+        f"{fix['users'][0].full_name} accepted"
+    )
 
     # 4. Unanimous Acceptance: Student 1 accepts
     p1, final_prop = respond_to_proposal(

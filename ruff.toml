@@ -1,0 +1,12 @@
+target-version = "py312"
+exclude = [
+    ".git",
+    ".venv",
+    "node_modules",
+    "static",
+    "**/migrations/**",
+]
+
+# CI blocks syntax errors and undefined names. Broader style debt is documented
+# for incremental review instead of unsafe bulk rewrites to operational code.
+lint.select = ["E9", "F821"]

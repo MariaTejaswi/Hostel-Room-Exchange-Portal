@@ -134,7 +134,7 @@
 
                 <!-- User Dropdown Menu -->
                 <div class="relative">
-                    <button id="user-menu-button" type="button" class="flex items-center gap-2 p-1 rounded-xl hover:bg-[#FAF4EB] transition-colors focus:outline-none focus:ring-2 focus:ring-[#702C3B]/30 group" aria-expanded="false" aria-haspopup="true">
+                    <button id="user-menu-button" type="button" class="flex items-center gap-2 p-1 rounded-xl hover:bg-[#FAF4EB] transition-colors focus:outline-none focus:ring-2 focus:ring-[#702C3B]/30 group" aria-expanded="false" aria-haspopup="true" aria-label="Open user menu">
                         <div class="w-8 h-8 rounded-lg bg-[#702C3B] text-white font-bold flex items-center justify-center text-xs flex-shrink-0 shadow-2xs">
                             {{ request.user.full_name|slice:":2"|upper }}
                         </div>
@@ -202,7 +202,7 @@
         </header>
 
         <!-- Main Viewport Content Area -->
-        <main class="flex-1 p-4 sm:p-6 w-full min-w-0 max-w-7xl mx-auto">
+        <main id="main-content" tabindex="-1" class="flex-1 p-4 sm:p-6 w-full min-w-0 max-w-7xl mx-auto">
             {% block content %}{% endblock %}
         </main>
 

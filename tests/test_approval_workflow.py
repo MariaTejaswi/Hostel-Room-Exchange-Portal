@@ -460,6 +460,15 @@ def test_chief_warden_approves_cross_hostel_proposal(institution, warden_user):
 
     assert prop.status == ExchangeProposal.Status.PENDING_APPROVAL
     assert prop.is_cross_hostel is True
+    authority_notifications = Notification.objects.filter(
+        proposal=prop,
+        notification_type=Notification.NotificationType.APPROVAL_UPDATED,
+        message__contains="awaiting your approval",
+    )
+    assert set(authority_notifications.values_list("recipient_id", flat=True)) == {
+        chief_warden.id
+    }
+    assert not authority_notifications.filter(recipient=warden_user).exists()
 
     # Chief Warden approves
     appr, updated_prop = decide_exchange_proposal(

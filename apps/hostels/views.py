@@ -633,9 +633,9 @@ def bed_list_view(request):
         beds_qs = beds_qs.filter(operational_status=operational_status)
     if search_query:
         beds_qs = beds_qs.filter(
-            models.Q(bed_label__icontains=search_query)
-            | models.Q(room__room_number__icontains=search_query)
-            | models.Q(room__floor__block__hostel__name__icontains=search_query)
+            Q(bed_label__icontains=search_query)
+            | Q(room__room_number__icontains=search_query)
+            | Q(room__floor__block__hostel__name__icontains=search_query)
         )
 
     paginator = Paginator(beds_qs, 20)
@@ -704,10 +704,10 @@ def occupancy_list_view(request):
         qs = qs.filter(status=status_filter)
     if search_query:
         qs = qs.filter(
-            models.Q(student__full_name__icontains=search_query)
-            | models.Q(student__email__icontains=search_query)
-            | models.Q(student__registration_number__icontains=search_query)
-            | models.Q(bed__room__room_number__icontains=search_query)
+            Q(student__full_name__icontains=search_query)
+            | Q(student__email__icontains=search_query)
+            | Q(student__registration_number__icontains=search_query)
+            | Q(bed__room__room_number__icontains=search_query)
         )
 
     paginator = Paginator(qs, 15)

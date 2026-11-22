@@ -1227,17 +1227,25 @@ def respond_to_proposal(
                 ip_address=ip_address,
             )
 
-            dispatch_proposal_notification(
-                recipient=student,
-                notification_type=Notification.NotificationType.ACCEPTANCE_UPDATED,
-                message="Your acceptance has been recorded. Waiting for all participants to respond.",
-                proposal=proposal,
-                exchange_request=participant.exchange_request,
-                now=now,
-            )
-
             # Check if all participants accepted
             all_parts = list(proposal.participants.select_related("student", "exchange_request"))
+            for p in all_parts:
+                if p.student_id == student.id:
+                    message = "Your acceptance has been recorded. Waiting for all participants to respond."
+                else:
+                    message = (
+                        f"{student.full_name} accepted the room exchange proposal. "
+                        "Waiting for all participants to respond."
+                    )
+                dispatch_proposal_notification(
+                    recipient=p.student,
+                    notification_type=Notification.NotificationType.ACCEPTANCE_UPDATED,
+                    message=message,
+                    proposal=proposal,
+                    exchange_request=p.exchange_request,
+                    now=now,
+                )
+
             all_accepted = all(
                 p.response_status == ProposalParticipant.ResponseStatus.ACCEPTED
                 for p in all_parts

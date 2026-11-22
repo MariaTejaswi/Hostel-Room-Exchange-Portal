@@ -14,6 +14,10 @@ def test_warden_dashboard_coffee_brown_theme_and_static_hostel_badge(client, war
     response = client.get(reverse("accounts:dashboard_warden"))
     assert response.status_code == 200
     html = response.content.decode()
+    assert 'href="#main-content"' in html
+    assert 'id="main-content" tabindex="-1"' in html
+    assert 'aria-label="Open user menu"' in html
+    assert 'aria-label="Notifications (' in html
 
     # 1. Coffee-brown palette tokens
     assert "#702C3B" in html

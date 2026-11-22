@@ -255,7 +255,7 @@ The expected 17 hostels (`BH-01..BH-10` and `GH-01..GH-07`) were missing due to 
    - Semantic definition lists (`<dl>`, `<dt>`, `<dd>`) for all student and bed allocation attributes.
    - Bounded label column with flexible, wrapping value column; long emails wrap without crowding labels or clipping.
    - Secondary styling for empty/ongoing fields: "Not specified" and "Active Ongoing" styled in `text-slate-400 font-normal italic`.
-   - Lifecycle metadata card with 3 responsive summary tiles (Status, Allocation Start, End/Release Date), release reason callout, and padded audit footer displaying timestamps with explicit timezone (`UTC`).
+   - Lifecycle metadata card with 3 responsive summary tiles (Status, Allocation Start, End/Release Date), release reason callout, and padded audit footer displaying timestamps with explicit timezone (`IST`).
    - Release Occupant button: strictly preserved authorization check (`occupancy.status == 'active' and can_assign_occupancy`), CSRF protection, and confirmation flow.
 
 ### 10.3 Verification Summary
