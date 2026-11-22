@@ -58,7 +58,7 @@ roomloop/
 ├── static/
 │   ├── css/dist/styles.css      # Compiled Tailwind CSS design system
 │   ├── js/main.js               # Drawer, dropdown, toast auto-dismiss scripts
-│   └── images/logo.svg          # RoomLoop brand icon
+│   └── images/logo.png          # RoomLoop brand icon
 │
 ├── frontend/
 │   ├── src/input.css            # Tailwind directives and custom component classes

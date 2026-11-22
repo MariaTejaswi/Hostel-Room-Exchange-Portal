@@ -1,488 +1,744 @@
-{% extends 'layouts/dashboard_base.html' %}
-{% load static %}
-
-{% block breadcrumb_current %}{{ hostel.name }}{% endblock %}
-
-{% block content %}
+{% extends 'layouts/dashboard_base.html' %} {% load static %} {% block
+breadcrumb_current %}{{ hostel.name }}{% endblock %} {% block content %}
 <div class="space-y-6">
-    <!-- Header -->
-    <div class="no-collision-header">
-        <div>
-            <div class="flex items-center gap-2 mb-1 flex-wrap">
-                <a href="{% url 'hostels:hostel_list' %}" class="text-xs text-teal-700 hover:text-teal-800 font-semibold flex items-center gap-1 transition-colors">
-                    &larr; All Hostels
-                </a>
-                <span class="text-slate-300">•</span>
-                <span class="badge-neutral font-mono font-bold text-[10px]">{{ hostel.code }}</span>
-                {% if hostel.resident_category == 'male' %}
-                <span class="badge-category-boys">Boys' Hostel</span>
-                {% elif hostel.resident_category == 'female' %}
-                <span class="badge-category-girls">Girls' Hostel</span>
-                {% else %}
-                <span class="badge-neutral">{{ hostel.get_resident_category_display }}</span>
-                {% endif %}
-
-                {% if hostel.status == 'active' %}
-                <span class="badge-success text-[10px]">Operational</span>
-                {% elif hostel.status == 'maintenance' %}
-                <span class="badge-warning text-[10px]">Maintenance</span>
-                {% else %}
-                <span class="badge-danger text-[10px]">Inactive</span>
-                {% endif %}
-            </div>
-            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">{{ hostel.name }}</h1>
-            <p class="mt-1 text-xs text-slate-500">{{ hostel.address|default:"Campus Residential Facility" }}</p>
-        </div>
-        <div class="no-collision-actions">
-            {% if can_manage_inventory %}
-            <a href="{% url 'hostels:hostel_edit_builder' pk=hostel.id %}" class="btn-secondary btn-sm flex items-center gap-1.5">
-                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                <span>Edit in Builder</span>
-            </a>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Illustrative Facility Photo Gallery (3-Card Responsive Grid) -->
-    <div class="card p-4 bg-white border border-slate-200 rounded-xl space-y-3">
-        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-            <div>
-                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700">Facility Overview & Accommodations</h2>
-                <p class="text-[11px] text-slate-500">Representative views of building exterior, room specifications, and communal areas.</p>
-            </div>
-            <span class="badge-neutral text-[10px]">3 Illustrative Views</span>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <!-- Exterior View -->
-            <div class="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50 group">
-                <img src="{% static 'images/accommodation/exterior_modern.svg' %}"
-                     alt="Illustrative exterior photo of {{ hostel.name }}"
-                     width="400" height="225"
-                     loading="lazy"
-                     class="w-full h-32 object-cover">
-                <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-900/80 text-white">
-                    Illustrative photo
-                </span>
-                <div class="p-2 bg-white border-t border-slate-100">
-                    <span class="text-[11px] font-semibold text-slate-800 block">Residential Complex Exterior</span>
-                    <span class="text-[10px] text-slate-500">Multistory accommodation with secure campus access</span>
-                </div>
-            </div>
-
-            <!-- Bedroom View -->
-            <div class="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50 group">
-                <img src="{% static 'images/accommodation/room_standard.svg' %}"
-                     alt="Illustrative standard room interior with desk and bed"
-                     width="400" height="225"
-                     loading="lazy"
-                     class="w-full h-32 object-cover">
-                <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-900/80 text-white">
-                    Illustrative photo
-                </span>
-                <div class="p-2 bg-white border-t border-slate-100">
-                    <span class="text-[11px] font-semibold text-slate-800 block">Typical Room Specification</span>
-                    <span class="text-[10px] text-slate-500">Study workstation, individual storage, and window light</span>
-                </div>
-            </div>
-
-            <!-- Common Area View -->
-            <div class="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50 group">
-                <img src="{% static 'images/accommodation/study_lounge.svg' %}"
-                     alt="Illustrative quiet study space and common room"
-                     width="400" height="225"
-                     loading="lazy"
-                     class="w-full h-32 object-cover">
-                <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-900/80 text-white">
-                    Illustrative photo
-                </span>
-                <div class="p-2 bg-white border-t border-slate-100">
-                    <span class="text-[11px] font-semibold text-slate-800 block">Study & Shared Spaces</span>
-                    <span class="text-[10px] text-slate-500">Quiet academic workstations and reading areas</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Statistics Grid -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {% include 'components/stats_card.html' with title="Total Rooms" value=hostel.total_rooms subtitle=hostel.total_floors|stringformat:"s"|add:" Floors configured" %}
-        {% include 'components/stats_card.html' with title="Total Capacity" value=hostel.total_beds subtitle="Bed accommodations" %}
-        {% include 'components/stats_card.html' with title="Occupied Beds" value=hostel.occupied_beds subtitle="Allocated residents" progress_pct=hostel.occupancy_rate %}
-        {% include 'components/stats_card.html' with title="Available Beds" value=hostel.available_beds subtitle=hostel.occupancy_status_label %}
-    </div>
-
-    <!-- Restricted Inventory Selection Notice (for unverified students) -->
-    {% if is_student and not can_select_beds %}
-    <div class="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-900" role="alert">
-        <svg class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-        </svg>
-        <div>
-            <span class="font-bold">Restricted Inventory Selection:</span>
-            Your student profile residential eligibility is pending institutional verification. Bed selection and exchange requests are locked until your category is verified.
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Accommodation Selection Workspace: Main Grid + Docked Selection Summary -->
-    <div class="flex flex-col lg:flex-row items-start gap-6">
-        <!-- Main Inventory Area (Left Column) -->
-        <div class="flex-1 w-full space-y-5">
-            <!-- Block & Floor Selector Card -->
-            <div class="card p-4 sm:p-5 bg-white border border-slate-200 rounded-xl space-y-4">
-                <!-- Block Selector (if multiple blocks exist) -->
-                {% if blocks|length > 1 %}
-                <div class="flex items-center gap-2 pb-3 border-b border-slate-100 overflow-x-auto text-xs">
-                    <span class="text-slate-500 font-semibold mr-1">Block:</span>
-                    {% for block in blocks %}
-                    <a href="?block={{ block.id }}"
-                       class="px-3 py-1.5 rounded-lg font-medium transition-colors {% if selected_block.id == block.id %}bg-slate-800 text-white font-semibold{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
-                        {{ block.name }}
-                    </a>
-                    {% endfor %}
-                </div>
-                {% endif %}
-
-                <!-- Floor Navigation -->
-                {% if floors %}
-                <div>
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">Select Floor</span>
-                        <div class="flex items-center gap-2">
-                            <!-- Floor Select Dropdown for quick jump with many floors -->
-                            <label for="floor-select-jump" class="sr-only">Jump to floor</label>
-                            <select id="floor-select-jump" onchange="if(this.value) window.location.href=this.value;" class="form-select text-[11px] py-1 px-2 w-36">
-                                {% for floor in floors %}
-                                <option value="?{% if selected_block %}block={{ selected_block.id }}&{% endif %}floor={{ floor.id }}" {% if selected_floor.id == floor.id %}selected{% endif %}>
-                                    {{ floor.floor_label|default:floor.floor_number }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Horizontal Floor Pills -->
-                    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                        {% for floor in floors %}
-                        <a href="?{% if selected_block %}block={{ selected_block.id }}&{% endif %}floor={{ floor.id }}"
-                           class="px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 flex-shrink-0 transition-colors {% if selected_floor.id == floor.id %}bg-teal-700 text-white font-semibold{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
-                            <span>{{ floor.floor_label|default:floor.floor_number }}</span>
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Active Floor Summary & Room Filter -->
-                {% if selected_floor %}
-                <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div class="flex items-center gap-2">
-                        <h2 class="text-sm font-bold text-slate-900">{{ selected_floor.floor_label }}</h2>
-                        <span class="badge-neutral text-[10px]">{{ floor_stats.total_rooms }} Rooms</span>
-                    </div>
-
-                    <!-- Availability Indicators -->
-                    <div class="flex items-center gap-2 text-xs flex-wrap">
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-medium">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                            {{ floor_stats.available_beds }} Available
-                        </span>
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-medium">
-                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                            {{ floor_stats.occupied_beds }} Occupied
-                        </span>
-                        {% if floor_stats.maintenance_beds > 0 %}
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-medium">
-                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                            {{ floor_stats.maintenance_beds }} Maintenance
-                        </span>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Rooms and Bed Schematic Layout -->
-            {% if selected_floor %}
-            <div class="space-y-4">
-                <div class="flex items-center justify-between text-xs text-slate-500 px-1">
-                    <span>Rooms on {{ selected_floor.floor_label }} (Click an available bed to select)</span>
-                    <span class="font-mono text-[11px]">{{ rooms_data|length }} Rooms loaded</span>
-                </div>
-
-                <!-- Room Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {% for rdata in rooms_data %}
-                    <div class="card p-4 bg-white border border-slate-200 rounded-xl space-y-3">
-                        <!-- Room Header -->
-                        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-                            <div>
-                                <span class="text-sm font-bold text-slate-900 font-mono">Room {{ rdata.room.room_number }}</span>
-                                <span class="text-[10px] text-slate-500 block">{{ rdata.room.get_room_type_display }} ({{ rdata.total_beds }} Bed{{ rdata.total_beds|pluralize }})</span>
-                            </div>
-                            <div>
-                                {% if rdata.available_beds > 0 %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                    {{ rdata.available_beds }}/{{ rdata.total_beds }} Available
-                                </span>
-                                {% else %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                                    Fully Occupied
-                                </span>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <!-- Top-View Schematic Bed Tiles (Dynamic Capacity 1, 2, 4, 8, 12) -->
-                        <div class="bed-workspace-grid">
-                            {% for bed in rdata.beds %}
-                                {% if bed.is_available %}
-                                    {% if can_select_beds %}
-                                    <!-- Available Bed (Interactive) -->
-                                    <button type="button"
-                                            id="bed-btn-{{ bed.id }}"
-                                            onclick="selectBed('{{ hostel.name|escapejs }}', '{{ selected_block.name|default:""|escapejs }}', '{{ selected_floor.floor_label|escapejs }}', 'Room {{ rdata.room.room_number }}', '{{ bed.bed_label }}', '{{ bed.id }}')"
-                                            class="bed-tile state-available"
-                                            tabindex="0"
-                                            aria-label="Select Bed {{ bed.bed_label }} in Room {{ rdata.room.room_number }}"
-                                            title="Click to select Bed {{ bed.bed_label }}">
-                                        <!-- Top-View Schematic Bed Graphic -->
-                                        <div class="bed-graphic">
-                                            <div class="bed-pillow"></div>
-                                            <div class="bed-sheet-fold"></div>
-                                        </div>
-                                        <span class="font-bold text-xs text-slate-900 font-mono">{{ bed.bed_label }}</span>
-                                        <span class="text-[10px] font-semibold text-teal-700 mt-0.5">Available</span>
-                                    </button>
-                                    {% else %}
-                                    <!-- Available Bed: Locked (Unverified Student) -->
-                                    <div class="bed-tile state-locked"
-                                         title="Selection locked: Residential eligibility unverified">
-                                        <div class="bed-graphic">
-                                            <div class="bed-pillow"></div>
-                                            <div class="bed-sheet-fold"></div>
-                                        </div>
-                                        <span class="font-bold text-xs text-slate-500 font-mono">{{ bed.bed_label }}</span>
-                                        <span class="text-[10px] font-medium text-slate-400 mt-0.5">Locked</span>
-                                    </div>
-                                    {% endif %}
-                                {% elif bed.is_occupied %}
-                                <!-- Occupied Bed (Privacy Protected) -->
-                                <div class="bed-tile state-occupied"
-                                     {% if can_view_student_details and bed.occupant_reg %}title="Resident: {{ bed.occupant_name }} ({{ bed.occupant_reg }})"{% else %}title="Occupied bed"{% endif %}>
-                                    <div class="bed-graphic">
-                                        <div class="bed-pillow"></div>
-                                        <div class="bed-sheet-fold"></div>
-                                    </div>
-                                    <span class="font-bold text-xs text-slate-700 font-mono">{{ bed.bed_label }}</span>
-                                    <span class="text-[10px] font-medium text-slate-500 mt-0.5">Occupied</span>
-                                </div>
-                                {% elif bed.is_maintenance %}
-                                <!-- Maintenance Bed -->
-                                <div class="bed-tile state-maintenance"
-                                     title="Bed currently under maintenance">
-                                    <div class="bed-graphic">
-                                        <div class="bed-pillow"></div>
-                                        <div class="bed-sheet-fold"></div>
-                                    </div>
-                                    <span class="font-bold text-xs text-amber-900 font-mono">{{ bed.bed_label }}</span>
-                                    <span class="text-[10px] font-semibold text-amber-700 mt-0.5">Maintenance</span>
-                                </div>
-                                {% else %}
-                                <!-- Inactive Bed -->
-                                <div class="bed-tile state-locked">
-                                    <div class="bed-graphic">
-                                        <div class="bed-pillow"></div>
-                                        <div class="bed-sheet-fold"></div>
-                                    </div>
-                                    <span class="font-bold text-xs text-slate-400 font-mono">{{ bed.bed_label }}</span>
-                                    <span class="text-[10px] font-medium text-slate-400 mt-0.5">Inactive</span>
-                                </div>
-                                {% endif %}
-                            {% empty %}
-                            <p class="text-xs text-slate-400 italic col-span-full py-2">No beds configured</p>
-                            {% endfor %}
-                        </div>
-
-                        <!-- Room Status Footer -->
-                        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-                            <span>Floor: {{ selected_floor.floor_label }}</span>
-                            <span>Status: {{ rdata.room.get_operational_status_display }}</span>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="col-span-full py-8 text-center text-slate-500 text-xs">
-                        No rooms configured on this floor level.
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% else %}
-            <p class="text-xs text-slate-500 text-center py-6">No floors configured for this hostel.</p>
-            {% endif %}
-        </div>
-
-        <!-- Docked Live Selection Summary (Right Column / Sticky Sidebar) -->
-        <div class="w-full lg:w-80 flex-shrink-0">
-            <!-- Bed Selection Preview Bar: Kept visible with id="selection-preview-bar" for test assertions -->
-            <div id="selection-preview-bar" class="card p-5 bg-white border border-slate-200 rounded-xl space-y-4 sticky top-20 shadow-xs" role="region" aria-live="polite">
-                <!-- Card Header -->
-                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <div class="flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full bg-teal-600"></span>
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-800">Selection Preview</span>
-                    </div>
-                    <button type="button" onclick="clearSelectedBed()" id="clear-selection-btn" class="hidden text-[11px] font-medium text-slate-400 hover:text-red-600 transition-colors">
-                        Clear
-                    </button>
-                </div>
-
-                <!-- Bed Selection Details -->
-                <div id="selection-active-box" class="hidden space-y-3">
-                    <div class="p-3 bg-teal-50/70 border border-teal-200 rounded-lg">
-                        <span class="text-[10px] text-teal-800 font-semibold uppercase tracking-wider block">Selected Accommodation</span>
-                        <span id="selected-bed-info" class="font-bold text-sm text-teal-950 block mt-0.5">Room 101 • Bed A</span>
-                        <span class="text-[11px] text-teal-700 mt-1 block">Status: Verified Available</span>
-                    </div>
-
-                    <div class="space-y-1.5 text-xs text-slate-600">
-                        <div class="flex justify-between py-1 border-b border-slate-100">
-                            <span class="text-slate-500">Hostel:</span>
-                            <span id="summary-hostel" class="font-medium text-slate-800">{{ hostel.name }}</span>
-                        </div>
-                        {% if selected_block %}
-                        <div class="flex justify-between py-1 border-b border-slate-100">
-                            <span class="text-slate-500">Block:</span>
-                            <span id="summary-block" class="font-medium text-slate-800">{{ selected_block.name }}</span>
-                        </div>
-                        {% endif %}
-                        <div class="flex justify-between py-1 border-b border-slate-100">
-                            <span class="text-slate-500">Floor:</span>
-                            <span id="summary-floor" class="font-medium text-slate-800">{{ selected_floor.floor_label|default:"—" }}</span>
-                        </div>
-                        <div class="flex justify-between py-1 border-b border-slate-100">
-                            <span class="text-slate-500">Room:</span>
-                            <span id="summary-room" class="font-mono font-medium text-slate-800">—</span>
-                        </div>
-                        <div class="flex justify-between py-1">
-                            <span class="text-slate-500">Bed:</span>
-                            <span id="summary-bed" class="font-mono font-bold text-teal-700">—</span>
-                        </div>
-                    </div>
-
-                    <div class="pt-2 text-[11px] text-slate-500 leading-relaxed">
-                        <p>
-                            <strong>Selection preview only.</strong> Final student allocations and room transfers are authorized by destination wardens according to university policy.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Empty Selection State in Dock -->
-                <div id="selection-empty-box" class="text-center py-6 space-y-2">
-                    <svg class="w-8 h-8 text-slate-300 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-                    </svg>
-                    <p class="text-xs font-medium text-slate-600">No Bed Selected</p>
-                    <p class="text-[11px] text-slate-400 leading-normal max-w-xs mx-auto">
-                        Click on any available green bed tile in the floor plan to inspect its allocation status.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Assigned Wardens Section -->
-    <div class="card p-5 bg-white border border-slate-200 rounded-xl">
-        <div class="pb-3 border-b border-slate-100 mb-4">
-            <h2 class="text-sm font-bold text-slate-900">Assigned Wardens</h2>
-            <p class="text-xs text-slate-500">Authorized residential administration for {{ hostel.name }}.</p>
-        </div>
-
-        {% if assigned_wardens %}
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {% for assignment in assigned_wardens %}
-            <div class="p-3 rounded-lg border border-slate-200 bg-slate-50/50 flex items-center gap-3">
-                <div class="w-8 h-8 rounded bg-teal-100 text-teal-800 font-bold flex items-center justify-center text-xs flex-shrink-0">
-                    {{ assignment.warden.full_name|slice:":2"|upper }}
-                </div>
-                <div class="min-w-0 flex-1">
-                    <span class="text-xs font-semibold text-slate-900 block truncate">{{ assignment.warden.full_name }}</span>
-                    <span class="text-[11px] text-slate-500 block truncate">{{ assignment.warden.email }}</span>
-                    {% if assignment.is_primary %}
-                    <span class="badge-brand text-[9px] py-0.2 mt-0.5">Primary Warden</span>
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
-        </div>
+  <!-- Header -->
+  <div class="no-collision-header">
+    <div>
+      <div class="flex items-center gap-2 mb-1 flex-wrap">
+        <a
+          href="{% url 'hostels:hostel_list' %}"
+          class="text-xs text-teal-700 hover:text-teal-800 font-semibold flex items-center gap-1 transition-colors"
+        >
+          &larr; All Hostels
+        </a>
+        <span class="text-slate-300">•</span>
+        <span class="badge-neutral font-mono font-bold text-[10px]"
+          >{{ hostel.code }}</span
+        >
+        {% if hostel.resident_category == 'male' %}
+        <span class="badge-category-boys">Boys' Hostel</span>
+        {% elif hostel.resident_category == 'female' %}
+        <span class="badge-category-girls">Girls' Hostel</span>
         {% else %}
-        <p class="text-xs text-slate-400 text-center py-4">No wardens currently assigned to this hostel.</p>
+        <span class="badge-neutral"
+          >{{ hostel.get_resident_category_display }}</span
+        >
+        {% endif %} {% if hostel.status == 'active' %}
+        <span class="badge-success text-[10px]">Operational</span>
+        {% elif hostel.status == 'maintenance' %}
+        <span class="badge-warning text-[10px]">Maintenance</span>
+        {% else %}
+        <span class="badge-danger text-[10px]">Inactive</span>
         {% endif %}
+      </div>
+      <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+        {{ hostel.name }}
+      </h1>
+      <p class="mt-1 text-xs text-slate-500">
+        {{ hostel.address|default:"Campus Residential Facility" }}
+      </p>
     </div>
+    <div class="no-collision-actions">
+      {% if can_manage_inventory %}
+      <a
+        href="{% url 'hostels:hostel_edit_builder' pk=hostel.id %}"
+        class="btn-secondary btn-sm flex items-center gap-1.5"
+      >
+        <svg
+          class="w-3.5 h-3.5 text-slate-500"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+          />
+        </svg>
+        <span>Edit in Builder</span>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Illustrative Facility Photo Gallery (3-Card Responsive Grid) -->
+  <div class="card p-4 bg-white border border-slate-200 rounded-xl space-y-3">
+    <div
+      class="flex items-center justify-between pb-2 border-b border-slate-100"
+    >
+      <div>
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700">
+          Facility Overview & Accommodations
+        </h2>
+        <p class="text-[11px] text-slate-500">
+          Representative views of building exterior, room specifications, and
+          communal areas.
+        </p>
+      </div>
+      <span class="badge-neutral text-[10px]">3 Illustrative Views</span>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <!-- Exterior View -->
+      <div
+        class="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50 group"
+      >
+        <img
+          src="{% static 'images/accommodation/exterior_modern.svg' %}"
+          alt="Illustrative exterior photo of {{ hostel.name }}"
+          width="400"
+          height="225"
+          loading="lazy"
+          class="w-full h-32 object-cover"
+        />
+        <span
+          class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-900/80 text-white"
+        >
+          Illustrative photo
+        </span>
+        <div class="p-2 bg-white border-t border-slate-100">
+          <span class="text-[11px] font-semibold text-slate-800 block"
+            >Residential Complex Exterior</span
+          >
+          <span class="text-[10px] text-slate-500"
+            >Multistory accommodation with secure campus access</span
+          >
+        </div>
+      </div>
+
+      <!-- Bedroom View -->
+      <div
+        class="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50 group"
+      >
+        <img
+          src="{% static 'images/accommodation/room_standard.svg' %}"
+          alt="Illustrative standard room interior with desk and bed"
+          width="400"
+          height="225"
+          loading="lazy"
+          class="w-full h-32 object-cover"
+        />
+        <span
+          class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-900/80 text-white"
+        >
+          Illustrative photo
+        </span>
+        <div class="p-2 bg-white border-t border-slate-100">
+          <span class="text-[11px] font-semibold text-slate-800 block"
+            >Typical Room Specification</span
+          >
+          <span class="text-[10px] text-slate-500"
+            >Study workstation, individual storage, and window light</span
+          >
+        </div>
+      </div>
+
+      <!-- Common Area View -->
+      <div
+        class="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50 group"
+      >
+        <img
+          src="{% static 'images/accommodation/study_lounge.svg' %}"
+          alt="Illustrative quiet study space and common room"
+          width="400"
+          height="225"
+          loading="lazy"
+          class="w-full h-32 object-cover"
+        />
+        <span
+          class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-900/80 text-white"
+        >
+          Illustrative photo
+        </span>
+        <div class="p-2 bg-white border-t border-slate-100">
+          <span class="text-[11px] font-semibold text-slate-800 block"
+            >Study & Shared Spaces</span
+          >
+          <span class="text-[10px] text-slate-500"
+            >Quiet academic workstations and reading areas</span
+          >
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics Grid -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    {% include 'components/stats_card.html' with title="Total Rooms"
+    value=hostel.total_rooms subtitle=hostel.total_floors|stringformat:"s"|add:"
+    Floors configured" %} {% include 'components/stats_card.html' with
+    title="Total Capacity" value=hostel.total_beds subtitle="Bed accommodations"
+    %} {% include 'components/stats_card.html' with title="Occupied Beds"
+    value=hostel.occupied_beds subtitle="Allocated residents"
+    progress_pct=hostel.occupancy_rate %} {% include
+    'components/stats_card.html' with title="Available Beds"
+    value=hostel.available_beds subtitle=hostel.occupancy_status_label %}
+  </div>
+
+  <!-- Restricted Inventory Selection Notice (for unverified students) -->
+  {% if is_student and not can_select_beds %}
+  <div
+    class="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-900"
+    role="alert"
+  >
+    <svg
+      class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+      />
+    </svg>
+    <div>
+      <span class="font-bold">Restricted Inventory Selection:</span>
+      Your student profile residential eligibility is pending institutional
+      verification. Bed selection and exchange requests are locked until your
+      category is verified.
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Accommodation Selection Workspace: Main Grid + Docked Selection Summary -->
+  <div class="flex flex-col lg:flex-row items-start gap-6">
+    <!-- Main Inventory Area (Left Column) -->
+    <div class="flex-1 w-full space-y-5">
+      <!-- Block & Floor Selector Card -->
+      <div
+        class="card p-4 sm:p-5 bg-white border border-slate-200 rounded-xl space-y-4"
+      >
+        <!-- Block Selector (if multiple blocks exist) -->
+        {% if blocks|length > 1 %}
+        <div
+          class="flex items-center gap-2 pb-3 border-b border-slate-100 overflow-x-auto text-xs"
+        >
+          <span class="text-slate-500 font-semibold mr-1">Block:</span>
+          {% for block in blocks %}
+          <a
+            href="?block={{ block.id }}"
+            class="px-3 py-1.5 rounded-lg font-medium transition-colors {% if selected_block.id == block.id %}bg-slate-800 text-white font-semibold{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
+          >
+            {{ block.name }}
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Floor Navigation -->
+        {% if floors %}
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span
+              class="text-xs font-bold text-slate-800 uppercase tracking-wider"
+              >Select Floor</span
+            >
+            <div class="flex items-center gap-2">
+              <!-- Floor Select Dropdown for quick jump with many floors -->
+              <label for="floor-select-jump" class="sr-only"
+                >Jump to floor</label
+              >
+              <select
+                id="floor-select-jump"
+                onchange="if (this.value) window.location.href = this.value;"
+                class="form-select text-[11px] py-1 px-2 w-36"
+              >
+                {% for floor in floors %}
+                <option
+                  value="?{% if selected_block %}block={{ selected_block.id }}&{% endif %}floor={{ floor.id }}"
+                  {%
+                  if
+                  selected_floor.id=""
+                  ="floor.id"
+                  %}selected{%
+                  endif
+                  %}
+                >
+                  {{ floor.floor_label|default:floor.floor_number }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <!-- Horizontal Floor Pills -->
+          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            {% for floor in floors %}
+            <a
+              href="?{% if selected_block %}block={{ selected_block.id }}&{% endif %}floor={{ floor.id }}"
+              class="px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 flex-shrink-0 transition-colors {% if selected_floor.id == floor.id %}bg-teal-700 text-white font-semibold{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
+            >
+              <span>{{ floor.floor_label|default:floor.floor_number }}</span>
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Active Floor Summary & Room Filter -->
+        {% if selected_floor %}
+        <div
+          class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+        >
+          <div class="flex items-center gap-2">
+            <h2 class="text-sm font-bold text-slate-900">
+              {{ selected_floor.floor_label }}
+            </h2>
+            <span class="badge-neutral text-[10px]"
+              >{{ floor_stats.total_rooms }} Rooms</span
+            >
+          </div>
+
+          <!-- Availability Indicators -->
+          <div class="flex items-center gap-2 text-xs flex-wrap">
+            <span
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-medium"
+            >
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+              {{ floor_stats.available_beds }} Available
+            </span>
+            <span
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-medium"
+            >
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+              {{ floor_stats.occupied_beds }} Occupied
+            </span>
+            {% if floor_stats.maintenance_beds > 0 %}
+            <span
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-medium"
+            >
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              {{ floor_stats.maintenance_beds }} Maintenance
+            </span>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Rooms and Bed Schematic Layout -->
+      {% if selected_floor %}
+      <div class="space-y-4">
+        <div
+          class="flex items-center justify-between text-xs text-slate-500 px-1"
+        >
+          <span
+            >Rooms on {{ selected_floor.floor_label }} (Click an available bed
+            to select)</span
+          >
+          <span class="font-mono text-[11px]"
+            >{{ rooms_data|length }} Rooms loaded</span
+          >
+        </div>
+
+        <!-- Room Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {% for rdata in rooms_data %}
+          <div
+            class="card p-4 bg-white border border-slate-200 rounded-xl space-y-3"
+          >
+            <!-- Room Header -->
+            <div
+              class="flex items-center justify-between pb-2 border-b border-slate-100"
+            >
+              <div>
+                <span class="text-sm font-bold text-slate-900 font-mono"
+                  >Room {{ rdata.room.room_number }}</span
+                >
+                <span class="text-[10px] text-slate-500 block"
+                  >{{ rdata.room.get_room_type_display }} ({{ rdata.total_beds
+                  }} Bed{{ rdata.total_beds|pluralize }})</span
+                >
+              </div>
+              <div>
+                {% if rdata.available_beds > 0 %}
+                <span
+                  class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                >
+                  {{ rdata.available_beds }}/{{ rdata.total_beds }} Available
+                </span>
+                {% else %}
+                <span
+                  class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200"
+                >
+                  Fully Occupied
+                </span>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Top-View Schematic Bed Tiles (Dynamic Capacity 1, 2, 4, 8, 12) -->
+            <div class="bed-workspace-grid">
+              {% for bed in rdata.beds %} {% if bed.is_available %} {% if
+              can_select_beds %}
+              <!-- Available Bed (Interactive) -->
+              <button
+                type="button"
+                id="bed-btn-{{ bed.id }}"
+                
+                class="bed-tile state-available"
+                tabindex="0"
+                aria-label="Select Bed {{ bed.bed_label }} in Room {{ rdata.room.room_number }}"
+                title="Click to select Bed {{ bed.bed_label }}"
+              >
+                <!-- Top-View Schematic Bed Graphic -->
+                <div class="bed-graphic">
+                  <div class="bed-pillow"></div>
+                  <div class="bed-sheet-fold"></div>
+                </div>
+                <span class="font-bold text-xs text-slate-900 font-mono"
+                  >{{ bed.bed_label }}</span
+                >
+                <span class="text-[10px] font-semibold text-teal-700 mt-0.5"
+                  >Available</span
+                >
+              </button>
+              {% else %}
+              <!-- Available Bed: Locked (Unverified Student) -->
+              <div
+                class="bed-tile state-locked"
+                title="Selection locked: Residential eligibility unverified"
+              >
+                <div class="bed-graphic">
+                  <div class="bed-pillow"></div>
+                  <div class="bed-sheet-fold"></div>
+                </div>
+                <span class="font-bold text-xs text-slate-500 font-mono"
+                  >{{ bed.bed_label }}</span
+                >
+                <span class="text-[10px] font-medium text-slate-400 mt-0.5"
+                  >Locked</span
+                >
+              </div>
+              {% endif %} {% elif bed.is_occupied %}
+              <!-- Occupied Bed (Privacy Protected) -->
+              <div
+                class="bed-tile state-occupied"
+                {%
+                if
+                can_view_student_details
+                and
+                bed.occupant_reg
+                %}title="Resident: {{ bed.occupant_name }} ({{ bed.occupant_reg }})"
+                {%
+                else
+                %}title="Occupied bed"
+                {%
+                endif
+                %}
+              >
+                <div class="bed-graphic">
+                  <div class="bed-pillow"></div>
+                  <div class="bed-sheet-fold"></div>
+                </div>
+                <span class="font-bold text-xs text-slate-700 font-mono"
+                  >{{ bed.bed_label }}</span
+                >
+                <span class="text-[10px] font-medium text-slate-500 mt-0.5"
+                  >Occupied</span
+                >
+              </div>
+              {% elif bed.is_maintenance %}
+              <!-- Maintenance Bed -->
+              <div
+                class="bed-tile state-maintenance"
+                title="Bed currently under maintenance"
+              >
+                <div class="bed-graphic">
+                  <div class="bed-pillow"></div>
+                  <div class="bed-sheet-fold"></div>
+                </div>
+                <span class="font-bold text-xs text-amber-900 font-mono"
+                  >{{ bed.bed_label }}</span
+                >
+                <span class="text-[10px] font-semibold text-amber-700 mt-0.5"
+                  >Maintenance</span
+                >
+              </div>
+              {% else %}
+              <!-- Inactive Bed -->
+              <div class="bed-tile state-locked">
+                <div class="bed-graphic">
+                  <div class="bed-pillow"></div>
+                  <div class="bed-sheet-fold"></div>
+                </div>
+                <span class="font-bold text-xs text-slate-400 font-mono"
+                  >{{ bed.bed_label }}</span
+                >
+                <span class="text-[10px] font-medium text-slate-400 mt-0.5"
+                  >Inactive</span
+                >
+              </div>
+              {% endif %} {% empty %}
+              <p class="text-xs text-slate-400 italic col-span-full py-2">
+                No beds configured
+              </p>
+              {% endfor %}
+            </div>
+
+            <!-- Room Status Footer -->
+            <div
+              class="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400"
+            >
+              <span>Floor: {{ selected_floor.floor_label }}</span>
+              <span
+                >Status: {{ rdata.room.get_operational_status_display }}</span
+              >
+            </div>
+          </div>
+          {% empty %}
+          <div class="col-span-full py-8 text-center text-slate-500 text-xs">
+            No rooms configured on this floor level.
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <p class="text-xs text-slate-500 text-center py-6">
+        No floors configured for this hostel.
+      </p>
+      {% endif %}
+    </div>
+
+    <!-- Docked Live Selection Summary (Right Column / Sticky Sidebar) -->
+    <div class="w-full lg:w-80 flex-shrink-0">
+      <!-- Bed Selection Preview Bar: Kept visible with id="selection-preview-bar" for test assertions -->
+      <div
+        id="selection-preview-bar"
+        class="card p-5 bg-white border border-slate-200 rounded-xl space-y-4 sticky top-20 shadow-xs"
+        role="region"
+        aria-live="polite"
+      >
+        <!-- Card Header -->
+        <div
+          class="flex items-center justify-between pb-3 border-b border-slate-100"
+        >
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-teal-600"></span>
+            <span
+              class="text-xs font-bold uppercase tracking-wider text-slate-800"
+              >Selection Preview</span
+            >
+          </div>
+          <button
+            type="button"
+            onclick="clearSelectedBed()"
+            id="clear-selection-btn"
+            class="hidden text-[11px] font-medium text-slate-400 hover:text-red-600 transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+
+        <!-- Bed Selection Details -->
+        <div id="selection-active-box" class="hidden space-y-3">
+          <div class="p-3 bg-teal-50/70 border border-teal-200 rounded-lg">
+            <span
+              class="text-[10px] text-teal-800 font-semibold uppercase tracking-wider block"
+              >Selected Accommodation</span
+            >
+            <span
+              id="selected-bed-info"
+              class="font-bold text-sm text-teal-950 block mt-0.5"
+              >Room 101 • Bed A</span
+            >
+            <span class="text-[11px] text-teal-700 mt-1 block"
+              >Status: Verified Available</span
+            >
+          </div>
+
+          <div class="space-y-1.5 text-xs text-slate-600">
+            <div class="flex justify-between py-1 border-b border-slate-100">
+              <span class="text-slate-500">Hostel:</span>
+              <span id="summary-hostel" class="font-medium text-slate-800"
+                >{{ hostel.name }}</span
+              >
+            </div>
+            {% if selected_block %}
+            <div class="flex justify-between py-1 border-b border-slate-100">
+              <span class="text-slate-500">Block:</span>
+              <span id="summary-block" class="font-medium text-slate-800"
+                >{{ selected_block.name }}</span
+              >
+            </div>
+            {% endif %}
+            <div class="flex justify-between py-1 border-b border-slate-100">
+              <span class="text-slate-500">Floor:</span>
+              <span id="summary-floor" class="font-medium text-slate-800"
+                >{{ selected_floor.floor_label|default:"—" }}</span
+              >
+            </div>
+            <div class="flex justify-between py-1 border-b border-slate-100">
+              <span class="text-slate-500">Room:</span>
+              <span
+                id="summary-room"
+                class="font-mono font-medium text-slate-800"
+                >—</span
+              >
+            </div>
+            <div class="flex justify-between py-1">
+              <span class="text-slate-500">Bed:</span>
+              <span id="summary-bed" class="font-mono font-bold text-teal-700"
+                >—</span
+              >
+            </div>
+          </div>
+
+          <div class="pt-2 text-[11px] text-slate-500 leading-relaxed">
+            <p>
+              <strong>Selection preview only.</strong> Final student allocations
+              and room transfers are authorized by destination wardens according
+              to university policy.
+            </p>
+          </div>
+        </div>
+
+        <!-- Empty Selection State in Dock -->
+        <div id="selection-empty-box" class="text-center py-6 space-y-2">
+          <svg
+            class="w-8 h-8 text-slate-300 mx-auto"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+            />
+          </svg>
+          <p class="text-xs font-medium text-slate-600">No Bed Selected</p>
+          <p class="text-[11px] text-slate-400 leading-normal max-w-xs mx-auto">
+            Click on any available green bed tile in the floor plan to inspect
+            its allocation status.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assigned Wardens Section -->
+  <div class="card p-5 bg-white border border-slate-200 rounded-xl">
+    <div class="pb-3 border-b border-slate-100 mb-4">
+      <h2 class="text-sm font-bold text-slate-900">Assigned Wardens</h2>
+      <p class="text-xs text-slate-500">
+        Authorized residential administration for {{ hostel.name }}.
+      </p>
+    </div>
+
+    {% if assigned_wardens %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+      {% for assignment in assigned_wardens %}
+      <div
+        class="p-3 rounded-lg border border-slate-200 bg-slate-50/50 flex items-center gap-3"
+      >
+        <div
+          class="w-8 h-8 rounded bg-teal-100 text-teal-800 font-bold flex items-center justify-center text-xs flex-shrink-0"
+        >
+          {{ assignment.warden.full_name|slice:":2"|upper }}
+        </div>
+        <div class="min-w-0 flex-1">
+          <span class="text-xs font-semibold text-slate-900 block truncate"
+            >{{ assignment.warden.full_name }}</span
+          >
+          <span class="text-[11px] text-slate-500 block truncate"
+            >{{ assignment.warden.email }}</span
+          >
+          {% if assignment.is_primary %}
+          <span class="badge-brand text-[9px] py-0.2 mt-0.5"
+            >Primary Warden</span
+          >
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-xs text-slate-400 text-center py-4">
+      No wardens currently assigned to this hostel.
+    </p>
+    {% endif %}
+  </div>
 </div>
 
 <script>
-    let currentSelectedBedId = null;
+  let currentSelectedBedId = null;
 
-    function selectBed(hostelName, blockName, floorLabel, roomLabel, bedLabel, bedId) {
-        // Deselect previous bed if any
-        if (currentSelectedBedId) {
-            const prevBtn = document.getElementById('bed-btn-' + currentSelectedBedId);
-            if (prevBtn) {
-                prevBtn.classList.remove('state-selected');
-                prevBtn.classList.add('state-available');
-            }
-        }
-
-        currentSelectedBedId = bedId;
-        const currentBtn = document.getElementById('bed-btn-' + bedId);
-        if (currentBtn) {
-            currentBtn.classList.remove('state-available');
-            currentBtn.classList.add('state-selected');
-        }
-
-        const previewBar = document.getElementById('selection-preview-bar');
-        const activeBox = document.getElementById('selection-active-box');
-        const emptyBox = document.getElementById('selection-empty-box');
-        const clearBtn = document.getElementById('clear-selection-btn');
-        const infoSpan = document.getElementById('selected-bed-info');
-
-        const summaryHostel = document.getElementById('summary-hostel');
-        const summaryBlock = document.getElementById('summary-block');
-        const summaryFloor = document.getElementById('summary-floor');
-        const summaryRoom = document.getElementById('summary-room');
-        const summaryBed = document.getElementById('summary-bed');
-
-        if (infoSpan) infoSpan.textContent = roomLabel + ' • Bed ' + bedLabel;
-        if (summaryRoom) summaryRoom.textContent = roomLabel;
-        if (summaryBed) summaryBed.textContent = 'Bed ' + bedLabel;
-        if (summaryFloor) summaryFloor.textContent = floorLabel;
-        if (summaryBlock && blockName) summaryBlock.textContent = blockName;
-        if (summaryHostel) summaryHostel.textContent = hostelName;
-
-        if (activeBox) activeBox.classList.remove('hidden');
-        if (emptyBox) emptyBox.classList.add('hidden');
-        if (clearBtn) clearBtn.classList.remove('hidden');
+  function selectBed(
+    hostelName,
+    blockName,
+    floorLabel,
+    roomLabel,
+    bedLabel,
+    bedId,
+  ) {
+    // Deselect previous bed if any
+    if (currentSelectedBedId) {
+      const prevBtn = document.getElementById(
+        "bed-btn-" + currentSelectedBedId,
+      );
+      if (prevBtn) {
+        prevBtn.classList.remove("state-selected");
+        prevBtn.classList.add("state-available");
+      }
     }
 
-    function clearSelectedBed() {
-        if (currentSelectedBedId) {
-            const prevBtn = document.getElementById('bed-btn-' + currentSelectedBedId);
-            if (prevBtn) {
-                prevBtn.classList.remove('state-selected');
-                prevBtn.classList.add('state-available');
-            }
-            currentSelectedBedId = null;
-        }
-
-        const activeBox = document.getElementById('selection-active-box');
-        const emptyBox = document.getElementById('selection-empty-box');
-        const clearBtn = document.getElementById('clear-selection-btn');
-
-        if (activeBox) activeBox.classList.add('hidden');
-        if (emptyBox) emptyBox.classList.remove('hidden');
-        if (clearBtn) clearBtn.classList.add('hidden');
+    currentSelectedBedId = bedId;
+    const currentBtn = document.getElementById("bed-btn-" + bedId);
+    if (currentBtn) {
+      currentBtn.classList.remove("state-available");
+      currentBtn.classList.add("state-selected");
     }
+
+    const previewBar = document.getElementById("selection-preview-bar");
+    const activeBox = document.getElementById("selection-active-box");
+    const emptyBox = document.getElementById("selection-empty-box");
+    const clearBtn = document.getElementById("clear-selection-btn");
+    const infoSpan = document.getElementById("selected-bed-info");
+
+    const summaryHostel = document.getElementById("summary-hostel");
+    const summaryBlock = document.getElementById("summary-block");
+    const summaryFloor = document.getElementById("summary-floor");
+    const summaryRoom = document.getElementById("summary-room");
+    const summaryBed = document.getElementById("summary-bed");
+
+    if (infoSpan) infoSpan.textContent = roomLabel + " • Bed " + bedLabel;
+    if (summaryRoom) summaryRoom.textContent = roomLabel;
+    if (summaryBed) summaryBed.textContent = "Bed " + bedLabel;
+    if (summaryFloor) summaryFloor.textContent = floorLabel;
+    if (summaryBlock && blockName) summaryBlock.textContent = blockName;
+    if (summaryHostel) summaryHostel.textContent = hostelName;
+
+    if (activeBox) activeBox.classList.remove("hidden");
+    if (emptyBox) emptyBox.classList.add("hidden");
+    if (clearBtn) clearBtn.classList.remove("hidden");
+  }
+
+  function clearSelectedBed() {
+    if (currentSelectedBedId) {
+      const prevBtn = document.getElementById(
+        "bed-btn-" + currentSelectedBedId,
+      );
+      if (prevBtn) {
+        prevBtn.classList.remove("state-selected");
+        prevBtn.classList.add("state-available");
+      }
+      currentSelectedBedId = null;
+    }
+
+    const activeBox = document.getElementById("selection-active-box");
+    const emptyBox = document.getElementById("selection-empty-box");
+    const clearBtn = document.getElementById("clear-selection-btn");
+
+    if (activeBox) activeBox.classList.add("hidden");
+    if (emptyBox) emptyBox.classList.remove("hidden");
+    if (clearBtn) clearBtn.classList.add("hidden");
+  }
 </script>
 {% endblock %}

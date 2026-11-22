@@ -1,4 +1,4 @@
-<div class="stats-card-compact bg-white border border-[#E8DED4] rounded-xl p-4.5 transition-all shadow-2xs hover:border-[#C69B62]/50 hover:shadow-sm">
+<div class="stats-card-compact bg-white border border-[#E8DED4] rounded-xl p-5 sm:p-6 transition-all shadow-2xs hover:border-[#C69B62]/50 hover:shadow-sm">
     <!-- Header: Title + Optional Icon/Indicator -->
     <div class="flex items-center justify-between gap-2">
         <span class="text-[11px] font-bold uppercase tracking-wider text-[#8A7B72] truncate" title="{{ title }}">{{ title }}</span>
@@ -23,7 +23,7 @@
     {% if progress_pct is not None %}
     <div class="mt-3">
         <div class="w-full bg-[#FAF4EB] rounded-full h-1.5 overflow-hidden border border-[#E8DED4]/60">
-            <div class="bg-[#702C3B] h-1.5 rounded-full transition-all" style="width: {{ progress_pct }}%;"></div>
+            <div class="bg-[#702C3B] h-1.5 w-[var(--progress-width)] rounded-full transition-all" style="--progress-width: {{ progress_pct }}%;"></div>
         </div>
         <div class="mt-1.5 flex justify-between items-center text-[10px] text-[#8A7B72] font-medium">
             <span>Occupancy</span>

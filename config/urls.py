@@ -8,7 +8,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path(
         "favicon.ico",
-        RedirectView.as_view(url=settings.STATIC_URL + "images/logo.svg", permanent=True),
+        RedirectView.as_view(url=settings.STATIC_URL + "images/logo.png", permanent=True),
         name="favicon",
     ),
     path("", RedirectView.as_view(pattern_name="accounts:login", permanent=False), name="home"),
