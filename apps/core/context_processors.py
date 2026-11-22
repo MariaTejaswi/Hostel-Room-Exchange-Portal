@@ -16,7 +16,7 @@ def navigation_context(request):
         "can_assign_occupancy": False,
         "current_institution": None,
         "app_name": "RoomLoop",
-        "app_version": "1.0.0 (Phase 1)",
+        "app_version": "1.0.0",
     }
 
     if not request.user.is_authenticated:

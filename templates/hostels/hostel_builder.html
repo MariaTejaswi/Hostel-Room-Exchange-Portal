@@ -14,10 +14,6 @@
                 <a href="{% url 'hostels:hostel_list' %}" class="text-xs text-teal-700 hover:text-teal-800 font-medium">
                     &larr; Hostels Directory
                 </a>
-                <span class="text-slate-300">•</span>
-                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 text-[11px] font-semibold border border-teal-200">
-                    Phase 2 Custom Builder
-                </span>
                 {% if is_edit %}
                 <span class="badge-neutral font-mono">{{ hostel.code }}</span>
                 {% endif %}

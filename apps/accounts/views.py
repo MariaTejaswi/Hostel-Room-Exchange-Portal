@@ -54,6 +54,11 @@ def login_view(request):
     if request.user.is_authenticated:
         return redirect(get_dashboard_url_for_user(request.user))
 
+    # Keep the public login URL canonical. Authentication always routes users to
+    # their role dashboard, so a caller-supplied next target is unnecessary.
+    if request.method == "GET" and "next" in request.GET:
+        return redirect("accounts:login")
+
     show_demo_accounts = getattr(settings, "SHOW_DEMO_ACCOUNTS", True)
     demo_accounts = []
     default_demo_password = ""
@@ -155,9 +160,6 @@ def login_view(request):
             )
 
             messages.success(request, f"Welcome back, {user.full_name}!")
-            next_url = request.POST.get("next") or request.GET.get("next")
-            if next_url and next_url.startswith("/") and not next_url.startswith("//"):
-                return redirect(next_url)
             return redirect(get_dashboard_url_for_user(user))
     else:
         form = LoginForm()

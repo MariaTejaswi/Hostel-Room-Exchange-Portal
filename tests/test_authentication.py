@@ -54,6 +54,50 @@ def test_unauthenticated_user_redirected_to_login(client):
 
 
 @pytest.mark.django_db
+def test_root_redirects_to_clean_login_url(client):
+    response = client.get("/")
+
+    assert response.status_code == 302
+    assert response.url == reverse("accounts:login")
+    assert "next=" not in response.url
+
+
+@pytest.mark.django_db
+def test_login_canonicalizes_legacy_next_query(client):
+    login_url = reverse("accounts:login")
+    response = client.get(login_url, {"next": reverse("accounts:dashboard")})
+
+    assert response.status_code == 302
+    assert response.url == login_url
+    assert "next=" not in response.url
+
+
+@pytest.mark.django_db
+def test_protected_dashboard_redirect_finishes_at_clean_login_url(client):
+    response = client.get(reverse("accounts:dashboard"), follow=True)
+
+    assert response.status_code == 200
+    assert response.request["PATH_INFO"] == reverse("accounts:login")
+    assert response.request["QUERY_STRING"] == ""
+
+
+@pytest.mark.django_db
+def test_login_ignores_posted_next_and_uses_role_dashboard(client, student_user):
+    response = client.post(
+        reverse("accounts:login"),
+        {
+            "email": student_user.email,
+            "password": "TestPassword123!",
+            "next": reverse("accounts:profile"),
+        },
+    )
+
+    assert response.status_code == 302
+    assert response.url == reverse("accounts:dashboard_student")
+    assert "next=" not in response.url
+
+
+@pytest.mark.django_db
 def test_logout_invalidates_session(client, student_user):
     client.force_login(student_user)
     response = client.get(reverse("accounts:logout"), follow=True)
@@ -288,4 +332,3 @@ def test_login_demo_accounts_query_caching(client):
     resp2 = client.get(url)
     assert resp2.status_code == 200
     assert cache.get("roomloop_login_demo_active_emails") == cached
-

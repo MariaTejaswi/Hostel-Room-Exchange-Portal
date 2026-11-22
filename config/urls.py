@@ -11,7 +11,7 @@ urlpatterns = [
         RedirectView.as_view(url=settings.STATIC_URL + "images/logo.svg", permanent=True),
         name="favicon",
     ),
-    path("", RedirectView.as_view(pattern_name="accounts:dashboard", permanent=False), name="home"),
+    path("", RedirectView.as_view(pattern_name="accounts:login", permanent=False), name="home"),
     path("", include("apps.accounts.urls", namespace="accounts")),
     path("", include("apps.hostels.urls", namespace="hostels")),
     path("", include("apps.exchange.urls", namespace="exchange")),

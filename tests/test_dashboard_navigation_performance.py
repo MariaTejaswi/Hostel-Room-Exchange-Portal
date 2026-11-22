@@ -76,6 +76,30 @@ def test_successful_login_and_redirect_all_six_roles(client, test_users):
 
 
 @pytest.mark.django_db
+def test_all_dashboards_hide_stale_phase_and_soon_labels(test_users):
+    """Completed functionality must not be presented as a future phase."""
+    dashboard_urls = {
+        ROLE_STUDENT: reverse("accounts:dashboard_student"),
+        ROLE_WARDEN: reverse("accounts:dashboard_warden"),
+        ROLE_CHIEF_WARDEN: reverse("accounts:dashboard_chief_warden"),
+        ROLE_HOSTEL_ADMIN: reverse("accounts:dashboard_admin"),
+        ROLE_DEAN: reverse("accounts:dashboard_dean"),
+        ROLE_SYSADMIN: reverse("accounts:dashboard_sysadmin"),
+    }
+
+    for role_name, url in dashboard_urls.items():
+        role_client = Client()
+        role_client.force_login(test_users[role_name])
+        response = role_client.get(url)
+
+        assert response.status_code == 200
+        rendered_html = response.content.decode()
+        assert "Phase 1" not in rendered_html
+        assert "Phase 2" not in rendered_html
+        assert ">Soon<" not in rendered_html.replace(" ", "")
+
+
+@pytest.mark.django_db
 def test_unauthorized_dashboard_access_denied(client, test_users):
     """Verify that unauthorized roles are forbidden from accessing restricted dashboards."""
     student = test_users[ROLE_STUDENT]
