@@ -1,5 +1,9 @@
-{% extends 'layouts/dashboard_base.html' %} {% load static %} {% block
-breadcrumb_current %}{{ hostel.name }}{% endblock %} {% block content %}
+{% extends 'layouts/dashboard_base.html' %}
+{% load static %}
+
+{% block breadcrumb_current %}{{ hostel.name }}{% endblock %}
+
+{% block content %}
 <div class="space-y-6">
   <!-- Header -->
   <div class="no-collision-header">
@@ -251,13 +255,7 @@ breadcrumb_current %}{{ hostel.name }}{% endblock %} {% block content %}
                 {% for floor in floors %}
                 <option
                   value="?{% if selected_block %}block={{ selected_block.id }}&{% endif %}floor={{ floor.id }}"
-                  {%
-                  if
-                  selected_floor.id=""
-                  ="floor.id"
-                  %}selected{%
-                  endif
-                  %}
+                  {% if selected_floor.id == floor.id %}selected{% endif %}
                 >
                   {{ floor.floor_label|default:floor.floor_number }}
                 </option>
@@ -374,8 +372,9 @@ breadcrumb_current %}{{ hostel.name }}{% endblock %} {% block content %}
 
             <!-- Top-View Schematic Bed Tiles (Dynamic Capacity 1, 2, 4, 8, 12) -->
             <div class="bed-workspace-grid">
-              {% for bed in rdata.beds %} {% if bed.is_available %} {% if
-              can_select_beds %}
+              {% for bed in rdata.beds %}
+              {% if bed.is_available %}
+              {% if can_select_beds %}
               <!-- Available Bed (Interactive) -->
               <button
                 type="button"
@@ -415,22 +414,12 @@ breadcrumb_current %}{{ hostel.name }}{% endblock %} {% block content %}
                   >Locked</span
                 >
               </div>
-              {% endif %} {% elif bed.is_occupied %}
+              {% endif %}
+              {% elif bed.is_occupied %}
               <!-- Occupied Bed (Privacy Protected) -->
               <div
                 class="bed-tile state-occupied"
-                {%
-                if
-                can_view_student_details
-                and
-                bed.occupant_reg
-                %}title="Resident: {{ bed.occupant_name }} ({{ bed.occupant_reg }})"
-                {%
-                else
-                %}title="Occupied bed"
-                {%
-                endif
-                %}
+                {% if can_view_student_details and bed.occupant_reg %}title="Resident: {{ bed.occupant_name }} ({{ bed.occupant_reg }})"{% else %}title="Occupied bed"{% endif %}
               >
                 <div class="bed-graphic">
                   <div class="bed-pillow"></div>

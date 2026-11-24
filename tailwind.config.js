@@ -9,28 +9,28 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          50: '#F0FDFA',
-          100: '#CCFBF1',
-          200: '#99F6E4',
-          300: '#5EEAD4',
-          400: '#2DD4BF',
-          500: '#14B8A6',
-          600: '#0D9488',
-          700: '#0F766E', // Primary
-          800: '#115E59', // Primary hover
-          900: '#134E4A',
-          950: '#042F2E',
+          50: '#FAF4EB',
+          100: '#F5EBDD',
+          200: '#E8DED4',
+          300: '#D5C2B1',
+          400: '#A88D7E',
+          500: '#8A7B72',
+          600: '#702C3B',
+          700: '#702C3B',
+          800: '#57212E',
+          900: '#49372F',
+          950: '#230E14',
         },
         accent: {
-          500: '#6366F1',
-          600: '#4F46E5',
+          500: '#702C3B',
+          600: '#57212E',
         },
         surface: {
-          bg: '#F8FAFC',
+          bg: '#F5EBDD',
           card: '#FFFFFF',
-          border: '#E2E8F0',
-          heading: '#0F172A',
-          secondary: '#64748B',
+          border: '#E8DED4',
+          heading: '#49372F',
+          secondary: '#8A7B72',
         },
         coffee: {
           50: '#FDFBF7',

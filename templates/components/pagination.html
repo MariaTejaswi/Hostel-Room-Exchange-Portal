@@ -1,6 +1,6 @@
 {% if page_obj and page_obj.has_other_pages %}
-<div class="flex items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6 rounded-b-xl">
-    <div class="flex flex-1 justify-between sm:hidden">
+<div class="flex flex-col gap-3 border-t border-[#E8DED4] bg-white px-4 py-3 sm:px-6 rounded-b-xl sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex w-full justify-between sm:hidden">
         {% if page_obj.has_previous %}
         <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="btn-secondary btn-sm">Previous</a>
         {% else %}

@@ -11,18 +11,31 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function openSidebar() {
     if (sidebar) sidebar.classList.add("mobile-open");
+    if (sidebar) sidebar.style.transform = "translateX(0)";
     if (sidebarBackdrop) sidebarBackdrop.classList.remove("hidden");
+    if (sidebarToggle) sidebarToggle.setAttribute("aria-expanded", "true");
+    document.body.classList.add("sidebar-drawer-open");
+    if (sidebar) {
+      const firstLink = sidebar.querySelector("a");
+      if (firstLink) firstLink.focus();
+    }
   }
 
   function closeSidebar() {
     if (sidebar) sidebar.classList.remove("mobile-open");
+    if (sidebar) {
+      sidebar.style.transform = window.innerWidth < 1024 ? "translateX(-100%)" : "translateX(0)";
+    }
     if (sidebarBackdrop) sidebarBackdrop.classList.add("hidden");
+    if (sidebarToggle) sidebarToggle.setAttribute("aria-expanded", "false");
+    document.body.classList.remove("sidebar-drawer-open");
   }
 
   if (sidebarToggle) {
     sidebarToggle.addEventListener("click", function (e) {
       e.stopPropagation();
-      openSidebar();
+      if (sidebar && sidebar.classList.contains("mobile-open")) closeSidebar();
+      else openSidebar();
     });
   }
 
@@ -68,6 +81,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") {
+      if (sidebar && sidebar.classList.contains("mobile-open")) {
+        closeSidebar();
+        if (sidebarToggle) sidebarToggle.focus();
+      }
       if (userMenuDropdown) userMenuDropdown.classList.add("hidden");
       if (notifDropdown) {
         notifDropdown.classList.add("hidden");
@@ -75,6 +92,18 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
   });
+
+  window.addEventListener("resize", function () {
+    closeSidebar();
+  });
+
+  if (sidebar) {
+    sidebar.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", function () {
+        if (window.innerWidth < 1024) closeSidebar();
+      });
+    });
+  }
 
   // 3. Password visibility toggle
   const togglePasswordBtns = document.querySelectorAll("[data-toggle-password]");
@@ -145,11 +174,11 @@ document.addEventListener("DOMContentLoaded", function () {
       // Update button active state
       const siblingBtns = this.parentElement.querySelectorAll("[data-card-filter]");
       siblingBtns.forEach((b) => {
-        b.classList.remove("bg-teal-700", "text-white", "shadow-sm");
+        b.classList.remove("bg-[#702C3B]", "bg-teal-700", "text-white", "shadow-sm");
         b.classList.add("bg-white", "text-slate-600", "hover:bg-slate-50");
       });
       this.classList.remove("bg-white", "text-slate-600", "hover:bg-slate-50");
-      this.classList.add("bg-teal-700", "text-white", "shadow-sm");
+      this.classList.add("bg-[#702C3B]", "text-white", "shadow-sm");
 
       // Filter cards
       const cards = grid.querySelectorAll("[data-category]");

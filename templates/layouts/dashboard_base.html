@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block body %}
-<div class="min-h-screen flex warden-shell roomloop-dashboard-shell {% if is_student %}student-shell{% endif %}" style="background-color: #FAF6F0;">
+<div class="min-h-screen flex warden-shell roomloop-dashboard-shell {% if is_student %}student-shell{% endif %}" style="background-color: #F5EBDD;">
     <!-- Mobile Sidebar Backdrop -->
     <div id="sidebar-backdrop" class="hidden fixed inset-0 bg-[#1F1412]/50 backdrop-blur-xs z-30 lg:hidden transition-opacity"></div>
 
@@ -15,7 +15,7 @@
         <header class="topbar h-14 bg-white border-b border-[#E8DED4] px-4 sm:px-6 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
             <!-- Left Section: Hamburger (mobile) + Breadcrumbs -->
             <div class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 mr-3">
-                <button id="mobile-sidebar-toggle" type="button" class="lg:hidden p-1.5 rounded-lg text-[#73665E] hover:text-[#35251F] hover:bg-[#FAF4EB] transition-colors focus:outline-none focus:ring-2 focus:ring-[#702C3B]/30 flex-shrink-0" aria-label="Open Navigation Menu">
+                <button id="mobile-sidebar-toggle" type="button" class="lg:hidden p-1.5 rounded-lg text-[#73665E] hover:text-[#35251F] hover:bg-[#FAF4EB] transition-colors focus:outline-none focus:ring-2 focus:ring-[#702C3B]/30 flex-shrink-0" aria-label="Open Navigation Menu" aria-controls="app-sidebar" aria-expanded="false">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
 

@@ -1,18 +1,18 @@
-<header class="h-14 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-20">
+<header class="h-14 bg-white border-b border-[#E8DED4] px-4 sm:px-6 flex items-center justify-between sticky top-0 z-20">
     <!-- Left Section: Hamburger (mobile) + Breadcrumbs -->
     <div class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 mr-3">
-        <button id="mobile-sidebar-toggle" type="button" class="lg:hidden p-1.5 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-600/30 flex-shrink-0" aria-label="Open Navigation Menu">
+        <button id="mobile-sidebar-toggle" type="button" class="lg:hidden p-1.5 rounded-md text-[#8A7B72] hover:text-[#49372F] hover:bg-[#FAF4EB] transition-colors focus:outline-none focus:ring-2 focus:ring-[#702C3B]/30 flex-shrink-0" aria-label="Open Navigation Menu">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
 
         <div class="flex items-center gap-2 text-xs sm:text-sm min-w-0">
-            <a href="{% url 'accounts:dashboard' %}" class="text-slate-500 hover:text-teal-700 font-medium transition-colors flex-shrink-0">
+            <a href="{% url 'accounts:dashboard' %}" class="text-[#8A7B72] hover:text-[#702C3B] font-medium transition-colors flex-shrink-0">
                 <span class="hidden sm:inline">RoomLoop</span>
                 <span class="sm:hidden">RL</span>
             </a>
-            <span class="text-slate-300 flex-shrink-0">/</span>
+            <span class="text-[#E8DED4] flex-shrink-0">/</span>
             {% block breadcrumbs %}
-            <span class="text-slate-900 font-semibold truncate">{% block breadcrumb_current %}Dashboard{% endblock %}</span>
+            <span class="text-[#49372F] font-semibold truncate">{% block breadcrumb_current %}Dashboard{% endblock %}</span>
             {% endblock %}
         </div>
     </div>
@@ -20,31 +20,31 @@
     <!-- Right Section: Role pill + User Menu -->
     <div class="flex items-center gap-2.5 sm:gap-3 flex-shrink-0">
         <!-- Role Indicator Pill with SVG Icon -->
-        <div class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold">
-            <span class="w-2 h-2 rounded-full bg-teal-600"></span>
+        <div class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FAF4EB] border border-[#E8DED4] text-[#49372F] text-xs font-semibold">
+            <span class="w-2 h-2 rounded-full bg-[#702C3B]"></span>
             <span>{{ user_role_label|default:user_role }}</span>
         </div>
 
         <!-- User Dropdown Menu -->
         <div class="relative">
-            <button id="user-menu-button" type="button" class="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-600/30 group" aria-expanded="false" aria-haspopup="true">
-                <div class="w-7 h-7 rounded bg-teal-700 text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
+            <button id="user-menu-button" type="button" class="flex items-center gap-2 p-1 rounded-lg hover:bg-[#FAF4EB] transition-colors focus:outline-none focus:ring-2 focus:ring-[#702C3B]/30 group" aria-expanded="false" aria-haspopup="true">
+                <div class="w-7 h-7 rounded bg-[#702C3B] text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
                     {{ request.user.full_name|slice:":2"|upper }}
                 </div>
                 <div class="hidden md:block text-left text-xs pr-1">
-                    <span class="font-medium text-slate-900 block leading-tight truncate max-w-[120px]">{{ request.user.full_name }}</span>
+                    <span class="font-medium text-[#49372F] block leading-tight truncate max-w-[120px]">{{ request.user.full_name }}</span>
                 </div>
-                <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                <svg class="w-3.5 h-3.5 text-[#8A7B72] group-hover:text-[#49372F] transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
 
             <!-- Dropdown Content -->
-            <div id="user-menu-dropdown" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-30">
-                <div class="px-4 py-2.5 border-b border-slate-100 bg-slate-50/50">
-                    <p class="text-xs font-semibold text-slate-900 truncate">{{ request.user.full_name }}</p>
-                    <p class="text-[11px] text-slate-500 truncate">{{ request.user.email }}</p>
-                    <div class="mt-1.5 flex items-center justify-between text-[10px] text-slate-500">
+            <div id="user-menu-dropdown" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-[#E8DED4] py-1.5 z-30">
+                <div class="px-4 py-2.5 border-b border-[#E8DED4] bg-[#FAF4EB]/50">
+                    <p class="text-xs font-semibold text-[#49372F] truncate">{{ request.user.full_name }}</p>
+                    <p class="text-[11px] text-[#8A7B72] truncate">{{ request.user.email }}</p>
+                    <div class="mt-1.5 flex items-center justify-between text-[10px] text-[#8A7B72]">
                         <span>Role:</span>
-                        <span class="font-medium text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                        <span class="font-medium text-[#702C3B] bg-[#FAF4EB] px-2 py-0.5 rounded border border-[#E8DED4]">
                             {{ user_role }}
                         </span>
                     </div>
